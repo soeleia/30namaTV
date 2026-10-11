@@ -1,6 +1,6 @@
 # 30namaTV branding provenance
 
-The user requested the original 30nama logo and loading animation from `30tv-3.2.3.apk`, plus the exact display name `30namaTV`. The application ID remains `com.doxigo.tv30` so existing installations can update.
+The user requested the original 30nama logo and loading animation from `30tv-3.2.3.apk`, the display name `30namaTV`, and distinct launcher artwork for this unofficial client. The application ID remains `com.doxigo.tv30` so existing installations can update.
 
 Source APK SHA-256: `569ea759f3366aa994bad67b40c1e209d36e0b7a73fe4afd12628722ffcc20e9`.
 
@@ -26,21 +26,15 @@ Source SHA-256: `67cf43d7bb2214288574327fbd1c1e499fc2fda2c2d3a97ee4fc9748fa3ca08
 
 Shipping SHA-256: `6be49139e36a46942a2bf1c318da390147dccff63499675883483f80161bab1f`.
 
-### drawable-nodpi/nama_tv_banner.png
+### Launcher banner and icons
 
-Source entry: `res/sQ.png`. Original 320x180 banner copied unchanged.
+The launcher artwork is an adaptation, not a copy of the official app thumbnail. The original film-cube identity is retained on a warm white tile with a red TV badge. The in-app logos and original motion stay unchanged.
 
-Source SHA-256: `5a93fc930cf5a746d980cd5c9b08c1cf9ac720d4374ac3ffb8c1148d59467704`.
+The built-in imagegen tool generated the two source images in `docs/branding/`. Prompt for the banner: "Keep the original red film-cube identity, use a warm off-white background and dark 30NAMA wordmark, replace androidtv with a red TV badge, and make a clean 16:9 launcher tile without shadows or extra text." Prompt for the icon: "Keep the original film-cube identity on a warm off-white square, add a centered red TV badge beneath the cube, and use simple shapes that remain legible at 48 pixels."
 
-Shipping SHA-256: `5a93fc930cf5a746d980cd5c9b08c1cf9ac720d4374ac3ffb8c1148d59467704`.
+`sips` resized the sources into Android resources. The TV banner is 320x180. Legacy icons use Android's standard 48/72/96/144/192-pixel sizes. Android 8 and newer use an adaptive icon with a 22% foreground inset so the logo and badge fit launcher masks.
 
-### mipmap-mdpi/ic_nama.png
-
-Source entry: `res/u3.png`. Original launcher copied unchanged; all five APK density variants are included.
-
-Source SHA-256: `f2fb60c30b00e0c5ac2df4dbc1ef10fc36b0e7855b45c68da858677c7fbfc8e8`.
-
-Shipping SHA-256: `f2fb60c30b00e0c5ac2df4dbc1ef10fc36b0e7855b45c68da858677c7fbfc8e8`.
+![Distinct 30namaTV launcher banner](branding/launcher-banner.png)
 
 ### raw/nama_motion.mp4
 
@@ -58,14 +52,14 @@ Reference PNG SHA-256: `a4c199b1cdc951873c863c3dc597d95345d1d560e3ea4ae9ff37c6a6
 
 ![Original motion logo at one second](branding/original-motion-1s.png)
 
-## Original launcher density variants
+## Launcher resource checksums
 
-All are copied byte-for-byte from the supplied APK.
-
-| Density | APK entry | Shipping resource | SHA-256 |
-| --- | --- | --- | --- |
-| mdpi | `res/u3.png` | `mipmap-mdpi/ic_nama.png` | `f2fb60c30b00e0c5ac2df4dbc1ef10fc36b0e7855b45c68da858677c7fbfc8e8` |
-| hdpi | `res/SD.png` | `mipmap-hdpi/ic_nama.png` | `f2fb60c30b00e0c5ac2df4dbc1ef10fc36b0e7855b45c68da858677c7fbfc8e8` |
-| xhdpi | `res/jy.png` | `mipmap-xhdpi/ic_nama.png` | `f2fb60c30b00e0c5ac2df4dbc1ef10fc36b0e7855b45c68da858677c7fbfc8e8` |
-| xxhdpi | `res/D2.png` | `mipmap-xxhdpi/ic_nama.png` | `f2fb60c30b00e0c5ac2df4dbc1ef10fc36b0e7855b45c68da858677c7fbfc8e8` |
-| xxxhdpi | `res/CG.png` | `mipmap-xxxhdpi/ic_nama.png` | `f2fb60c30b00e0c5ac2df4dbc1ef10fc36b0e7855b45c68da858677c7fbfc8e8` |
+| Resource | SHA-256 |
+| --- | --- |
+| `drawable-nodpi/nama_tv_banner.png` | `c5541dc751f0bc2210a3158d000c474902dfbe1619507a2b577be16d36a91f00` |
+| `drawable-nodpi/nama_icon.png` | `e4eb064347d4b008f471c200e31a4775aa36d6cce9a38b88a7c46596bd85fb7a` |
+| `mipmap-mdpi/ic_nama.png` | `e374be701b2d6f989bdb711c924a3d72dbf0e38c3f0f8193be926c92e0a6aa52` |
+| `mipmap-hdpi/ic_nama.png` | `9171fa98473f7f583f489314cf6873b3da84b8f29ddbcb268bbfeeabe5225c4e` |
+| `mipmap-xhdpi/ic_nama.png` | `a2772ab0ffe3b5112a7016cf7df3bed40542bfce09c5c634a68d10d96e649d1e` |
+| `mipmap-xxhdpi/ic_nama.png` | `f5cd2ba889c86efb968466803009e5c495ef770ed0d7721d3f4914b941705b54` |
+| `mipmap-xxxhdpi/ic_nama.png` | `a128d3f57d1c18f79c35186f6dd7a6e75c84bfc51b2fc79799e57758a600e0fe` |

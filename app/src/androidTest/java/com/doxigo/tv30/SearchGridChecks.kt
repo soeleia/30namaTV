@@ -13,6 +13,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.TextView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.leanback.widget.VerticalGridView
 import androidx.leanback.widget.ItemBridgeAdapter
 import okhttp3.FormBody
@@ -85,16 +87,12 @@ object SearchGridChecks {
                 runOnMainSync {
                     check(editor.hasFocus()) { "Search stopped opening on the keyboard" }
                     check(grid.verticalSpacing == (POSTER_GRID_ROW_SPACING_DP * host.resources.displayMetrics.density).toInt())
-                    host.getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(editor.windowToken, 0)
                 }
-                waitForIdleSync()
-                SystemClock.sleep(300)
-                var dismissedIntoResults = false
-                runOnMainSync { dismissedIntoResults = grid.hasFocus() }
-                if (!dismissedIntoResults) press(KeyEvent.KEYCODE_DPAD_DOWN)
-                await("Down or keyboard dismissal did not reach search results", detail = {
-                    "grid.hasFocus=${grid.hasFocus()}, selectedPosition=${grid.selectedPosition}, focus=${host.currentFocus?.javaClass?.simpleName}, focusId=${host.currentFocus?.id}"
-                }) { grid.hasFocus() && grid.selectedPosition >= 0 }
+                await("Search keyboard did not appear") { keyboardVisible(host) }
+                press(KeyEvent.KEYCODE_BACK)
+                await("Keyboard dismissal did not reach search results", detail = {
+                    "ime=${keyboardVisible(host)}, windowFocus=${host.hasWindowFocus()}, grid.hasFocus=${grid.hasFocus()}, selectedPosition=${grid.selectedPosition}, focus=${host.currentFocus?.javaClass?.simpleName}, focusId=${host.currentFocus?.id}"
+                }) { !keyboardVisible(host) && grid.hasFocus() && grid.selectedPosition >= 0 }
                 var landing = 0
                 runOnMainSync { landing = grid.selectedPosition }
                 press(KeyEvent.KEYCODE_DPAD_DOWN)
@@ -116,6 +114,19 @@ object SearchGridChecks {
                 await("Rail did not return to the search card") { grid.hasFocus() && grid.selectedPosition == 0 }
                 press(KeyEvent.KEYCODE_DPAD_UP)
                 await("Up from search first row did not return to the editor") { editor.hasFocus() }
+                await("Search keyboard did not reopen") { keyboardVisible(host) }
+                runOnMainSync {
+                    host.getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(editor.windowToken, 0)
+                }
+                await("Search keyboard did not hide before Down") { !keyboardVisible(host) }
+                var dismissedIntoResults = false
+                runOnMainSync { dismissedIntoResults = grid.hasFocus() }
+                if (!dismissedIntoResults) press(KeyEvent.KEYCODE_DPAD_DOWN)
+                await("Down after keyboard dismissal did not reach search results", detail = {
+                    "ime=${keyboardVisible(host)}, windowFocus=${host.hasWindowFocus()}, touchMode=${editor.isInTouchMode}, grid.hasFocus=${grid.hasFocus()}, focus=${host.currentFocus?.javaClass?.simpleName}"
+                }) { grid.hasFocus() }
+                press(KeyEvent.KEYCODE_DPAD_UP)
+                await("Up did not return to typing") { editor.hasFocus() }
 
                 text(editor, "alpha")
                 SystemClock.sleep(100)
@@ -213,6 +224,9 @@ object SearchGridChecks {
 
     private fun field(instance: Any, name: String): Any? =
         instance.javaClass.getDeclaredField(name).apply { isAccessible = true }.get(instance)
+
+    private fun keyboardVisible(host: Activity) =
+        ViewCompat.getRootWindowInsets(host.window.decorView)?.isVisible(WindowInsetsCompat.Type.ime()) == true
 
     private fun Instrumentation.text(editor: TextView, value: String) {
         runOnMainSync { editor.requestFocus(); editor.text = value }

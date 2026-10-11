@@ -155,14 +155,21 @@ object TrailerChecks {
             foreground = startActivitySync(Intent(targetContext, SettingsActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as SettingsActivity
             await("Settings did not take foreground focus") { foreground?.hasWindowFocus() == true }
-            fun playbackState() = "state=${player.playbackState}, playWhenReady=${player.playWhenReady}, isPlaying=${player.isPlaying}, lifecycle=${host.lifecycle.currentState}, windowFocus=${host.hasWindowFocus()}, focused=${host.currentFocus?.javaClass?.simpleName}"
+            fun playbackState() = "state=${player.playbackState}, playWhenReady=${player.playWhenReady}, isPlaying=${player.isPlaying}, position=${player.currentPosition}, bufferedMs=${player.totalBufferedDuration}, suppression=${player.playbackSuppressionReason}, error=${player.playerError?.errorCodeName}, lifecycle=${host.lifecycle.currentState}, windowFocus=${host.hasWindowFocus()}, focused=${host.currentFocus?.javaClass?.simpleName}"
             await("Background trailer kept loading or playing", details = ::playbackState) {
                 !host.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) && player.playbackState == Player.STATE_IDLE && !player.playWhenReady && !player.isPlaying
             }
             runOnMainSync { foreground?.finish() }
             foreground = null
-            await("Returning to the trailer did not resume", details = ::playbackState) {
-                host.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) && host.hasWindowFocus() && player.isPlaying
+            // stop()/prepare() refetches public HLS, so allow the initial playback network budget.
+            await("Returning to the trailer did not resume", if (publicPlayed) 40_000 else 7_000, details = ::playbackState) {
+                host.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) && host.hasWindowFocus() &&
+                    player.playbackState == Player.STATE_READY && player.isPlaying
+            }
+            var resumedAt = 0L
+            runOnMainSync { resumedAt = player.currentPosition }
+            await("Resumed trailer position did not advance", details = ::playbackState) {
+                player.isPlaying && player.currentPosition >= resumedAt + 500
             }
             close()
 

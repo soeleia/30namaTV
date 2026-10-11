@@ -123,6 +123,7 @@ object IntroChecks {
             check(viewport.intersect(visible)) { "Intro did not intersect the visible window: $viewport / $visible" }
             check(viewport.intersect(bars.left, bars.top, pixels.width - bars.right, pixels.height - bars.bottom)) { "Intro did not fit outside system bars: $viewport / $bars" }
             val logo = Rect(viewport.right, viewport.bottom, viewport.left, viewport.top)
+            val loadingInk = Rect(loading.right, loading.bottom, loading.left, loading.top)
             val gap = (16 * host.resources.displayMetrics.density).toInt()
             var symbolBottom = viewport.top
             for (y in viewport.top until viewport.bottom step 2) {
@@ -132,6 +133,12 @@ object IntroChecks {
                     val green = color shr 8 and 255
                     val blue = color and 255
                     if (red > 60 && red > green * 1.7f && red > blue * 1.4f) symbolBottom = maxOf(symbolBottom, y + 1)
+                    if (loading.contains(x, y) && minOf(red, green, blue) > 120) {
+                        loadingInk.left = minOf(loadingInk.left, x)
+                        loadingInk.top = minOf(loadingInk.top, y)
+                        loadingInk.right = maxOf(loadingInk.right, x + 1)
+                        loadingInk.bottom = maxOf(loadingInk.bottom, y + 1)
+                    }
                     if (y >= loading.top - gap || maxOf(red, green, blue) < 60) continue
                     logo.left = minOf(logo.left, x)
                     logo.top = minOf(logo.top, y)
@@ -142,7 +149,8 @@ object IntroChecks {
             check(logo.width() > viewport.width() * .5f && logo.height() > viewport.height() * .2f) { "Final loading logo was not rendered: $logo" }
             check(logo.top >= viewport.top + viewport.height() * .05f) { "Loading logo was cropped at the top: $logo / viewport=$viewport, visible=$visible, bars=$bars" }
             check(logo.left >= viewport.left + viewport.width() * .05f && logo.right <= viewport.right - viewport.width() * .05f) { "Loading logo exceeded the viewport: $logo" }
-            check(symbolBottom > viewport.top && symbolBottom + gap < loading.top) { "Loading text overlapped the logo: bottom=$symbolBottom / $loading" }
+            check(loadingInk.width() > loading.width() * .4f && loadingInk.height() > loading.height() * .2f) { "Loading text did not render: $loadingInk / $loading" }
+            check(symbolBottom > viewport.top && symbolBottom + gap <= loadingInk.top) { "Loading text overlapped the logo: bottom=$symbolBottom / ink=$loadingInk / view=$loading" }
         } finally {
             pixels.recycle()
         }

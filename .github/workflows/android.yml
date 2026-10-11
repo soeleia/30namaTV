@@ -73,6 +73,13 @@ jobs:
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then
             test -f .signing/release.jks
           fi
+          python3 - <<'PY'
+          import os, re, subprocess
+          if os.environ['GITHUB_REF'].startswith('refs/tags/'):
+              badging = subprocess.check_output([os.environ['ANDROID_HOME'] + '/build-tools/37.0.0/aapt2', 'dump', 'badging', 'dist/30namaTV.apk'], text=True)
+              version = re.search(r"versionName='([^']+)'", badging).group(1)
+              assert os.environ['GITHUB_REF_NAME'] == 'v' + version, 'Release tag must match the APK versionName'
+          PY
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: optimized-apk

@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Run isolated native TV regressions and collect their screenshots."""
 import argparse
+import io
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import subprocess
 import sys
+import tarfile
+import tempfile
 
 CHECKS = ("performance", "intro", "controls", "alignment", "subtitles", "skip", "title", "lists", "search", "genres", "trailer", "updates")
 
@@ -13,6 +16,20 @@ CHECKS = ("performance", "intro", "controls", "alignment", "subtitles", "skip", 
 def passed(output):
     return bool(re.search(r"^INSTRUMENTATION_CODE: -1\s*$", output, re.M)
                 and re.search(r"^INSTRUMENTATION_RESULT: stream=PASS:", output, re.M))
+
+
+def extract_reports(payload, destination):
+    with tarfile.open(fileobj=io.BytesIO(payload)) as archive:
+        for member in archive:
+            path = PurePosixPath(member.name)
+            if path.is_absolute() or ".." in path.parts:
+                raise ValueError(f"Unsafe report path: {member.name}")
+            if not member.isfile() or path.suffix not in (".png", ".xml", ".txt"):
+                continue
+            target = destination.joinpath(*path.parts)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with archive.extractfile(member) as source:
+                target.write_bytes(source.read())
 
 
 def main():
@@ -28,7 +45,19 @@ def main():
         assert not passed("INSTRUMENTATION_STATUS: stream=PUBLIC PASS: video\nINSTRUMENTATION_CODE: 0\n")
         assert not passed("INSTRUMENTATION_RESULT: stream=AssertionError\nINSTRUMENTATION_CODE: -1\n")
         assert not passed("INSTRUMENTATION_FAILED: Process crashed.\n")
-        print("PASS: instrumentation result validation")
+        for name, safe in (("./fixture.png", True), ("../outside.png", False)):
+            payload = io.BytesIO()
+            with tarfile.open(fileobj=payload, mode="w") as archive:
+                entry = tarfile.TarInfo(name)
+                entry.size = 5
+                archive.addfile(entry, io.BytesIO(b"proof"))
+            with tempfile.TemporaryDirectory() as folder:
+                try:
+                    extract_reports(payload.getvalue(), Path(folder))
+                    assert safe and (Path(folder) / "fixture.png").read_bytes() == b"proof"
+                except ValueError:
+                    assert not safe
+        print("PASS: instrumentation result validation and scoped-storage report extraction")
         return 0
     if not args.serial:
         parser.error("--serial is required: choose a disposable emulator, never a signed-in TV")
@@ -63,7 +92,15 @@ def main():
             failed.append(check)
     screenshots = args.output / "screenshots"
     screenshots.mkdir(exist_ok=True)
-    subprocess.run(adb + ["pull", "/sdcard/Android/data/com.doxigo.tv30/files/.", str(screenshots)], timeout=60)
+    reports = subprocess.run(adb + ["exec-out", "run-as", "com.doxigo.tv30", "tar", "-C",
+                             "/sdcard/Android/data/com.doxigo.tv30/files", "-cf", "-", "."],
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
+    if reports.returncode == 0:
+        extract_reports(reports.stdout, screenshots)
+    else:
+        message = reports.stderr.decode(errors="replace")
+        (args.output / "screenshot-extraction.txt").write_text(message)
+        print("Screenshot extraction failed: " + message, file=sys.stderr)
     with (args.output / "device.txt").open("w") as device:
         subprocess.run(adb + ["shell", "getprop"], stdout=device, check=True, timeout=15)
     if failed:

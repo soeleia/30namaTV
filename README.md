@@ -56,20 +56,14 @@ Use a disposable emulator. Fixture checks replace local preferences and use mock
 
 The trailer check attempts the public Animals trailer. If its CDN is unreachable, logs state `PUBLIC_UNAVAILABLE` and use a silence fixture for interaction/lifecycle checks. That result does not certify live CDN playback.
 
-GitHub Actions runs the instrumented debug APK on an Android 11 TV emulator with two cores and 1.5 GB RAM. The optimized release APK also passes build, full lint, signature and ZIP alignment checks. Each run uploads APKs, lint/unit-test reports, instrumentation logs and screenshots. See [setup and release instructions](docs/setup.md) and [manual Sony TV checks](docs/testing.md). Emulator timing does not establish performance on a 2017 Sony TV.
+GitHub Actions runs the instrumented debug APK on an Android 11 TV emulator with two cores and 1.5 GB RAM. The optimized release APK also passes build, full lint, signature and ZIP alignment checks. Each run uploads APKs, lint/unit-test reports, instrumentation logs and screenshots. See [setup and release instructions](docs/setup.md) and [manual Sony TV checks](docs/testing.md) and [performance evidence](docs/performance.md). Emulator timing does not establish performance on a 2017 Sony TV.
 
 ## Interface
 
-![Original 30nama loading screen](docs/screenshots/loading.png)
+![Home with loaded artwork](docs/screenshots/home-fa.png)
 
-![Vertical search results](docs/screenshots/search-grid-fa.png)
+![Real Friends search results](docs/screenshots/search-friends-fa.png)
 
-![Genre page](docs/screenshots/genres-fa.png)
+![Movies catalogue with loaded posters](docs/screenshots/catalogue-movies-fa.png)
 
-![My Lists](docs/screenshots/my-lists-fa.png)
-
-![App update ready for installation](docs/screenshots/updates-fa.png)
-
-![Centered Persian subtitles above player controls](docs/screenshots/subtitles-controls-fa.png)
-
-Screenshots use test fixtures, not private account data. The original logo and loading animation are documented in [branding provenance](docs/branding.md). 30nama branding and third-party font licenses retain their respective owners' rights; publishing this client does not imply affiliation or a license to reuse those assets separately.
+Screenshots show the optimized release browsing the live catalogue as a guest on a disposable emulator, after artwork loaded. They contain no mocked results or private account data. The emulator's status bar is visible; these are unmodified captures, not photos of a physical TV. The original logo and loading animation are documented in [branding provenance](docs/branding.md). 30nama branding and third-party font licenses retain their respective owners' rights; publishing this client does not imply affiliation or a license to reuse those assets separately.
