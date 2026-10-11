@@ -93,7 +93,7 @@ object ListsChecks {
                         check((link.background.current as GradientDrawable).color?.defaultColor == host.getColor(R.color.text))
                     }
                     val screenshot = checkNotNull(uiAutomation.takeScreenshot())
-                    File(targetContext.getExternalFilesDir(null), "lists-$language-$scale-$i.png").outputStream().use {
+                    File(targetContext.filesDir, "lists-$language-$scale-$i.png").outputStream().use {
                         screenshot.compress(Bitmap.CompressFormat.PNG, 100, it)
                     }
                     screenshot.recycle()

@@ -19,6 +19,7 @@ def passed(output):
 
 
 def extract_reports(payload, destination):
+    screenshots = 0
     with tarfile.open(fileobj=io.BytesIO(payload)) as archive:
         for member in archive:
             path = PurePosixPath(member.name)
@@ -29,7 +30,15 @@ def extract_reports(payload, destination):
             target = destination.joinpath(*path.parts)
             target.parent.mkdir(parents=True, exist_ok=True)
             with archive.extractfile(member) as source:
-                target.write_bytes(source.read())
+                data = source.read()
+            if path.suffix == ".png":
+                if not data.startswith(b"\x89PNG\r\n\x1a\n"):
+                    raise ValueError(f"Invalid screenshot: {member.name}")
+                screenshots += 1
+            target.write_bytes(data)
+    if screenshots == 0:
+        raise ValueError("No PNG screenshots were collected")
+    return screenshots
 
 
 def main():
@@ -46,18 +55,27 @@ def main():
         assert not passed("INSTRUMENTATION_RESULT: stream=AssertionError\nINSTRUMENTATION_CODE: -1\n")
         assert not passed("INSTRUMENTATION_FAILED: Process crashed.\n")
         for name, safe in (("./fixture.png", True), ("../outside.png", False)):
+            image = b"\x89PNG\r\n\x1a\nproof"
             payload = io.BytesIO()
             with tarfile.open(fileobj=payload, mode="w") as archive:
                 entry = tarfile.TarInfo(name)
-                entry.size = 5
-                archive.addfile(entry, io.BytesIO(b"proof"))
+                entry.size = len(image)
+                archive.addfile(entry, io.BytesIO(image))
             with tempfile.TemporaryDirectory() as folder:
                 try:
-                    extract_reports(payload.getvalue(), Path(folder))
-                    assert safe and (Path(folder) / "fixture.png").read_bytes() == b"proof"
+                    assert extract_reports(payload.getvalue(), Path(folder)) == 1
+                    assert safe and (Path(folder) / "fixture.png").read_bytes() == image
                 except ValueError:
                     assert not safe
-        print("PASS: instrumentation result validation and scoped-storage report extraction")
+        for payload in (b"tar: Permission denied\n", bytes(1024)):
+            with tempfile.TemporaryDirectory() as folder:
+                try:
+                    extract_reports(payload, Path(folder))
+                except (tarfile.TarError, ValueError):
+                    pass
+                else:
+                    raise AssertionError("Invalid or empty report archive was accepted")
+        print("PASS: instrumentation results, internal report extraction, PNG evidence and invalid archive rejection")
         return 0
     if not args.serial:
         parser.error("--serial is required: choose a disposable emulator, never a signed-in TV")
@@ -92,15 +110,18 @@ def main():
             failed.append(check)
     screenshots = args.output / "screenshots"
     screenshots.mkdir(exist_ok=True)
-    reports = subprocess.run(adb + ["exec-out", "run-as", "com.doxigo.tv30", "tar", "-C",
-                             "/sdcard/Android/data/com.doxigo.tv30/files", "-cf", "-", "."],
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
-    if reports.returncode == 0:
-        extract_reports(reports.stdout, screenshots)
-    else:
-        message = reports.stderr.decode(errors="replace")
+    try:
+        reports = subprocess.run(adb + ["shell", "-T", "run-as", "com.doxigo.tv30", "tar", "-C", "files", "-cf", "-", "."],
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
+        if reports.returncode != 0:
+            raise RuntimeError(f"Remote tar exited {reports.returncode}: {reports.stderr.decode(errors='replace').strip()}")
+        count = extract_reports(reports.stdout, screenshots)
+        print(f"Collected {count} PNG screenshots", flush=True)
+    except (subprocess.TimeoutExpired, tarfile.TarError, ValueError, OSError, RuntimeError) as error:
+        message = f"Internal screenshot collection failed: {error}"
         (args.output / "screenshot-extraction.txt").write_text(message)
-        print("Screenshot extraction failed: " + message, file=sys.stderr)
+        print(message, file=sys.stderr)
+        failed.append("screenshots")
     with (args.output / "device.txt").open("w") as device:
         subprocess.run(adb + ["shell", "getprop"], stdout=device, check=True, timeout=15)
     if failed:

@@ -168,7 +168,7 @@ object IntroChecks {
     }
 
     private fun Instrumentation.save(pixels: Bitmap, name: String) {
-        File(targetContext.getExternalFilesDir(null), name).outputStream().use {
+        File(targetContext.filesDir, name).outputStream().use {
             pixels.compress(Bitmap.CompressFormat.PNG, 100, it)
         }
     }

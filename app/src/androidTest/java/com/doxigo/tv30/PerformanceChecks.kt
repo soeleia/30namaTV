@@ -164,7 +164,7 @@ class PerformanceChecks : Instrumentation() {
 
 internal fun Instrumentation.capture(name: String) {
     val screenshot = checkNotNull(uiAutomation.takeScreenshot())
-    File(targetContext.getExternalFilesDir(null), "$name.png").outputStream().use {
+    File(targetContext.filesDir, "$name.png").outputStream().use {
         screenshot.compress(Bitmap.CompressFormat.PNG, 100, it)
     }
     screenshot.recycle()

@@ -208,7 +208,7 @@ object UpdatesChecks {
     private fun Instrumentation.screenshot(name: String) {
         val pixels = checkNotNull(uiAutomation.takeScreenshot())
         try {
-            File(targetContext.getExternalFilesDir(null), name).outputStream().use { pixels.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            File(targetContext.filesDir, name).outputStream().use { pixels.compress(Bitmap.CompressFormat.PNG, 100, it) }
         } finally { pixels.recycle() }
     }
 

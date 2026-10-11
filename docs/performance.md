@@ -6,7 +6,7 @@ The local verification device is a disposable Android 9 arm64 emulator at 1920x1
 
 | Measurement | Observed value | Meaning |
 | --- | --- | --- |
-| APK size | 5,044,005 bytes | R8 and resource shrinking enabled; no native ABI libraries |
+| APK size | 5,044,021 bytes | R8 and resource shrinking enabled; no native ABI libraries |
 | Cold Activity launch (`am start -W`) | 662 ms | Activity launch only; excludes catalogue/image completion |
 | Guest home process PSS | 95.6 MiB | One settled home snapshot, not a long-session peak |
 | Software-rendered startup frames | 316/329 janky frames; median 32 ms | This emulator did not sustain 60 fps during startup; these timings cannot certify physical TV smoothness |
