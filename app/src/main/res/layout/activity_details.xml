@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Netflix's title page: the art behind, the names and facts over its dark side, the actions
+     under them. Seasons and cast wait below the actions (@dimen/details_rows_top) and rise when
+     the remote moves into them. The names and the meta line take the block's 600dp; the reading
+     lines under them keep to @dimen/details_text_width. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/ink">
+
+    <ImageView
+        android:id="@+id/backdrop"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:scaleType="centerCrop" />
+
+    <View
+        android:id="@+id/scrim_side"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <View
+        android:id="@+id/scrim_bottom"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <LinearLayout
+        android:id="@+id/billboard"
+        android:layout_width="600dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="56dp"
+        android:layout_marginTop="40dp"
+        android:orientation="vertical">
+
+        <include layout="@layout/billboard_names" />
+
+        <TextView
+            android:id="@+id/bb_meta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.App.Meta" />
+
+        <!-- The genres, then where the title is from after a hairline and a globe, on their own
+             quieter line under the facts (Meta.kt, genresLine). The view's grey is the genres'. -->
+        <TextView
+            android:id="@+id/genres"
+            android:layout_width="@dimen/details_text_width"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.App.Caption"
+            android:visibility="gone" />
+
+        <!-- An airing series' next episode: a fact worth a brighter line than the genres. -->
+        <TextView
+            android:id="@+id/next_air"
+            android:layout_width="@dimen/details_text_width"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.App.Caption"
+            android:textColor="@color/text_body"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/bb_plot"
+            android:layout_width="@dimen/details_text_width"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:ellipsize="end"
+            android:maxLines="3"
+            android:textAppearance="@style/TextAppearance.App.Synopsis" />
+
+        <TextView
+            android:id="@+id/credits"
+            android:layout_width="@dimen/details_text_width"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.App.Caption"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/actions"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:orientation="horizontal" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/rows"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+</FrameLayout>

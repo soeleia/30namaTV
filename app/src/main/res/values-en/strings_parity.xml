@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="exit_again">Press Back again to exit.</string>
+    <string name="persian_subtitle">Persian subtitles</string>
+    <!-- %s: the day, "Saturday, October 17", after the episode when the server names it. -->
+    <string name="next_air">Next episode: %s</string>
+    <string name="lists_empty_title">Your lists are empty</string>
+    <string name="lists_empty_hint">Add any title to your lists from its page.</string>
+    <string name="suggested_archive">Browse suggestions</string>
+    <string name="my_watchlist">My List</string>
+    <!-- %s: runtime's own words, "8m", "1h 5m". -->
+    <string name="time_left">%s left</string>
+</resources>

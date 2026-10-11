@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fa">
+    <!-- On the episode tile the remote would resume, over its red bar. -->
+    <string name="episode_watching">در حال تماشا</string>
+    <!-- What a screen reader says for the tile's number. -->
+    <string name="episode_numbered">قسمت %s</string>
+</resources>

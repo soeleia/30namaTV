@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The head of the Account panel: who this TV is signed in as and the plan it carries. Not a
+     row (nothing to press); the panel's one row, sign out, sits under it. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/settings_row_pad"
+    android:paddingTop="16dp"
+    android:paddingEnd="@dimen/settings_row_pad"
+    android:paddingBottom="20dp">
+
+    <!-- The name's first letter, or the account icon for a guest (set as the foreground). -->
+    <TextView
+        android:id="@+id/settings_avatar"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:background="@drawable/settings_disc"
+        android:foregroundGravity="center"
+        android:foregroundTint="@color/text_dim"
+        android:gravity="center"
+        android:importantForAccessibility="no"
+        android:includeFontPadding="false"
+        android:textAppearance="@style/TextAppearance.App.DialogTitle"
+        android:textSize="24sp" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/settings_account_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAlignment="viewStart"
+            android:textAppearance="@style/TextAppearance.App.DialogTitle"
+            android:textDirection="locale" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <!-- The plan: its colour's dot, then its name. -->
+            <TextView
+                android:id="@+id/settings_tier"
+                android:layout_width="wrap_content"
+                android:layout_height="24dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/settings_badge"
+                android:drawablePadding="6dp"
+                android:fontFamily="@font/vazirmatn_medium"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:textColor="@color/text_body"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/settings_days"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:textAppearance="@style/TextAppearance.App.Meta"
+                android:textSize="15sp" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The person page (PersonActivity): the header's portrait, beside a name set at up to 46sp.
+     Its rows sit where home's do, under @dimen/billboard_height. -->
+<resources>
+    <dimen name="person_portrait">148dp</dimen>
+</resources>

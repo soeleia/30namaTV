@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Button fills at rest: white laid over whatever is behind, so a button over art takes a
+     little of its tone rather than sitting on it as a grey slab. Never solid white: white is
+     focus, and a white Play beside a focused More would leave the viewer guessing which has
+     the remote. Over the billboard's scrim (at least 88% ink where buttons sit) white labels
+     keep 6.9:1 on the primary and 8.5:1 on the secondary even over a white frame of art. -->
+<resources>
+    <!-- Play / Resume: 25% white, the contract's idle grey (#4D4D4E) where it sits on ink. -->
+    <color name="button_primary">#40FFFFFF</color>
+    <!-- More, Check now, Guest, the round toggles, sort, dialogs. -->
+    <color name="button_secondary">#24FFFFFF</color>
+    <color name="button_disabled">#12FFFFFF</color>
+</resources>

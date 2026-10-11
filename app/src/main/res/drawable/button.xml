@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A secondary button: a pill of white over the art at rest, solid white under the remote, a
+     shade down while OK is held, faint when disabled. The fill fades as every control's does
+     (150 ms in, 100 ms out); the lift is button_lift's. Inset 2dp top and bottom: see
+     dimens_buttons.xml. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:insetTop="@dimen/button_inset" android:insetBottom="@dimen/button_inset">
+    <selector android:enterFadeDuration="150" android:exitFadeDuration="100">
+        <item android:state_enabled="false">
+            <shape><solid android:color="@color/button_disabled" /><corners android:radius="@dimen/button_radius" /></shape>
+        </item>
+        <item android:state_pressed="true">
+            <shape><solid android:color="@color/text_body" /><corners android:radius="@dimen/button_radius" /></shape>
+        </item>
+        <item android:state_focused="true">
+            <shape><solid android:color="@color/text" /><corners android:radius="@dimen/button_radius" /></shape>
+        </item>
+        <item>
+            <shape><solid android:color="@color/button_secondary" /><corners android:radius="@dimen/button_radius" /></shape>
+        </item>
+    </selector>
+</inset>

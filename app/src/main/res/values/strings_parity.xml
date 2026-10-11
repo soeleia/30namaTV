@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Parity with the official app: double Back to exit, the title page's subtitle chip and next
+     episode, the empty list. Same orthography as strings.xml (ZWNJ, ezafe, Persian punctuation). -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fa">
+    <string name="exit_again">برای خروج، دوباره بازگشت را بزنید.</string>
+    <string name="persian_subtitle">زیرنویس فارسی</string>
+    <!-- %s: the day, «شنبه ۲۵ مهر», after the episode when the server names it. -->
+    <string name="next_air">قسمت بعد: %s</string>
+    <string name="lists_empty_title">لیست‌های شما خالی است</string>
+    <string name="lists_empty_hint">از صفحهٔ هر عنوان، آن را به لیست‌هایتان اضافه کنید.</string>
+    <string name="suggested_archive">آرشیو پیشنهادی</string>
+    <!-- Home's row of the watchlist, as the official mobile app names it. -->
+    <string name="my_watchlist">لیست تماشای من</string>
+    <!-- %s: runtime's own words, «۸ دقیقه», «۱ ساعت و ۵ دقیقه». -->
+    <string name="time_left">%s مانده</string>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sign out's label and icon: the lifted red on the panel, the brand red on the white card. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/red" android:state_focused="true" />
+    <item android:color="@color/settings_danger" />
+</selector>

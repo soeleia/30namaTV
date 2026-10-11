@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Settings page, in rail_screen's host (see SettingsActivity). Three columns, each its own
+     kind of thing: the sections down the start side as the rail's pills, on the ink; the focused
+     section's options on their own raised panel, in titled groups; and at the end edge, plain on
+     the ink again, the section's icon beside what is focused, what it does, every value it takes,
+     and a live preview where there is one. The subtitle sample sits where the player draws
+     subtitles, at their real size, so it can be judged from the sofa.
+     Nothing here clips: a focused row lifts past its own bounds, the panel's surface stretches
+     from the last section's height to the next one's, and outgoing rows slide out in the page's
+     overlay. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/settings_page"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginStart="@dimen/content_start"
+        android:layout_marginTop="32dp"
+        android:layout_marginEnd="48dp"
+        android:clipChildren="false"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/settings_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:includeFontPadding="false"
+            android:text="@string/settings"
+            android:textAlignment="viewStart"
+            android:textAppearance="@style/TextAppearance.App.Display" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:baselineAligned="false"
+            android:clipChildren="false"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:id="@+id/settings_categories"
+                android:layout_width="@dimen/settings_sections_width"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <FrameLayout
+                android:id="@+id/settings_panel"
+                android:layout_width="@dimen/settings_panel_width"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="24dp"
+                android:clipChildren="false">
+
+                <!-- The surface on its own view, so it can stretch between sections' heights
+                     with a transform rather than a layout per frame; sized to the rows in code. -->
+                <View
+                    android:id="@+id/settings_surface"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:background="@drawable/settings_panel" />
+
+                <LinearLayout
+                    android:id="@+id/settings_options"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
+                    android:orientation="vertical"
+                    android:padding="@dimen/settings_panel_pad" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:id="@+id/settings_detail"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="40dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <!-- The section's icon on its plate, then the name of what is focused. -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <android.widget.ImageView
+                        android:id="@+id/settings_detail_icon"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:background="@drawable/settings_disc"
+                        android:importantForAccessibility="no"
+                        android:padding="11dp"
+                        android:tint="@color/text_body" />
+
+                    <TextView
+                        android:id="@+id/settings_detail_title"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:maxLines="2"
+                        android:textAlignment="viewStart"
+                        android:textAppearance="@style/TextAppearance.App.DialogTitle"
+                        android:textDirection="locale" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/settings_detail_body"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:lineSpacingMultiplier="1.12"
+                    android:textAlignment="viewStart"
+                    android:textAppearance="@style/TextAppearance.App.Body"
+                    android:textColor="@color/text_dim"
+                    android:textDirection="locale"
+                    android:textSize="16sp" />
+
+                <!-- Every value the option takes, the one now checked. -->
+                <LinearLayout
+                    android:id="@+id/settings_choices"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:orientation="vertical" />
+
+                <!-- Preload's preview: a two-hour film, what would be ready ahead of the picture lit. -->
+                <FrameLayout
+                    android:id="@+id/settings_meter"
+                    android:layout_width="match_parent"
+                    android:layout_height="4dp"
+                    android:layout_marginTop="20dp"
+                    android:background="@drawable/settings_meter"
+                    android:visibility="gone">
+
+                    <View
+                        android:id="@+id/settings_meter_fill"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/settings_meter_fill" />
+                </FrameLayout>
+
+                <!-- What the value now means here, worked out live (preload's minutes, the
+                     system's own reduce-motion). Brighter than the help: it answers. -->
+                <TextView
+                    android:id="@+id/settings_note"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:lineSpacingMultiplier="1.12"
+                    android:textAlignment="viewStart"
+                    android:textAppearance="@style/TextAppearance.App.Body"
+                    android:textDirection="locale"
+                    android:textSize="15sp"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/settings_sample"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:fontFamily="@font/vazirmatn_medium"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:visibility="gone" />
+</FrameLayout>

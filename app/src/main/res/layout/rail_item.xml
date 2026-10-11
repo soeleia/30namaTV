@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One rail destination: its icon, and its label, which shows once the rail opens. The item is
+     always the pill's size; the pill itself is one shared view (rail_screen) gliding behind the
+     items. Children copy the item's state so they can turn ink on the pill. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="@dimen/rail_pill_width"
+    android:layout_height="@dimen/rail_item_height"
+    android:layout_marginStart="@dimen/rail_item_inset"
+    android:layout_marginBottom="@dimen/rail_item_gap"
+    android:focusable="true"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="13dp"
+    android:paddingEnd="16dp">
+
+    <android.widget.ImageView
+        android:id="@+id/rail_icon"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:duplicateParentState="true"
+        android:importantForAccessibility="no"
+        android:tint="@color/rail_ink" />
+
+    <TextView
+        android:id="@+id/rail_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:alpha="0"
+        android:duplicateParentState="true"
+        android:maxLines="1"
+        android:textAppearance="@style/TextAppearance.App.Nav"
+        android:textColor="@color/rail_ink" />
+</LinearLayout>

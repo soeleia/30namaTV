@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The options' own raised surface: the contract's first surface step over the ink ground, no
+     shadow (2 GB TVs). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/surface" />
+    <corners android:radius="@dimen/settings_panel_radius" />
+</shape>

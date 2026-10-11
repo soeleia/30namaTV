@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="category_movie">Movie</string>
+    <string name="category_series">Series</string>
+    <string name="category_anime">Anime</string>
+    <string name="category_miniseries">Miniseries</string>
+    <string name="runtime_hours_minutes">%1$dh %2$dm</string>
+    <string name="runtime_hours">%dh</string>
+    <string name="runtime_minutes">%dm</string>
+</resources>

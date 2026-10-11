@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Where the code will be, before it is: a dark plate the size and shape of the white one, so the
+     page never shows an empty white square. It carries the spinner, or the failure and a retry. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/surface" />
+    <corners android:radius="12dp" />
+</shape>

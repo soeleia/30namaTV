@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The hero's meta line: what a title is and how long it runs. Digits come out Persian through
+     the locale-aware formatter, so %d stays %d. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fa">
+    <string name="category_movie">فیلم</string>
+    <string name="category_series">سریال</string>
+    <string name="category_anime">انیمه</string>
+    <string name="category_miniseries">مینی‌سریال</string>
+    <string name="runtime_hours_minutes">%1$d ساعت و %2$d دقیقه</string>
+    <string name="runtime_hours">%d ساعت</string>
+    <string name="runtime_minutes">%d دقیقه</string>
+</resources>

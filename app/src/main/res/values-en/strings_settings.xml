@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_playback">Playback</string>
+    <string name="settings_subtitles">Subtitles</string>
+    <string name="settings_app">App</string>
+    <string name="settings_account">Account</string>
+    <string name="settings_playback_about">The quality, sound and speed playback starts with, and what happens by itself while you watch: preloading for unsteady connections, the next episode, skipping intros.</string>
+    <string name="settings_subtitles_about">Subtitle language and look, for every film and series.</string>
+    <string name="settings_app_about">Interface language, caches and version.</string>
+    <string name="settings_account_about">Your 30nama account and plan.</string>
+
+    <string name="settings_group_quality">Quality &amp; sound</string>
+    <string name="settings_group_watching">While watching</string>
+    <string name="settings_group_look">Appearance</string>
+    <string name="settings_group_interface">Interface</string>
+    <string name="settings_group_storage">Storage</string>
+    <string name="settings_group_about">About</string>
+
+    <string name="settings_on">On</string>
+    <string name="settings_off">Off</string>
+    <string name="settings_empty">Empty</string>
+    <string name="settings_percent">%d%%</string>
+    <plurals name="settings_minutes">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
+
+    <string name="settings_buffer">Preload</string>
+    <string name="settings_buffer_help">Loads what\'s coming onto the TV\'s storage before you reach it, so short drops in the connection don\'t stop playback. The percentage is a share of what\'s left of the title.</string>
+    <string name="settings_buffer_off">Off: only a minute or two, held in memory.</string>
+    <string name="settings_buffer_ahead">At %1$s, about %2$s are ready ahead of the picture in a two-hour 1080p film.</string>
+    <string name="settings_buffer_capped">At %1$s, about %2$s are ready ahead of the picture in a two-hour 1080p film: all this TV\'s free space holds.</string>
+    <string name="settings_buffer_no_room">This TV hasn\'t the free space to preload; only a minute or two stays in memory.</string>
+    <string name="settings_quality">Default quality</string>
+    <string name="settings_quality_help">The quality playback starts in, or the best one below it when a title lacks it. Auto rises and falls with your connection. You can change it in the player for that viewing.</string>
+    <string name="settings_speed">Default speed</string>
+    <string name="settings_speed_help">The speed playback starts at. You can change it in the player for that viewing.</string>
+    <string name="settings_audio">Default audio</string>
+    <string name="settings_audio_help">5.1 for a home theatre or soundbar, Stereo for the TV\'s own speakers. A title without it plays its main audio.</string>
+    <string name="settings_audio_51">5.1</string>
+    <string name="settings_audio_stereo">Stereo</string>
+    <string name="settings_autoplay">Autoplay next episode</string>
+    <string name="settings_autoplay_help">When an episode ends, the next one starts by itself.</string>
+    <string name="settings_auto_skip">Skip intros</string>
+    <string name="settings_auto_skip_help">Skips opening titles and recaps wherever 30nama marks them.</string>
+
+    <string name="settings_subtitle_language">Subtitle language</string>
+    <string name="settings_subtitle_language_help">The subtitles playback starts with, when the title has them. Choosing in the player changes this too.</string>
+    <string name="settings_subtitle_size_help">Judge it from the sofa: the sample below is the real size, in the real place.</string>
+    <string name="settings_subtitle_color_help">Yellow reads better over bright scenes.</string>
+    <string name="settings_subtitle_background_help">Translucent keeps text readable while covering less of the picture.</string>
+
+    <string name="settings_language_help">The language of menus and names. The app reopens in it.</string>
+    <string name="settings_image_cache">Image cache</string>
+    <string name="settings_image_cache_help">Posters and artwork kept so rows open fast. Clearing it takes nothing from your account; rows just load a little slower next time. Press OK to clear it.</string>
+    <string name="settings_video_cache">Video cache</string>
+    <string name="settings_video_cache_help">Parts of titles preloaded or played lately, up to %s. New ones push the oldest out by themselves. Press OK to clear it.</string>
+    <string name="settings_version_help">30namaTV, an unofficial 30nama app for Android TV.</string>
+
+    <string name="settings_plan_help">To renew your plan, visit the 30nama website.</string>
+    <string name="settings_sign_out_help">Signs this TV out of your account. To sign back in, scan the QR code with your phone.</string>
+    <string name="settings_tier">%s plan</string>
+    <string name="settings_signing_out">Signing out…</string>
+    <string name="settings_guest_line">Not signed in</string>
+    <string name="settings_sign_in_help">Sign in with your phone to watch.</string>
+</resources>

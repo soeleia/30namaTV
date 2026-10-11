@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="trailer">Trailer</string>
+    <string name="watch_trailer">Watch Trailer</string>
+    <string name="trailer_youtube">YouTube</string>
+    <string name="trailer_aparat">Aparat</string>
+    <string name="trailer_error">The trailer could not play. Try again.</string>
+</resources>

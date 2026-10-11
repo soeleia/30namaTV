@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Settings page (SettingsActivity). Same orthography as strings.xml: ZWNJ in compounds and
+     plurals, ezafe after silent ه, Persian punctuation; %d comes out in Persian digits. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fa">
+    <string name="settings_playback">پخش</string>
+    <string name="settings_subtitles">زیرنویس‌ها</string>
+    <string name="settings_app">برنامه</string>
+    <string name="settings_account">حساب کاربری</string>
+    <string name="settings_playback_about">کیفیت، صدا و سرعتی که پخش با آن شروع می‌شود، و آنچه هنگام تماشا خودکار انجام می‌شود: پیش‌بارگذاری برای اینترنت ناپایدار، قسمت بعد و رد تیتراژ.</string>
+    <string name="settings_subtitles_about">زبان زیرنویس و ظاهر آن، در همهٔ فیلم‌ها و سریال‌ها.</string>
+    <string name="settings_app_about">زبان برنامه، حافظهٔ موقت و نسخه.</string>
+    <string name="settings_account_about">حساب ۳۰نما و اشتراک شما.</string>
+
+    <!-- Group titles in the options' panel. -->
+    <string name="settings_group_quality">کیفیت و صدا</string>
+    <string name="settings_group_watching">هنگام تماشا</string>
+    <string name="settings_group_look">ظاهر</string>
+    <string name="settings_group_interface">رابط کاربری</string>
+    <string name="settings_group_storage">فضای ذخیره‌سازی</string>
+    <string name="settings_group_about">درباره</string>
+
+    <string name="settings_on">روشن</string>
+    <string name="settings_off">خاموش</string>
+    <string name="settings_empty">خالی</string>
+    <string name="settings_percent">%d٪</string>
+    <plurals name="settings_minutes">
+        <item quantity="one">%d دقیقه</item>
+        <item quantity="other">%d دقیقه</item>
+    </plurals>
+
+    <string name="settings_buffer">پیش‌بارگذاری</string>
+    <string name="settings_buffer_help">ادامهٔ فیلم را پیش از رسیدن به آن روی حافظهٔ تلویزیون بارگذاری می‌کند تا قطعی‌های کوتاه اینترنت پخش را متوقف نکند. درصد، سهمی از باقی‌ماندهٔ فیلم است.</string>
+    <string name="settings_buffer_off">خاموش: فقط یکی دو دقیقه، در حافظهٔ اصلی.</string>
+    <string name="settings_buffer_ahead">با %1$s، در فیلمی دوساعته با کیفیت 1080p حدود %2$s جلوتر از تصویر آماده است.</string>
+    <string name="settings_buffer_capped">با %1$s، در فیلمی دوساعته با کیفیت 1080p حدود %2$s جلوتر از تصویر آماده است؛ فضای خالی این تلویزیون بیش از این جا ندارد.</string>
+    <string name="settings_buffer_no_room">فضای خالی این تلویزیون برای پیش‌بارگذاری کافی نیست؛ فقط یکی دو دقیقه در حافظهٔ اصلی می‌ماند.</string>
+    <string name="settings_quality">کیفیت پیش‌فرض</string>
+    <string name="settings_quality_help">کیفیتی که پخش با آن شروع می‌شود؛ اگر فیلمی آن را نداشته باشد، بهترین کیفیت پایین‌تر از آن. «خودکار» با سرعت اینترنت بالا و پایین می‌رود. در پخش می‌توانید آن را برای همان بار عوض کنید.</string>
+    <string name="settings_speed">سرعت پیش‌فرض</string>
+    <string name="settings_speed_help">سرعتی که پخش با آن شروع می‌شود. در پخش می‌توانید آن را برای همان بار عوض کنید.</string>
+    <string name="settings_audio">صدای پیش‌فرض</string>
+    <string name="settings_audio_help">۵٫۱ برای سینمای خانگی و ساندبار، استریو برای بلندگوهای خود تلویزیون. اگر فیلمی آن را نداشته باشد، صدای اصلی‌اش پخش می‌شود.</string>
+    <string name="settings_audio_51">۵٫۱</string>
+    <string name="settings_audio_stereo">استریو</string>
+    <string name="settings_autoplay">پخش خودکار قسمت بعد</string>
+    <string name="settings_autoplay_help">در پایان هر قسمت، قسمت بعد خودش شروع می‌شود.</string>
+    <string name="settings_auto_skip">رد خودکار تیتراژ</string>
+    <string name="settings_auto_skip_help">تیتراژ آغاز و «آنچه گذشت» را، هر جا ۳۰نما مشخص کرده باشد، خودش رد می‌کند.</string>
+
+    <string name="settings_subtitle_language">زبان زیرنویس</string>
+    <string name="settings_subtitle_language_help">زیرنویسی که پخش با آن شروع می‌شود، اگر فیلم آن را داشته باشد. انتخاب شما در پخش هم همین را عوض می‌کند.</string>
+    <string name="settings_subtitle_size_help">از روی مبل بسنجید: نمونهٔ پایین صفحه همان اندازه و جایی است که در پخش می‌بینید.</string>
+    <string name="settings_subtitle_color_help">زرد روی صحنه‌های روشن خواناتر است.</string>
+    <string name="settings_subtitle_background_help">نیمه‌شفاف متن را خوانا نگه می‌دارد و تصویر کمتری را می‌پوشاند.</string>
+    <!-- The live sample, in the subtitles' own language rather than the interface's. -->
+    <string name="settings_sample_fa" translatable="false">زیرنویس این‌طور دیده می‌شود.</string>
+    <string name="settings_sample_en" translatable="false">Subtitles look like this.</string>
+
+    <string name="settings_language_help">زبان منوها و نام‌ها. برنامه با زبان تازه دوباره باز می‌شود.</string>
+    <!-- Each language in its own name, as language pickers list them. -->
+    <string name="settings_language_fa" translatable="false">فارسی</string>
+    <string name="settings_language_en" translatable="false">English</string>
+    <string name="settings_image_cache">حافظهٔ موقت تصاویر</string>
+    <string name="settings_image_cache_help">پوسترها و تصاویری که برای باز شدن سریع ردیف‌ها نگه داشته شده‌اند. پاک کردنش چیزی از حساب شما کم نمی‌کند؛ فقط بار بعد ردیف‌ها کمی کندتر باز می‌شوند. برای پاک کردن، OK را بزنید.</string>
+    <string name="settings_video_cache">حافظهٔ موقت ویدیو</string>
+    <string name="settings_video_cache_help">بخش‌هایی از فیلم‌ها که از پیش بارگذاری یا تازه پخش شده‌اند، تا %s. قدیمی‌ترها با آمدن تازه‌ها خودشان پاک می‌شوند. برای پاک کردن، OK را بزنید.</string>
+    <string name="settings_version_help">30namaTV، برنامهٔ غیررسمی ۳۰نما برای Android TV.</string>
+
+    <string name="settings_plan_help">برای تمدید اشتراک، به وب‌سایت ۳۰نما بروید.</string>
+    <string name="settings_sign_out_help">این تلویزیون از حساب شما خارج می‌شود. برای ورود دوباره، کد QR را با گوشی اسکن کنید.</string>
+    <string name="settings_tier">اشتراک %s</string>
+    <string name="settings_signing_out">در حال خروج…</string>
+    <string name="settings_guest_line">وارد حساب نشده‌اید</string>
+    <string name="settings_sign_in_help">برای تماشا، با گوشی وارد حساب ۳۰نما شوید.</string>
+</resources>

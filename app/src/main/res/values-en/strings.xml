@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="nav_search">Search</string>
+    <string name="nav_home">Home</string>
+    <string name="see_all">More</string>
+    <string name="as_role">as %s</string>
+    <string name="continue_watching">Continue Watching</string>
+    <string name="suggested">Suggested</string>
+    <string name="movies">Movies</string>
+    <string name="series">Series</string>
+    <string name="anime">Anime</string>
+    <string name="my_lists">My Lists</string>
+    <string name="categories">Categories</string>
+    <string name="genres">Genres</string>
+    <string name="settings">Settings</string>
+
+    <string name="list_favorite">Favorite</string>
+    <string name="list_watchlist">Watchlist</string>
+    <string name="list_notify">Notify</string>
+    <string name="lists_empty">Your lists are empty.</string>
+
+    <string name="guest">Guest</string>
+    <string name="sign_in">Sign in</string>
+    <string name="sign_out">Sign out</string>
+    <string name="sign_out_confirm">Sign out of your account?</string>
+    <string name="remaining_days">%d days left</string>
+    <string name="plan">%s plan</string>
+    <string name="titles_count">%s titles</string>
+    <string name="language">Language</string>
+    <string name="language_current">English</string>
+    <string name="user_type_golden">Golden</string>
+    <string name="user_type_red">Red</string>
+    <string name="user_type_blue">Blue</string>
+    <string name="user_type_free">Free</string>
+    <string name="user_type_staff">Staff</string>
+    <string name="user_type_admin">Admin</string>
+    <string name="user_type_robot">Robot</string>
+    <string name="version">App version</string>
+
+    <string name="login_qr_text">Scan the QR code to sign in.</string>
+    <string name="login_qr_note">Or enter this address in your phone or computer\'s browser:</string>
+    <string name="login_instructions">After scanning the QR code and confirming the sign-in on the website, press Check now.</string>
+    <string name="check_now">Check now</string>
+    <string name="checking">Checking…</string>
+    <string name="enter_as_guest">Enter as guest</string>
+
+    <string name="watch">Watch now</string>
+    <string name="resume">Continue watching</string>
+    <string name="login_and_watch">Sign in &amp; watch</string>
+    <string name="not_allowed_to_stream">Upgrade your account to be able to watch.</string>
+    <string name="season_n">Season %d</string>
+    <string name="season_episode">S%1$d E%2$d</string>
+    <plurals name="seasons">
+        <item quantity="one">%d Season</item>
+        <item quantity="other">%d Seasons</item>
+    </plurals>
+    <string name="cast">Cast</string>
+    <string name="director">Director: %s</string>
+    <string name="creator">Creator: %s</string>
+    <string name="free">Free</string>
+
+    <string name="sort_by">Sort by</string>
+    <string name="sort_relevant">Relevant</string>
+    <string name="sort_added">Recently added</string>
+    <string name="sort_update">Updated</string>
+    <string name="sort_year">Year</string>
+    <string name="sort_favorite">Favorites</string>
+    <string name="sort_imdb">IMDb rating</string>
+    <string name="no_results">No results found</string>
+    <string name="search_results">Results</string>
+    <plurals name="search_count">
+        <item quantity="one">%d result</item>
+        <item quantity="other">%d results</item>
+    </plurals>
+    <!-- Leanback's search field, named as the rail names search (Persian: values-fa). -->
+    <string name="lb_search_bar_hint" tools:ignore="ExtraTranslation">Search movies, series and anime</string>
+    <string name="lb_search_bar_hint_speech" tools:ignore="ExtraTranslation">Search by voice</string>
+
+    <string name="subtitles">Subtitles</string>
+    <string name="subtitle_off">No subtitle</string>
+    <string name="subtitle_style">Subtitle settings</string>
+    <string name="subtitle_size">Font size</string>
+    <string name="subtitle_color">Color</string>
+    <string name="subtitle_background">Background color</string>
+    <string-array name="subtitle_sizes">
+        <item>Very small</item>
+        <item>Small</item>
+        <item>Medium</item>
+        <item>Big</item>
+        <item>Very big</item>
+    </string-array>
+    <string-array name="subtitle_colors">
+        <item>White</item>
+        <item>Yellow</item>
+    </string-array>
+    <string-array name="subtitle_backgrounds">
+        <item>Black</item>
+        <item>Pale dark</item>
+        <item>No color</item>
+    </string-array>
+    <string name="quality">Quality</string>
+    <string name="auto">Auto</string>
+    <string name="audio_channels">Audio channels</string>
+    <string name="audio_channel_n">%s channels</string>
+    <string name="audio_language">Audio language</string>
+    <string name="episodes">Episodes</string>
+    <string name="next_episode">Next episode</string>
+    <string name="skip_intro">Skip intro</string>
+
+    <string name="no_internet">Connection to the server was lost.</string>
+    <string name="retry">Retry</string>
+</resources>

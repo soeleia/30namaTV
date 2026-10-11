@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Leanback ships its own Persian (values-fa), with «جستجو» unjoined by ZWNJ, and a library's
+     values-fa outranks the app's default values/ for Persian. So the search field's hints are
+     restated here, spelt as the rail spells it (nav_search). English is in values-en/strings.xml. -->
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="lb_search_bar_hint" tools:ignore="ExtraTranslation">جست‌وجوی فیلم، سریال و انیمه</string>
+    <string name="lb_search_bar_hint_speech" tools:ignore="ExtraTranslation">با صدا جست‌وجو کنید</string>
+</resources>

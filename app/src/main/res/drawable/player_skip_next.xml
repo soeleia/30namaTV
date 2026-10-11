@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Next episode: the play triangle up against a bar. Not mirrored, like player_skip_forward. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24"
+    android:autoMirrored="false">
+    <path android:pathData="M6,6.2L15,12L6,17.8Z" android:fillColor="#FFFFFFFF" android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.5" android:strokeLineJoin="round" />
+    <path android:pathData="M18,6.5V17.5" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.25" android:strokeLineCap="round" />
+</vector>

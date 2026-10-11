@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Netflix on Leanback: stock widgets keep their behaviour and take Netflix's palette and
+         the pinned faces through the hooks Leanback exposes. -->
+    <style name="Theme.App" parent="@style/Theme.Leanback">
+        <item name="android:windowBackground">@color/ink</item>
+        <item name="android:colorPrimary">@color/ink</item>
+        <!-- Lilac is the one accent; red is left to watched progress and 30nama's own marks. -->
+        <item name="android:colorAccent">@color/brand</item>
+        <item name="android:colorControlHighlight">@color/focus_wash</item>
+        <item name="android:buttonStyle">@style/Widget.App.Button</item>
+        <item name="android:textViewStyle">@style/Widget.App.TextView</item>
+        <item name="android:windowAnimationStyle">@style/Animation.App.Screen</item>
+
+        <item name="defaultBrandColor">@color/ink_deep</item>
+        <item name="defaultSearchColor">@color/surface_high</item>
+        <item name="defaultSearchBrightColor">@color/brand</item>
+        <item name="defaultSearchIconColor">@color/text</item>
+        <item name="headerStyle">@style/Widget.App.Header</item>
+        <!-- Our focus states are drawn; Android 8's grey focus square over them is not wanted. -->
+        <item name="android:defaultFocusHighlightEnabled" tools:targetApi="o">false</item>
+        <item name="imageCardViewStyle">@style/Widget.App.Card</item>
+        <item name="imageCardViewInfoAreaStyle">@style/Widget.App.Card.Info</item>
+        <item name="detailsActionButtonStyle">@style/Widget.App.ActionButton</item>
+        <!-- Unfocused rows are never dimmed: artwork keeps its own colour. -->
+        <item name="overlayDimDimmedLevel">0%</item>
+        <item name="playbackProgressPrimaryColor">@color/red</item>
+        <item name="playbackProgressSecondaryColor">@color/progress_track</item>
+        <item name="playbackControlsIconHighlightColor">@color/text</item>
+        <item name="playbackControlsAutoHideTickleTimeout">5000</item>
+    </style>
+
+    <!-- Home: the rows live under the billboard, so the focused row aligns just below its own
+         title rather than Leanback's 167dp down. -->
+    <style name="Theme.App.Home">
+        <item name="browseRowsMarginTop">@dimen/rows_title_room</item>
+        <item name="browsePaddingStart">@dimen/content_start</item>
+        <!-- ListRowPresenter re-applies a row's padding as left/right read before RTL resolves,
+             so in Persian the start edge gets the end padding: keep the two equal. -->
+        <item name="browsePaddingEnd">@dimen/content_start</item>
+    </style>
+
+    <!-- Search: its bar and result rows start past the rail, as home's do. -->
+    <style name="Theme.App.Search">
+        <item name="browsePaddingStart">@dimen/content_start</item>
+        <item name="browsePaddingEnd">@dimen/content_start</item>
+    </style>
+
+    <!-- Moving between pages: the old one fades out quickly and the new one fades through,
+         rising into place when it opens and simply reappearing when Back returns to it. -->
+    <style name="Animation.App.Screen" parent="@android:style/Animation.Activity">
+        <item name="android:activityOpenEnterAnimation">@anim/screen_in</item>
+        <item name="android:activityOpenExitAnimation">@anim/screen_out</item>
+        <item name="android:activityCloseEnterAnimation">@anim/screen_back_in</item>
+        <item name="android:activityCloseExitAnimation">@anim/screen_out</item>
+    </style>
+
+    <style name="Theme.App.Grid" parent="@style/Theme.Leanback.VerticalGrid">
+        <item name="android:windowBackground">@color/ink</item>
+        <!-- Not under Theme.App, so it names the app's button itself (the empty list's action). -->
+        <item name="android:buttonStyle">@style/Widget.App.Button</item>
+        <item name="android:textViewStyle">@style/Widget.App.TextView</item>
+        <item name="android:windowAnimationStyle">@style/Animation.App.Screen</item>
+        <!-- The page title clears the rail at the start; both sides match (see Theme.App.Home). -->
+        <item name="browsePaddingStart">@dimen/content_start</item>
+        <item name="browsePaddingEnd">@dimen/content_start</item>
+        <item name="android:defaultFocusHighlightEnabled" tools:targetApi="o">false</item>
+        <item name="android:colorAccent">@color/brand</item>
+        <item name="android:colorControlHighlight">@color/focus_wash</item>
+        <item name="defaultSearchColor">@color/surface_high</item>
+        <item name="defaultSearchBrightColor">@color/brand</item>
+        <item name="defaultSearchIconColor">@color/text</item>
+        <item name="imageCardViewStyle">@style/Widget.App.Card</item>
+        <item name="imageCardViewInfoAreaStyle">@style/Widget.App.Card.Info</item>
+        <item name="overlayDimDimmedLevel">0%</item>
+    </style>
+
+    <!-- The button system, Netflix's controls with Apple TV's finish. One shape, the 44dp pill
+         (dimens_buttons.xml); white glass at rest (colors_buttons.xml); solid white with ink
+         under the remote, lifted 5% (animator/button_lift); a shade down while OK is held. The
+         base is the secondary, label only: Check now, Guest, Retry. -->
+    <style name="Widget.App.Button" parent="@android:style/Widget.Material.Button.Borderless">
+        <item name="android:background">@drawable/button</item>
+        <item name="android:textAppearance">@style/TextAppearance.App.Button</item>
+        <item name="android:textColor">@color/on_button</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:minHeight">@dimen/button_target</item>
+        <item name="android:minWidth">@dimen/button_min_width</item>
+        <item name="android:paddingStart">@dimen/button_pad</item>
+        <item name="android:paddingEnd">@dimen/button_pad</item>
+        <item name="android:drawablePadding">@dimen/button_icon_gap</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:stateListAnimator">@animator/button_lift</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <!-- With a 20dp icon before the label (drawableStart): More, sort. The icon side sits tighter. -->
+    <style name="Widget.App.Button.Icon">
+        <item name="android:paddingStart">@dimen/button_pad_icon</item>
+    </style>
+
+    <!-- Play / Resume: always with its icon, a step brighter at rest. -->
+    <style name="Widget.App.Button.Primary" parent="Widget.App.Button.Icon">
+        <item name="android:background">@drawable/button_primary</item>
+    </style>
+
+    <!-- Icon only: the pill closed to a 44dp circle. Give it a contentDescription. -->
+    <style name="Widget.App.Button.Round" parent="Widget.App.Button.Icon">
+        <item name="android:minWidth">@dimen/button_height</item>
+        <item name="android:paddingStart">@dimen/button_pad_round</item>
+        <item name="android:paddingEnd">@dimen/button_pad_round</item>
+        <item name="android:drawablePadding">0dp</item>
+    </style>
+
+    <!-- No automatic hyphenation: Android 9 broke English help text as "play-/back". Android 10
+         already defaults to none; this holds it below that, for every TextView not styled otherwise. -->
+    <style name="Widget.App.TextView" parent="@android:style/Widget.Material.TextView">
+        <item name="android:hyphenationFrequency">none</item>
+    </style>
+
+    <style name="Widget.App.Header" parent="Widget.Leanback.Header">
+        <item name="android:textColor">@color/header_text</item>
+        <item name="android:paddingBottom">6dp</item>
+        <item name="android:lineSpacingMultiplier">1.15</item>
+    </style>
+
+    <!-- Artwork with its caption beneath, always shown: the title, then the IMDb score and year
+         (the user's rule for every poster). No card plate. -->
+    <style name="Widget.App.Card" parent="Widget.Leanback.ImageCardViewStyle">
+        <item name="cardType">infoUnder</item>
+        <item name="infoVisibility">always</item>
+        <item name="lbImageCardViewType">Title|Content</item>
+        <item name="cardBackground">@android:color/transparent</item>
+        <item name="cardForeground">@android:color/transparent</item>
+        <item name="infoAreaBackground">@android:color/transparent</item>
+    </style>
+
+    <style name="Widget.App.Card.Info" parent="Widget.Leanback.ImageCardView.InfoAreaStyle">
+        <item name="android:background">@android:color/transparent</item>
+        <item name="android:paddingStart">2dp</item>
+        <item name="android:paddingEnd">2dp</item>
+        <item name="android:paddingTop">8dp</item>
+        <item name="android:paddingBottom">0dp</item>
+    </style>
+
+    <style name="Widget.App.ActionButton" parent="Widget.Leanback.DetailsActionButtonStyle">
+        <item name="android:background">@drawable/button</item>
+        <item name="android:textColor">@color/on_button</item>
+        <item name="android:stateListAnimator">@null</item>
+    </style>
+</resources>

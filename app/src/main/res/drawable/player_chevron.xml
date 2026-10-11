@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A row that opens another page of the panel; points toward the end edge in either direction. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24"
+    android:autoMirrored="true">
+    <path android:pathData="M9.5,6l6,6l-6,6" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.5"
+        android:strokeLineCap="round" android:strokeLineJoin="round" />
+</vector>

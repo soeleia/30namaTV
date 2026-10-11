@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fa">
+    <!-- The title page's last row: TMDB's recommendations on 30nama, else more of the first genre. -->
+    <string name="similar_titles">عناوین مشابه</string>
+    <string name="more_in_genre">بیشتر در %s</string>
+</resources>

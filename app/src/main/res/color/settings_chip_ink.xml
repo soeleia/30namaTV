@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A chosen value in its chip: as bright as the name at rest, ink on the white card. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/ink" android:state_focused="true" />
+    <item android:color="@color/text_body" />
+</selector>

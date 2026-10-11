@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The QR sign-in, after the Tizen client: 30nama's featured art as a dim wall behind, the steps
+     in a column at the content's start edge, and the code on a plate at the end edge with a status
+     light under it. The column hangs from the header (never centred up into it); the plate is
+     dark with a spinner until the code comes, then white, or says why not with a retry. The
+     column and the page don't clip, so a focused button's lift draws whole. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/ink"
+    android:clipChildren="false">
+
+    <!-- Half-strength: the art is a mood behind the words, not something to read. -->
+    <ImageView
+        android:id="@+id/backdrop"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:alpha=".5"
+        android:importantForAccessibility="no"
+        android:scaleType="centerCrop" />
+
+    <View
+        android:id="@+id/shade"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- The lockup reads mascot-then-wordmark in both languages, so the row stays LTR. Its own
+         start margin would then resolve to the left even in Persian (where the row sits at the
+         right edge), so it carries the inset on both sides: only the side it is pinned to shows. -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="48dp"
+        android:layout_gravity="top|start"
+        android:layout_marginLeft="@dimen/content_start"
+        android:layout_marginTop="28dp"
+        android:layout_marginRight="@dimen/content_start"
+        android:gravity="center_vertical"
+        android:layoutDirection="ltr"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/nama_logo_compact" />
+
+        <TextView
+            android:id="@+id/wordmark"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:textDirection="ltr"
+            android:textAppearance="@style/TextAppearance.Leanback.Title" />
+    </LinearLayout>
+
+    <!-- 100 dp: the header's foot (28 + 48) plus 24. -->
+    <LinearLayout
+        android:id="@+id/column"
+        android:layout_width="@dimen/login_column"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="@dimen/content_start"
+        android:layout_marginTop="100dp"
+        android:clipChildren="false"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/login_title"
+            android:textAppearance="@style/TextAppearance.App.Display" />
+
+        <LinearLayout
+            android:id="@+id/steps"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:orientation="vertical" />
+
+        <!-- The address arrives with the code; until then (or if it never does) its place stays
+             held, so nothing below it jumps. -->
+        <LinearLayout
+            android:id="@+id/address"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="invisible">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/login_qr_note"
+                android:textAppearance="@style/TextAppearance.App.Caption" />
+
+            <TextView
+                android:id="@+id/url"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:fontFamily="@font/inter_medium"
+                android:textAlignment="viewStart"
+                android:textColor="@color/text"
+                android:textDirection="ltr"
+                android:textSize="21sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:clipChildren="false"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/check"
+                style="@style/Widget.App.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="@dimen/button_gap"
+                android:text="@string/check_now" />
+
+            <Button
+                android:id="@+id/guest"
+                style="@style/Widget.App.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/enter_as_guest" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/login_instructions"
+            android:textAppearance="@style/TextAppearance.App.Caption"
+            android:textColor="@color/text_faint" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/code"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical|end"
+        android:layout_marginEnd="@dimen/content_start"
+        android:clipChildren="false"
+        android:gravity="center_horizontal"
+        android:orientation="vertical">
+
+        <!-- Sized by the white plate inside it, which is there (unseen) from the start. -->
+        <FrameLayout
+            android:id="@+id/plate"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/login_plate"
+            android:clipChildren="false">
+
+            <FrameLayout
+                android:id="@+id/qr_frame"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:alpha="0"
+                android:background="@drawable/qr_plate"
+                android:padding="14dp">
+
+                <ImageView
+                    android:id="@+id/qr"
+                    android:layout_width="@dimen/login_qr"
+                    android:layout_height="@dimen/login_qr"
+                    android:contentDescription="@string/login_qr_text" />
+
+                <ImageView
+                    android:id="@+id/done"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:alpha="0"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_check" />
+            </FrameLayout>
+
+            <ProgressBar
+                android:id="@+id/qr_loading"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_gravity="center"
+                android:indeterminate="true"
+                android:indeterminateTint="@color/brand" />
+
+            <!-- Fixed to the code's size: a lone match_parent child would stretch the frame. -->
+            <LinearLayout
+                android:id="@+id/qr_error"
+                android:layout_width="@dimen/login_qr"
+                android:layout_height="@dimen/login_qr"
+                android:layout_gravity="center"
+                android:clipChildren="false"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/qr_error_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="@string/login_code_failed"
+                    android:textAppearance="@style/TextAppearance.App.DialogTitle" />
+
+                <TextView
+                    android:id="@+id/qr_error_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center"
+                    android:textAppearance="@style/TextAppearance.App.Caption" />
+
+                <Button
+                    android:id="@+id/retry"
+                    style="@style/Widget.App.Button"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:text="@string/retry" />
+            </LinearLayout>
+        </FrameLayout>
+
+        <LinearLayout
+            android:id="@+id/status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:alpha="0"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <View
+                android:id="@+id/status_dot"
+                android:layout_width="6dp"
+                android:layout_height="6dp"
+                android:background="@drawable/login_dot" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="@string/checking"
+                android:textAppearance="@style/TextAppearance.App.Caption" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

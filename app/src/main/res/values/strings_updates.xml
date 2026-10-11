@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fa">
+    <string name="app_update">به‌روزرسانی</string>
+    <string name="app_update_help">برنامه روزی یک بار پس از باز شدن، نسخهٔ تازه را در GitHub بررسی و خودکار دانلود می‌کند. برای بررسی دوباره یا نصب نسخهٔ آماده، این گزینه را انتخاب کنید. نصب با تأیید شما در اندروید انجام می‌شود.</string>
+    <string name="update_check">بررسی</string>
+    <string name="update_checking">در حال بررسی</string>
+    <string name="update_current">به‌روز</string>
+    <string name="update_install">نصب</string>
+    <string name="update_retry">تلاش دوباره</string>
+    <string name="update_releases">نسخه‌ها</string>
+    <string name="update_downloading">دانلود</string>
+    <string name="update_ready">نسخهٔ %1$s آمادهٔ نصب است. اگر اندروید درخواست کرد، اجازهٔ نصب از این برنامه را فعال کنید و دوباره «نصب» را انتخاب کنید.</string>
+    <string name="update_download_version">در حال دانلود نسخهٔ %1$s. دانلود در پس‌زمینه ادامه دارد.</string>
+    <string name="update_signature_mismatch">امضای این نسخه با برنامهٔ نصب‌شده متفاوت است. برای جابه‌جایی از نسخهٔ آزمایشی قدیمی، راهنمای نصب در صفحهٔ نسخه‌ها را بخوانید. حذف برنامه، ورود و تنظیمات آن را پاک می‌کند.</string>
+    <string name="update_invalid">فایل به‌روزرسانی معتبر نیست و نصب نمی‌شود. دوباره بررسی کنید.</string>
+    <string name="update_no_installer">نصب‌کنندهٔ اندروید در این دستگاه در دسترس نیست.</string>
+    <string name="update_browser_missing">با گوشی یا رایانه، صفحهٔ github.com/soeleia/30namaTV/releases را باز کنید.</string>
+    <string name="update_failed">بررسی یا دانلود انجام نشد. اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.</string>
+</resources>

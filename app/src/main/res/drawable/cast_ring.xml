@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The focus ring around a cast portrait: the cards' 3 dp of white, made round. A shape already
+     draws its stroke inside its bounds, so the ring's outer edge is the portrait's edge. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:enterFadeDuration="150" android:exitFadeDuration="100">
+    <item android:state_focused="true">
+        <shape android:shape="oval">
+            <stroke android:width="3dp" android:color="@color/text" />
+        </shape>
+    </item>
+    <item android:drawable="@android:color/transparent" />
+</selector>

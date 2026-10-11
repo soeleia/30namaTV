@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The grid's sort button: three strokes shortening down, in the app's outline stroke and the
+     button's ink. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="@dimen/button_icon" android:height="@dimen/button_icon" android:viewportWidth="24" android:viewportHeight="24"
+    android:tint="@color/on_button" android:autoMirrored="true">
+    <path
+        android:pathData="M4,7H20M4,12H15M4,17H10"
+        android:strokeWidth="1.8"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round" />
+</vector>

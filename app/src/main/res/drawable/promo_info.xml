@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- More: an outlined (i) in the rail's stroke, inked like act_play (white at rest, ink on the
+     focused white button). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="@dimen/button_icon" android:height="@dimen/button_icon" android:viewportWidth="24" android:viewportHeight="24"
+    android:tint="@color/on_button" android:autoMirrored="false">
+    <path android:pathData="M12,3a9,9 0,1 1,0 18a9,9 0,1 1,0 -18z" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8" />
+    <path android:pathData="M12,11v5.5" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8" android:strokeLineCap="round" />
+    <path android:pathData="M12,7.75v0.01" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.2" android:strokeLineCap="round" />
+</vector>

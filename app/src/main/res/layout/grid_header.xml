@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A grid's title bar, in place of Leanback's (see GridHeader): the page name where reading
+     starts, the sort button at the other end naming the order now. Leanback's bar had a search
+     orb there that pulsed red and cast a shadow under focus; this is the app's own button, white
+     under the remote like every other. Same padding and 60dp line as Leanback's, so the grid
+     beneath keeps its place; the padding doesn't clip, so the button's lift draws whole. -->
+<com.doxigo.tv30.GridHeader xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@id/browse_title_group"
+    style="?attr/browseTitleViewStyle"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:clipToPadding="false"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+
+    <TextView
+        android:id="@id/title_text"
+        android:layout_width="0dp"
+        android:layout_height="@dimen/lb_browse_title_height"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:gravity="center_vertical|start"
+        android:maxLines="1"
+        android:textAlignment="viewStart"
+        android:textAppearance="@style/TextAppearance.Leanback.Title" />
+
+    <Button
+        android:id="@+id/grid_sort"
+        style="@style/Widget.App.Button.Icon"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="24dp"
+        android:drawableStart="@drawable/ic_sort" />
+</com.doxigo.tv30.GridHeader>

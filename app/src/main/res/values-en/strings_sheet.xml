@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sheet_cancel">Cancel</string>
+    <string name="continue_remove_question">Remove this title from Continue Watching?</string>
+    <string name="continue_remove">Remove from Continue Watching</string>
+</resources>

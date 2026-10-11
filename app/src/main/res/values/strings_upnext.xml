@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fa">
+    <!-- Under the player's title, beside the episode: when this one ends at the current speed.
+         The time arrives in Persian digits, 24-hour («۲۲:۴۵»). -->
+    <string name="player_ends_at">پایان ساعت %s</string>
+    <!-- The title page's Play once the saved episode is past its credits: «قسمت بعد: فصل ۱، قسمت ۶». -->
+    <string name="upnext_play">قسمت بعد: %s</string>
+</resources>

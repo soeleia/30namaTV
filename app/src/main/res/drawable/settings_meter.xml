@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Preload's preview: a two-hour film as a line, the part that would be ready ahead of the
+     picture lit (settings_meter_fill, scaled to its share). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/surface_high" />
+    <corners android:radius="2dp" />
+</shape>

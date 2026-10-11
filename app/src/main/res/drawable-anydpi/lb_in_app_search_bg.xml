@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Replaces Leanback's white search plate: the field is a dark surface like every other control. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/surface_high" />
+    <corners android:radius="@dimen/button_corner" />
+</shape>

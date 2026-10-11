@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A hairline of light round the portrait, so the disc keeps its edge over dark hair and dark
+     art. Inset by half the stroke, as cast_ring is, so the disc's clip keeps all of it. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android" android:inset="1dp">
+    <shape android:shape="oval">
+        <stroke android:width="2dp" android:color="#38FFFFFF" />
+    </shape>
+</inset>

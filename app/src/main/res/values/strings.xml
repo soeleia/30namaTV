@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Persian is the default language. Orthography: ZWNJ (U+200C) in compounds and plurals,
+     ezafe written after silent ه (ادامهٔ), Persian punctuation. Digits come out Persian through
+     the locale-aware formatters, so %d stays %d here. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fa">
+    <!-- A brand name, so Latin in both languages, as the wordmark sets it. -->
+    <string name="app_name" translatable="false">30namaTV</string>
+
+    <string name="nav_search">جست‌وجو</string>
+    <string name="nav_home">خانه</string>
+    <string name="see_all">بیشتر</string>
+    <string name="as_role">در نقش %s</string>
+    <string name="continue_watching">ادامهٔ تماشا</string>
+    <string name="suggested">پیشنهادی</string>
+    <string name="movies">فیلم‌ها</string>
+    <string name="series">سریال‌ها</string>
+    <string name="anime">انیمه‌ها</string>
+    <string name="my_lists">لیست‌های من</string>
+    <string name="categories">دسته‌ها</string>
+    <string name="genres">ژانرها</string>
+    <string name="settings">تنظیمات</string>
+
+    <string name="list_favorite">علاقه‌مندی‌ها</string>
+    <string name="list_watchlist">لیست تماشا</string>
+    <string name="list_notify">اطلاع‌رسانی</string>
+    <string name="lists_empty">لیست‌هایتان هنوز خالی است.</string>
+
+    <string name="guest">مهمان</string>
+    <string name="sign_in">ورود به حساب</string>
+    <string name="sign_out">خروج از حساب</string>
+    <string name="sign_out_confirm">از حساب خود خارج می‌شوید؟</string>
+    <string name="remaining_days">%d روز مانده</string>
+    <string name="plan">اشتراک %s</string>
+    <string name="titles_count">%s عنوان</string>
+    <string name="language">زبان</string>
+    <string name="language_current">فارسی</string>
+    <string name="user_type_golden">طلایی</string>
+    <string name="user_type_red">قرمز</string>
+    <string name="user_type_blue">آبی</string>
+    <string name="user_type_free">رایگان</string>
+    <string name="user_type_staff">همکار</string>
+    <string name="user_type_admin">مدیر</string>
+    <string name="user_type_robot">ربات</string>
+    <string name="version">نسخهٔ برنامه</string>
+
+    <string name="login_qr_text">برای ورود، کد QR را با گوشی اسکن کنید.</string>
+    <string name="login_qr_note">یا این نشانی را در مرورگر گوشی یا رایانه باز کنید:</string>
+    <string name="login_instructions">پس از تأیید ورود در وب‌سایت، تلویزیون خودش وارد می‌شود. اگر نشد، «بررسی دوباره» را بزنید.</string>
+    <string name="check_now">بررسی دوباره</string>
+    <string name="checking">در حال بررسی…</string>
+    <string name="enter_as_guest">ورود به‌عنوان مهمان</string>
+
+    <string name="watch">تماشا</string>
+    <string name="resume">ادامهٔ تماشا</string>
+    <string name="login_and_watch">ورود و تماشا</string>
+    <string name="not_allowed_to_stream">برای تماشا، اشتراک خود را ارتقا دهید.</string>
+    <string name="season_n">فصل %d</string>
+    <string name="season_episode">فصل %1$d، قسمت %2$d</string>
+    <plurals name="seasons">
+        <item quantity="one">%d فصل</item>
+        <item quantity="other">%d فصل</item>
+    </plurals>
+    <string name="cast">بازیگران</string>
+    <string name="director">کارگردان: %s</string>
+    <string name="creator">سازنده: %s</string>
+    <string name="free">رایگان</string>
+
+    <string name="sort_by">مرتب‌سازی</string>
+    <string name="sort_relevant">مرتبط‌ترین</string>
+    <string name="sort_added">تازه‌ترین افزوده‌ها</string>
+    <string name="sort_update">به‌روزترین</string>
+    <string name="sort_year">سال ساخت</string>
+    <string name="sort_favorite">محبوب‌ترین</string>
+    <string name="sort_imdb">امتیاز IMDb</string>
+    <string name="no_results">چیزی پیدا نشد.</string>
+    <!-- Search's row header: the results, then their count once it is known. -->
+    <string name="search_results">نتایج</string>
+    <plurals name="search_count">
+        <item quantity="one">%d نتیجه</item>
+        <item quantity="other">%d نتیجه</item>
+    </plurals>
+
+    <string name="subtitles">زیرنویس</string>
+    <string name="subtitle_off">بدون زیرنویس</string>
+    <string name="subtitle_style">ظاهر زیرنویس</string>
+    <string name="subtitle_size">اندازهٔ متن</string>
+    <string name="subtitle_color">رنگ متن</string>
+    <string name="subtitle_background">پس‌زمینه</string>
+    <string-array name="subtitle_sizes">
+        <item>خیلی کوچک</item>
+        <item>کوچک</item>
+        <item>متوسط</item>
+        <item>بزرگ</item>
+        <item>خیلی بزرگ</item>
+    </string-array>
+    <string-array name="subtitle_colors">
+        <item>سفید</item>
+        <item>زرد</item>
+    </string-array>
+    <string-array name="subtitle_backgrounds">
+        <item>مشکی</item>
+        <item>نیمه‌شفاف</item>
+        <item>بدون پس‌زمینه</item>
+    </string-array>
+    <string name="quality">کیفیت</string>
+    <string name="auto">خودکار</string>
+    <string name="audio_channels">کانال صدا</string>
+    <string name="audio_channel_n">%s کاناله</string>
+    <string name="audio_language">زبان صدا</string>
+    <string name="episodes">قسمت‌ها</string>
+    <string name="next_episode">قسمت بعد</string>
+    <string name="skip_intro">رد تیتراژ</string>
+
+    <string name="no_internet">ارتباط با سرور برقرار نشد.</string>
+    <string name="retry">تلاش دوباره</string>
+</resources>

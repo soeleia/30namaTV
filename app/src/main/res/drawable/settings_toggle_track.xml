@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A switch's track, by the row's state (activated = on). On is the lit one: near-white on the
+     panel, ink on the white card. Off is the idle grey, a lighter grey on the card. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:enterFadeDuration="150" android:exitFadeDuration="150">
+    <item android:state_focused="true" android:state_activated="true">
+        <shape><solid android:color="@color/ink" /><corners android:radius="12dp" /><size android:width="40dp" android:height="24dp" /></shape>
+    </item>
+    <item android:state_focused="true">
+        <shape><solid android:color="@color/settings_toggle_off_focus" /><corners android:radius="12dp" /><size android:width="40dp" android:height="24dp" /></shape>
+    </item>
+    <item android:state_activated="true">
+        <shape><solid android:color="@color/text_body" /><corners android:radius="12dp" /><size android:width="40dp" android:height="24dp" /></shape>
+    </item>
+    <item>
+        <shape><solid android:color="@color/button_idle" /><corners android:radius="12dp" /><size android:width="40dp" android:height="24dp" /></shape>
+    </item>
+</selector>

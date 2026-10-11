@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fa">
+    <!-- The title page's trailer button, and the long press's choice of source. -->
+    <string name="trailer">تریلر</string>
+    <string name="watch_trailer">تماشای تریلر</string>
+    <string name="trailer_youtube">یوتیوب</string>
+    <string name="trailer_aparat">آپارات</string>
+    <string name="trailer_error">تریلر پخش نشد. دوباره امتحان کنید.</string>
+</resources>

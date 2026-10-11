@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fa">
+    <string name="player_speed">سرعت پخش</string>
+    <!-- In step with PlayerFragment.SPEEDS. -->
+    <string-array name="player_speeds">
+        <item>۰٫۵×</item>
+        <item>۰٫۷۵×</item>
+        <item>عادی</item>
+        <item>۱٫۲۵×</item>
+        <item>۱٫۵×</item>
+        <item>۲×</item>
+    </string-array>
+
+    <!-- The settings panel's pages and columns. -->
+    <string name="player_audio_subtitles">صدا و زیرنویس</string>
+    <string name="player_quality_speed">کیفیت و سرعت</string>
+    <!-- The appearance page's live preview, drawn as the subtitles are. -->
+    <string name="player_sample">زیرنویس این‌طور دیده می‌شود</string>
+    <!-- An audio track with neither a name nor a language. -->
+    <string name="player_track">صدای %d</string>
+    <!-- The skip pill over the video: the recap's label, short beside «رد تیتراژ». -->
+    <string name="player_skip_recap">رد خلاصه</string>
+
+    <!-- Playback stopped (PlayerFragment.errorMessage): what went wrong and what to do. Play
+         («پخش», the transport's button) retries. -->
+    <string name="player_error_network">اتصال اینترنت قطع شد. پس از وصل شدن، دوباره پخش را بزنید.</string>
+    <string name="player_error_server">این ویدیو فعلاً در دسترس نیست. کمی بعد دوباره پخش را بزنید.</string>
+    <string name="player_error_format">این فایل روی این تلویزیون پخش نمی‌شود. کیفیت دیگری را امتحان کنید.</string>
+    <string name="player_error">پخش متوقف شد. دوباره پخش را بزنید.</string>
+</resources>

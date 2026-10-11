@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A value's pill: a step up from the panel at rest, ink at 12% on the white card. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:enterFadeDuration="150" android:exitFadeDuration="100">
+    <item android:state_focused="true">
+        <shape><solid android:color="@color/settings_chip_focus" /><corners android:radius="@dimen/settings_chip_radius" /></shape>
+    </item>
+    <item>
+        <shape><solid android:color="@color/surface_high" /><corners android:radius="@dimen/settings_chip_radius" /></shape>
+    </item>
+</selector>

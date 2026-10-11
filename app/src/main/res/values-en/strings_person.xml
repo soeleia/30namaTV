@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="person_actor">Actor</string>
+    <string name="person_director">Director</string>
+    <string name="person_creator">Creator</string>
+    <string name="person_cast_crew">Cast &amp; Crew</string>
+    <plurals name="person_titles">
+        <item quantity="one">%d title</item>
+        <item quantity="other">%d titles</item>
+    </plurals>
+    <string name="person_known_for">Known for %s</string>
+    <string name="person_sort_newest">Newest</string>
+    <string name="person_empty">Nothing with them on 30nama yet</string>
+    <string name="person_empty_hint">When 30nama adds a film or series with them, you\'ll find it here.</string>
+    <string name="person_error">Couldn\'t load their titles</string>
+    <string name="person_back">Back</string>
+</resources>

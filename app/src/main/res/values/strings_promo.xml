@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home's promoted hero (Promo.kt). Play reuses watch, resume and login_and_watch. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fa">
+    <string name="promo_more">بیشتر</string>
+</resources>

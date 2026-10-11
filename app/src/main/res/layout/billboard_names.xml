@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The English name, then the Persian one when 30nama has it. The English line keeps one
+     height and shrinks a long name to fit (API 26+), so nothing below it moves between titles;
+     a name too long for one line at 24sp takes two in a 60dp box instead (Billboard.fit). It
+     aligns to the layout's start, not its own LTR start, so it sits flush with the Persian. -->
+<merge xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <TextView
+        android:id="@+id/bb_title"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:autoSizeMaxTextSize="38sp"
+        android:autoSizeMinTextSize="24sp"
+        android:autoSizeStepGranularity="1sp"
+        android:autoSizeTextType="uniform"
+        android:ellipsize="end"
+        android:gravity="bottom|start"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:textAlignment="viewStart"
+        android:textAppearance="@style/TextAppearance.App.Hero" />
+
+    <TextView
+        android:id="@+id/bb_local"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textAppearance="@style/TextAppearance.App.Subtitle"
+        android:visibility="gone" />
+</merge>

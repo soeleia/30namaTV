@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A rail item's icon and label: ink on the white pill, white for the page you are on. The rest
+     sit back while the rail is shut (so the content leads) and come up a step once it opens
+     (activated) so the labels read. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/ink" android:state_focused="true" />
+    <item android:color="@color/text" android:state_selected="true" />
+    <item android:color="@color/text_dim" android:state_activated="true" />
+    <item android:color="@color/text_faint" />
+</selector>

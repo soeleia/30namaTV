@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Settings' few colours of its own. -->
+<resources>
+    <!-- Sign out and a plan about to lapse: red lifted off Netflix's, 5.4:1 on the panel's
+         #1F1F1F where the brand red manages only 3.4:1. On the white focus card the brand red
+         itself carries it (4.8:1). -->
+    <color name="settings_danger">#FF5C5C</color>
+    <!-- A switch's off track under focus: a step down from the white card. -->
+    <color name="settings_toggle_off_focus">#BDBDBD</color>
+    <!-- A value's chip on the white card: ink at 12%. -->
+    <color name="settings_chip_focus">#1F141414</color>
+    <!-- The plan's mark: 30nama names its plans by colour. Free keeps the contract's green. -->
+    <color name="settings_tier_golden">#E3B341</color>
+    <color name="settings_tier_blue">#4D8EFF</color>
+</resources>

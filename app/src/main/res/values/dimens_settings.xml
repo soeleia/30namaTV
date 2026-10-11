@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Settings page (SettingsActivity), on the 4dp scale. Three columns across the 816dp between
+     the rail's content start (96dp) and a 48dp safe edge: the sections (176), a 24dp gap, the
+     options' panel (320), a 40dp gap, and what the focused option does (the rest, 256). -->
+<resources>
+    <dimen name="settings_sections_width">176dp</dimen>
+    <dimen name="settings_panel_width">320dp</dimen>
+    <!-- Rows are inset 12dp in the panel; a focused row lifts 4dp a side (ROW_LIFT), so its white
+         card lands 8dp inside the panel's edge and the panel's corner is the card's plus that
+         8dp: the two curves run parallel. -->
+    <dimen name="settings_panel_pad">12dp</dimen>
+    <dimen name="settings_panel_radius">20dp</dimen>
+    <dimen name="settings_row_radius">12dp</dimen>
+    <!-- The remote's target, as a button's (button_target). -->
+    <dimen name="settings_row_height">48dp</dimen>
+    <!-- Text inside a row, and the hairlines and group titles lined up with it. -->
+    <dimen name="settings_row_pad">16dp</dimen>
+    <!-- A value's chip: a 28dp pill. -->
+    <dimen name="settings_chip_height">28dp</dimen>
+    <dimen name="settings_chip_radius">14dp</dimen>
+    <!-- Yekan Bakh's line box reaches 600 units below the baseline and 900 above, so Persian set
+         in the middle of a fixed-height pill sits about 1.6dp high (110 units at 15sp). Top
+         padding moves the text down by half of it. Latin (Inter) needs none. -->
+    <dimen name="settings_chip_nudge">3dp</dimen>
+    <!-- A switch: an 18dp knob, 3dp inside a 40 × 24 track, so it travels 16dp. -->
+    <dimen name="settings_toggle_travel">16dp</dimen>
+</resources>

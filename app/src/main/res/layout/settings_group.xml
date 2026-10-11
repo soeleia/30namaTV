@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A group's title in the panel, lined up with the rows' names: more room above (a new group)
+     than below (its rows). Peyda, as row titles are, a step under the rows and dim. -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="@dimen/settings_row_pad"
+    android:includeFontPadding="false"
+    android:paddingTop="18dp"
+    android:paddingEnd="@dimen/settings_row_pad"
+    android:paddingBottom="8dp"
+    android:textAlignment="viewStart"
+    android:textAppearance="@style/TextAppearance.App.Nav"
+    android:textColor="@color/text_dim"
+    android:textSize="14sp" />

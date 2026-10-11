@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="login_title">Sign in with your phone</string>
+    <string name="login_step_camera">Open your phone\'s camera.</string>
+    <string name="login_step_scan">Scan the QR code.</string>
+    <string name="login_step_confirm">Approve the sign-in on 30nama.</string>
+</resources>

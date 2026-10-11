@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The person, where the billboard's words would stand: the cast row's round portrait at the
+     start, the name in display type beside it, their part and title count, what they're known
+     for, and the sort pair. The last two keep their room while hidden, so nothing moves when they
+     appear. 40dp from the top, it ends near 218dp, a clear 34dp above the first row's title. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/person_header"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_gravity="top|start"
+    android:layout_marginStart="56dp"
+    android:layout_marginTop="40dp"
+    android:layout_marginEnd="56dp"
+    android:clipChildren="false"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+
+    <!-- The cast row's portrait, larger: the initials on their disc until the headshot loads and
+         takes its place, cut to the circle as the cast row cuts it (fitHead). Clipped round in
+         code (OVAL); the rim is drawn over the photo's edge. -->
+    <FrameLayout
+        android:id="@+id/person_portrait"
+        android:layout_width="@dimen/person_portrait"
+        android:layout_height="@dimen/person_portrait"
+        android:foreground="@drawable/person_rim">
+
+        <TextView
+            android:id="@+id/person_initials"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/cast_disc"
+            android:gravity="center"
+            android:importantForAccessibility="no"
+            android:textAppearance="@style/TextAppearance.App.Initials"
+            android:textSize="36sp" />
+
+        <ImageView
+            android:id="@+id/person_photo"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:importantForAccessibility="no"
+            android:scaleType="matrix" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:id="@+id/person_text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="32dp"
+        android:layout_weight="1"
+        android:clipChildren="false"
+        android:orientation="vertical">
+
+        <!-- One line at one height; a long name shrinks to fit rather than wrap. Set flush with
+             the start of the layout, not of its own (Latin) text, as the billboard's title is. -->
+        <TextView
+            android:id="@+id/person_name"
+            android:layout_width="match_parent"
+            android:layout_height="58dp"
+            android:autoSizeMaxTextSize="46sp"
+            android:autoSizeMinTextSize="28sp"
+            android:autoSizeStepGranularity="1sp"
+            android:autoSizeTextType="uniform"
+            android:ellipsize="end"
+            android:gravity="bottom|start"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:textAlignment="viewStart"
+            android:textAppearance="@style/TextAppearance.App.Hero" />
+
+        <TextView
+            android:id="@+id/person_meta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.App.Meta" />
+
+        <TextView
+            android:id="@+id/person_known"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.App.Meta"
+            android:visibility="invisible" />
+
+        <!-- The order, as a segmented control: both choices in one track, the one in use filled,
+             one press to switch. Up from the first row lands on the one in use. The track's 2dp
+             sides match the pills' own inset, so each pill sits evenly inside it. -->
+        <LinearLayout
+            android:id="@+id/person_sort"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/person_sort_track"
+            android:clipChildren="false"
+            android:orientation="horizontal"
+            android:paddingStart="@dimen/button_inset"
+            android:paddingEnd="@dimen/button_inset"
+            android:visibility="invisible">
+
+            <Button
+                android:id="@+id/person_sort_relevant"
+                style="@style/Widget.App.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/person_pill"
+                android:text="@string/sort_relevant"
+                android:textColor="@color/person_pill_ink" />
+
+            <Button
+                android:id="@+id/person_sort_newest"
+                style="@style/Widget.App.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/person_pill"
+                android:text="@string/person_sort_newest"
+                android:textColor="@color/person_pill_ink" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

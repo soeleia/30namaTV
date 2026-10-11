@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A page opening: it rises a little as it fades up, just after the old one starts to go (a
+     fade-through, not a double exposure). Motion.PAGE on Motion.emph; the fade is the shorter
+     Motion.ENTER so the page is readable while it still settles. -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:interpolator="@interpolator/emph"
+    android:shareInterpolator="true">
+    <alpha android:duration="220" android:fromAlpha="0" android:startOffset="60" android:toAlpha="1" />
+    <translate android:duration="420" android:fromYDelta="1.5%" android:startOffset="60" android:toYDelta="0" />
+</set>

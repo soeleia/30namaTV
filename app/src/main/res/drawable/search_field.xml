@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Search's field (SearchFragment.styleBar): a dark pill like the app's other controls, never
+     artwork's 6dp, ringed under the remote in the 3dp of white the posters wear (focus_ring.xml).
+     The field takes its children's states, so the ring follows the text editor's focus; the
+     text stays white on the dark fill in both states. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:enterFadeDuration="150" android:exitFadeDuration="100">
+    <item android:state_focused="true">
+        <shape>
+            <solid android:color="@color/surface_high" />
+            <stroke android:width="3dp" android:color="@color/text" />
+            <corners android:radius="@dimen/search_field_radius" />
+        </shape>
+    </item>
+    <item>
+        <shape>
+            <solid android:color="@color/surface_high" />
+            <corners android:radius="@dimen/search_field_radius" />
+        </shape>
+    </item>
+</selector>

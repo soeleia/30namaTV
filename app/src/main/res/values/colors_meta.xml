@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The title page's genres line (Meta.kt, genresLine): where the title is from, a step under
+         the genres' text_dim. The faintest grey that keeps 4.5:1 to the end of the 500dp reading
+         measure over a white frame of art under the side scrim (4.7:1; text_faint falls to 3.4:1). -->
+    <color name="meta_origin">#999999</color>
+    <!-- The hairline between the genres and where the title is from. -->
+    <color name="meta_rule">#40FFFFFF</color>
+</resources>

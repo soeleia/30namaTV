@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English text uses Inter.
+     Script-aware presenters keep Persian names in Peyda; the running clock keeps Yekan Bakh
+     with its tabular digits. -->
+<resources>
+    <style name="TextAppearance.Leanback" parent="TextAppearance.LeanbackBase">
+        <item name="android:fontFamily">@font/inter_regular</item>
+    </style>
+
+    <!-- Row headers (Row.Header inherits it). -->
+    <style name="TextAppearance.Leanback.Header" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/inter_bold</item>
+        <item name="android:textSize">@dimen/lb_browse_header_text_size</item>
+        <item name="android:textColor">@color/lb_browse_header_color</item>
+    </style>
+
+    <style name="TextAppearance.Leanback.DetailsActionButton">
+        <item name="android:fontFamily">@font/inter_bold</item>
+        <item name="android:textSize">@dimen/lb_action_text_size</item>
+        <item name="android:textColor">@color/on_button</item>
+        <item name="android:textAllCaps">false</item>
+    </style>
+
+    <style name="TextAppearance.Leanback.ErrorMessage">
+        <item name="android:fontFamily">@font/inter_regular</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:textColor">@color/lb_error_message</item>
+    </style>
+
+    <style name="TextAppearance.Leanback.PlaybackControlLabel">
+        <item name="android:fontFamily">@font/inter_regular</item>
+        <item name="android:textSize">@dimen/lb_control_button_text_size</item>
+        <item name="android:textColor">@color/lb_control_button_text</item>
+    </style>
+
+    <style name="TextAppearance.App.Numeral" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/inter_bold</item>
+        <item name="android:textSize">40sp</item>
+        <item name="android:textColor">@color/text</item>
+    </style>
+
+    <style name="TextAppearance.App.Nav" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/inter_medium</item>
+        <item name="android:textSize">17sp</item>
+    </style>
+
+    <!-- A touch tight, as the billboard sets its Inter titles. -->
+    <style name="TextAppearance.App.Display" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/inter_bold</item>
+        <item name="android:textSize">30sp</item>
+        <item name="android:textColor">@color/text</item>
+        <item name="android:letterSpacing">-0.01</item>
+    </style>
+
+    <!-- Medium, as metaLine sets the Latin runs of every meta line. -->
+    <style name="TextAppearance.App.Meta" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/inter_medium</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">@color/text_dim</item>
+    </style>
+
+    <style name="TextAppearance.App.Caption" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/inter_regular</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">@color/text_dim</item>
+    </style>
+
+    <style name="TextAppearance.App.Body" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/inter_regular</item>
+        <item name="android:textSize">17sp</item>
+        <item name="android:textColor">@color/text_body</item>
+    </style>
+
+    <style name="TextAppearance.App.Button" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/inter_medium</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">@color/on_button</item>
+    </style>
+
+    <style name="TextAppearance.App.DialogTitle" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/inter_bold</item>
+        <item name="android:textSize">21sp</item>
+        <item name="android:textColor">@color/text</item>
+    </style>
+</resources>

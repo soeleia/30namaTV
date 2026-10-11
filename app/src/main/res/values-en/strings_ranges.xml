@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="episode_range">Episodes %1$s–%2$s</string>
+    <string name="season_range">%1$s · %2$s</string>
+</resources>

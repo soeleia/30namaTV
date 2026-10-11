@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A switch's knob: the opposite of its track, so it always stands out of it. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:enterFadeDuration="150" android:exitFadeDuration="150">
+    <item android:state_focused="true">
+        <shape android:shape="oval"><solid android:color="@color/text" /></shape>
+    </item>
+    <item android:state_activated="true">
+        <shape android:shape="oval"><solid android:color="@color/ink" /></shape>
+    </item>
+    <item>
+        <shape android:shape="oval"><solid android:color="@color/text_dim" /></shape>
+    </item>
+</selector>

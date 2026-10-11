@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Marks the page you are on at the rail's edge: 30nama's red, the one place it shows there. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/red" />
+    <corners android:radius="1.5dp" />
+</shape>

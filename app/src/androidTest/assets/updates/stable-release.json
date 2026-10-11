@@ -1,0 +1,14 @@
+{
+  "draft": false,
+  "prerelease": false,
+  "tag_name": "v1.1.0",
+  "assets": [
+    {
+      "name": "30namaTV.apk",
+      "state": "uploaded",
+      "size": 4096,
+      "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "browser_download_url": "https://github.com/soeleia/30namaTV/releases/download/v1.1.0/30namaTV.apk"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="error_server">Something went wrong on 30nama\'s side. Try again in a moment.</string>
+    <string name="error_session">You\'ve been signed out. Sign in again.</string>
+    <string name="error_sign_in">Sign in to do this.</string>
+    <string name="login_code_failed">Couldn\'t get a sign-in code</string>
+</resources>

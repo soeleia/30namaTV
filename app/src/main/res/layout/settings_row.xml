@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One option, read as a unit from start to end: an icon where it has one, its name, then what
+     it is now: a switch, a value's chip, or a plain value, with an icon after it when OK does
+     something other than step the value (clear, open). Children take the row's state, so all of
+     it turns ink together on the white card. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/settings_row_height"
+    android:background="@drawable/settings_row"
+    android:focusable="true"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/settings_row_pad"
+    android:paddingEnd="@dimen/settings_row_pad">
+
+    <ImageView
+        android:id="@+id/settings_icon"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_marginEnd="12dp"
+        android:duplicateParentState="true"
+        android:importantForAccessibility="no"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/settings_label"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:duplicateParentState="true"
+        android:ellipsize="end"
+        android:fontFamily="@font/vazirmatn_medium"
+        android:maxLines="1"
+        android:textAlignment="viewStart"
+        android:textColor="@color/settings_label"
+        android:textSize="17sp" />
+
+    <TextView
+        android:id="@+id/settings_value"
+        android:layout_width="wrap_content"
+        android:layout_height="@dimen/settings_chip_height"
+        android:layout_marginStart="12dp"
+        android:background="@drawable/settings_chip"
+        android:duplicateParentState="true"
+        android:fontFamily="@font/vazirmatn_medium"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:textColor="@color/settings_chip_ink"
+        android:textSize="15sp"
+        android:visibility="gone" />
+
+    <!-- A switch: the track and its knob, both lit by the row's activated state (on). -->
+    <FrameLayout
+        android:id="@+id/settings_toggle"
+        android:layout_width="40dp"
+        android:layout_height="24dp"
+        android:layout_marginStart="12dp"
+        android:background="@drawable/settings_toggle_track"
+        android:duplicateParentState="true"
+        android:visibility="gone">
+
+        <View
+            android:id="@+id/settings_thumb"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_gravity="start|center_vertical"
+            android:layout_marginStart="3dp"
+            android:background="@drawable/settings_toggle_thumb"
+            android:duplicateParentState="true" />
+    </FrameLayout>
+
+    <android.widget.ImageView
+        android:id="@+id/settings_trail"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_marginStart="10dp"
+        android:duplicateParentState="true"
+        android:importantForAccessibility="no"
+        android:tint="@color/settings_value"
+        android:visibility="gone" />
+</LinearLayout>

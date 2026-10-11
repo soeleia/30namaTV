@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The skip / next-episode pill: the app's 48dp button height, rounded right off. -->
+    <dimen name="player_skip_height">48dp</dimen>
+    <dimen name="player_skip_radius">24dp</dimen>
+</resources>

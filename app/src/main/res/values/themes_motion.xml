@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Reduce motion (TvActivity sets it on its window): the opening page fades up where it is, as
+         the page Back returns to does, instead of rising; the leaving page already only fades. -->
+    <style name="Animation.App.Screen.Fade">
+        <item name="android:activityOpenEnterAnimation">@anim/screen_back_in</item>
+    </style>
+</resources>

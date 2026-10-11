@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A person's page, home's frame with the person in the billboard's place: its art and scrims
+     behind (the words stay hidden), the rows of what 30nama streams with them where home's sit
+     (their title at @dimen/billboard_height, the art @dimen/rows_title_room below), and the
+     header over them. The empty or failed state stands where the first row's title would. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <include layout="@layout/billboard" />
+
+    <FrameLayout
+        android:id="@+id/person_rows"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <include layout="@layout/person_header" />
+
+    <LinearLayout
+        android:id="@+id/person_note"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="56dp"
+        android:layout_marginTop="@dimen/billboard_height"
+        android:clipChildren="false"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/person_note_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="@style/TextAppearance.App.DialogTitle" />
+
+        <TextView
+            android:id="@+id/person_note_hint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:maxWidth="520dp"
+            android:textAppearance="@style/TextAppearance.App.Body"
+            android:textColor="@color/text_dim" />
+
+        <Button
+            android:id="@+id/person_note_action"
+            style="@style/Widget.App.Button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp" />
+    </LinearLayout>
+</FrameLayout>

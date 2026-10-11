@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The round plate behind the section's icon at the head of the end pane, and the account's
+     initial: the panel's surface, so the pane reads as about the panel beside it. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <solid android:color="@color/surface_high" />
+</shape>

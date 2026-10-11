@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="player_speed">Playback speed</string>
+    <string-array name="player_speeds">
+        <item>0.5×</item>
+        <item>0.75×</item>
+        <item>Normal</item>
+        <item>1.25×</item>
+        <item>1.5×</item>
+        <item>2×</item>
+    </string-array>
+
+    <string name="player_audio_subtitles">Audio &amp; Subtitles</string>
+    <string name="player_quality_speed">Quality &amp; Speed</string>
+    <string name="player_sample">Subtitles look like this</string>
+    <string name="player_track">Track %d</string>
+    <string name="player_skip_recap">Skip recap</string>
+
+    <string name="player_error_network">The internet connection dropped. Once it\'s back, press Play again.</string>
+    <string name="player_error_server">This video isn\'t available right now. Press Play again in a moment.</string>
+    <string name="player_error_format">This file won\'t play on this TV. Try another quality.</string>
+    <string name="player_error">Playback stopped. Press Play to try again.</string>
+</resources>

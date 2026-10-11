@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The sort pair's track: one quiet container for both choices, so the one not in use still
+     reads as part of a control rather than loose text. 48dp tall, its corners the pills' 22dp
+     plus their 2dp inset, so the pills sit concentric inside it. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#1FFFFFFF" />
+    <corners android:radius="24dp" />
+</shape>

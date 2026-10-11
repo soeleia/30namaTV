@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A person's page (PersonActivity), and the makers in a title's cast row. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fa">
+    <string name="person_actor">بازیگر</string>
+    <string name="person_director">کارگردان</string>
+    <string name="person_creator">سازنده</string>
+    <string name="person_cast_crew">بازیگران و عوامل</string>
+    <plurals name="person_titles">
+        <item quantity="one">%d عنوان</item>
+        <item quantity="other">%d عنوان</item>
+    </plurals>
+    <!-- %s: their best-known titles by name, «Slow Horses، MobLand، Backdraft». -->
+    <string name="person_known_for">شناخته‌شده برای %s</string>
+    <!-- The sort pair beside «مرتبط‌ترین» (sort_relevant). -->
+    <string name="person_sort_newest">جدیدترین</string>
+    <string name="person_empty">هنوز عنوانی از او در ۳۰نما نیست</string>
+    <string name="person_empty_hint">هر وقت فیلم یا سریالی از او به ۳۰نما بیاید، همین‌جا پیدایش می‌کنید.</string>
+    <string name="person_error">فهرست عنوان‌هایش بارگیری نشد</string>
+    <string name="person_back">بازگشت</string>
+</resources>

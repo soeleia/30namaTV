@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The interface keeps its lilac accent after the requested switch to original 30nama branding.
+         - brand: sign-in steps, status light, done check and player loading indicator.
+           As a fill it carries ink (never white: 2.1:1); as a mark it sits on ink.
+           Never on large areas, never as body text.
+         - red: not an accent. It is 30nama's, kept for watched progress and 30nama's own marks
+           (its score badge, the "30"). New work does not reach for it.
+         - Focus stays white everywhere; grounds stay ink. The purple ground in
+           original logo and launch motion keep their own source colors.
+         Other screens take these by name, never by hex. -->
+    <color name="brand">#C5A0FF</color>
+    <color name="ink">#141414</color>
+    <color name="ink_deep">#0B0B0B</color>
+    <color name="surface">#1F1F1F</color>
+    <color name="surface_high">#2E2E2E</color>
+    <color name="button_idle">#4D4D4E</color>
+    <color name="hairline">#333333</color>
+    <color name="text">#FFFFFF</color>
+    <color name="text_body">#E5E5E5</color>
+    <color name="text_dim">#B3B3B3</color>
+    <color name="text_faint">#808080</color>
+    <color name="red">#E50914</color>
+    <color name="green">#46D369</color>
+    <color name="focus_wash">#33FFFFFF</color>
+    <color name="progress_track">#66808080</color>
+    <color name="scrim">#141414</color>
+    <color name="scrim_mid">#B3141414</color>
+    <color name="scrim_clear">#00141414</color>
+
+    <!-- Leanback's own colours, overridden by name so every stock widget joins in. -->
+    <color name="lb_browse_title_color">@color/text</color>
+    <color name="lb_browse_header_color">@color/text_body</color>
+    <color name="lb_browse_header_description_color">@color/text_dim</color>
+    <color name="lb_basic_card_title_text_color">@color/text</color>
+    <color name="lb_basic_card_content_text_color">@color/text_dim</color>
+    <color name="lb_details_description_color">@color/text</color>
+    <color name="lb_details_description_body_color">@color/text_body</color>
+    <color name="lb_details_overview_bg_color">@color/surface</color>
+    <color name="lb_action_text_color">@color/text</color>
+    <color name="lb_error_message">@color/text_dim</color>
+    <color name="lb_search_bar_text">@color/text</color>
+    <color name="lb_search_bar_hint">@color/text_faint</color>
+    <color name="lb_search_bar_text_speech_mode">@color/text</color>
+    <color name="lb_search_bar_hint_speech_mode">@color/text_faint</color>
+    <!-- The idle voice orb: a dark control like the rest, not Leanback's pale disc. -->
+    <color name="lb_speech_orb_not_recording">@color/surface_high</color>
+    <color name="lb_speech_orb_not_recording_pulsed">@color/button_idle</color>
+    <color name="lb_speech_orb_not_recording_icon">@color/text</color>
+    <color name="lb_playback_controls_time_text_color">@color/text_dim</color>
+    <color name="lb_control_button_text">@color/text</color>
+    <!-- IMDb's own yellow, for its mark beside the score. -->
+    <color name="imdb">#F5C518</color>
+</resources>

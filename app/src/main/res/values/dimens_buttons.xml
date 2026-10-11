@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The button system (Widget.App.Button* in themes.xml). Every button is a pill: the 44dp
+     shape the app's other controls already use (the rail, settings, the skip pill), so a
+     control never reads as artwork (6dp corners) and an icon-only toggle is the same pill
+     closed to a circle. The pill sits inside a 48dp view, 2dp clear above and below, so the
+     focused 1.05 lift stays inside the view's own bounds wherever it is placed. -->
+<resources>
+    <dimen name="button_height">44dp</dimen>
+    <dimen name="button_radius">22dp</dimen>
+    <dimen name="button_inset">2dp</dimen>
+    <!-- button_height + 2 × button_inset: the remote's target. -->
+    <dimen name="button_target">48dp</dimen>
+    <dimen name="button_min_width">88dp</dimen>
+    <!-- Label side; the icon side is tighter because a glyph's box carries its own air. -->
+    <dimen name="button_pad">22dp</dimen>
+    <dimen name="button_pad_icon">16dp</dimen>
+    <!-- An icon-only toggle: the 20dp icon centred in the 44dp circle. -->
+    <dimen name="button_pad_round">12dp</dimen>
+    <dimen name="button_icon">20dp</dimen>
+    <dimen name="button_icon_gap">8dp</dimen>
+    <!-- Between buttons in a row. -->
+    <dimen name="button_gap">12dp</dimen>
+    <!-- A dialog's buttons sit edge to edge in the framework's bar: each pill is inset 6dp at the
+         sides (a 12dp gap between two), so its label padding is button_pad + 6dp. -->
+</resources>

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Leanback dimensions overridden by name. Persian sets about 10% larger than Latin and needs
+     more leading, so text sizes and line spacing run above Leanback's defaults. -->
+<resources>
+    <dimen name="corner">6dp</dimen>
+    <dimen name="button_corner">4dp</dimen>
+    <!-- The navigation rail: icons in a 64dp column at the start edge, solid ink under them and a
+         feather over the 32dp to where home's text and rows start. Open, a 320dp panel: solid to
+         8dp past the pill's end (216dp), then a 104dp feather. -->
+    <dimen name="rail_width">64dp</dimen>
+    <dimen name="rail_pill_width">200dp</dimen>
+    <dimen name="rail_panel_width">320dp</dimen>
+    <!-- Items and the one pill behind them share a size; the pill glides item to item, on a
+         52dp pitch (44 + 8). -->
+    <dimen name="rail_item_height">44dp</dimen>
+    <dimen name="rail_item_radius">22dp</dimen>
+    <dimen name="rail_item_inset">8dp</dimen>
+    <dimen name="rail_item_gap">8dp</dimen>
+    <!-- Down the 540dp screen: Lily from 40dp, past the 27dp title-safe band, 40dp tall; the
+         items from 112dp. Mark to Search's icon is 43dp, against 30dp between icons, so the mark
+         reads apart; eight items end with Settings' icon at 509dp and its pill at 520dp, inside
+         the bottom's safe bands. -->
+    <dimen name="rail_brand_top">40dp</dimen>
+    <dimen name="rail_brand_size">40dp</dimen>
+    <dimen name="rail_items_top">112dp</dimen>
+    <dimen name="rail_mark_width">3dp</dimen>
+    <dimen name="rail_mark_height">16dp</dimen>
+    <!-- How far the open rail's panel and labels travel in from the edge. -->
+    <dimen name="rail_slide">24dp</dimen>
+    <!-- The QR sign-in: the steps' column at the start edge, the code's plate at the end. -->
+    <dimen name="login_column">400dp</dimen>
+    <dimen name="login_qr">220dp</dimen>
+    <dimen name="content_start">96dp</dimen>
+    <!-- Where the rows begin on home: everything above belongs to the billboard, whose text
+         (40 + 50 + 34 + 35 + 70 dp at most) ends at 229dp, a row title's height above the rows.
+         The focused row's title then takes the first @dimen/rows_title_room of them, and its
+         captioned posters (162 + 48 dp) end inside the 540dp screen even lifted. -->
+    <dimen name="billboard_height">252dp</dimen>
+    <dimen name="rows_title_room">36dp</dimen>
+    <!-- The title page: where the first row's artwork sits under the actions, and where it
+         rises to once the remote moves into the rows (below the names, which stay). The text
+         (names, facts, genres, three synopsis lines, credits) and the actions end near 383dp,
+         48dp above the waiting rows. -->
+    <dimen name="details_rows_top">431dp</dimen>
+    <dimen name="details_rows_raised">186dp</dimen>
+
+    <dimen name="lb_browse_title_text_size">28sp</dimen>
+    <dimen name="lb_browse_header_text_size">20sp</dimen>
+    <dimen name="lb_browse_header_height">30dp</dimen>
+    <!-- Room for the 114% focus scale between neighbours. -->
+    <dimen name="lb_browse_item_horizontal_spacing">16dp</dimen>
+    <dimen name="lb_browse_item_vertical_spacing">20dp</dimen>
+    <dimen name="lb_rounded_rect_corner_radius">@dimen/corner</dimen>
+
+    <dimen name="lb_basic_card_title_text_size">15sp</dimen>
+    <dimen name="lb_basic_card_content_text_size">14sp</dimen>
+
+    <dimen name="lb_details_description_title_text_size">32sp</dimen>
+    <dimen name="lb_details_description_title_resized_text_size">26sp</dimen>
+    <dimen name="lb_details_description_title_line_spacing">46dp</dimen>
+    <dimen name="lb_details_description_subtitle_text_size">16sp</dimen>
+    <dimen name="lb_details_description_body_text_size">16sp</dimen>
+    <dimen name="lb_details_description_body_line_spacing">29dp</dimen>
+    <dimen name="lb_details_description_under_title_baseline_margin">36dp</dimen>
+    <dimen name="lb_details_description_under_subtitle_baseline_margin">36dp</dimen>
+
+    <dimen name="lb_action_text_size">16sp</dimen>
+    <dimen name="lb_action_1_line_height">44dp</dimen>
+    <dimen name="lb_action_2_lines_height">60dp</dimen>
+    <dimen name="lb_action_button_corner_radius">@dimen/button_corner</dimen>
+    <!-- Leanback dims its search plate to 20% while typing; ours is already dark, so keep it whole. -->
+    <integer name="lb_search_bar_text_mode_background_alpha">255</integer>
+    <!-- Search's voice orb starts past the rail, where home's content starts. -->
+    <dimen name="lb_search_bar_speech_orb_margin_start">@dimen/content_start</dimen>
+</resources>

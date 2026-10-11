@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- An alias kept so existing @font/vazirmatn_bold references need no edit: Yekan Bakh, see vazir.xml. -->
+<font-family xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <font android:font="@font/yekanbakh_bold" android:fontStyle="normal" android:fontWeight="700"
+        app:font="@font/yekanbakh_bold" app:fontStyle="normal" app:fontWeight="700" />
+</font-family>

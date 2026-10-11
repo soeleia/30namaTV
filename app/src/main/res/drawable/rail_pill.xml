@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The rail's focus pill: the same white every focused control uses. One view, gliding. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/text" />
+    <corners android:radius="@dimen/rail_item_radius" />
+</shape>

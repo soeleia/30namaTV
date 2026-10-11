@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A value that isn't a choice (a cache's size, the version) and a row's trailing icon: dim at
+     rest, softened ink on the white card. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:alpha="0.7" android:color="@color/ink" android:state_focused="true" />
+    <item android:color="@color/text_dim" />
+</selector>

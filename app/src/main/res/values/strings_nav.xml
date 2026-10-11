@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Strings for the navigation and login work (Rail, Intro, LoginActivity). Same orthography as
+     strings.xml: ZWNJ in compounds, Persian digits and punctuation. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fa">
+    <string name="login_title">با گوشی وارد شوید</string>
+    <string name="login_step_camera">دوربین گوشی را باز کنید.</string>
+    <string name="login_step_scan">کد QR را اسکن کنید.</string>
+    <string name="login_step_confirm">ورود را در ۳۰نما تأیید کنید.</string>
+</resources>

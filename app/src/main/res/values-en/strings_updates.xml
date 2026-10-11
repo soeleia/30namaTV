@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_update">App update</string>
+    <string name="app_update_help">Once a day after opening, the app checks GitHub and automatically downloads a new release. Select this row to check again or install a ready update. Android asks you to confirm installation.</string>
+    <string name="update_check">Check</string>
+    <string name="update_checking">Checking</string>
+    <string name="update_current">Up to date</string>
+    <string name="update_install">Install</string>
+    <string name="update_retry">Retry</string>
+    <string name="update_releases">Releases</string>
+    <string name="update_downloading">Downloading</string>
+    <string name="update_ready">Version %1$s is ready. If Android asks, allow this app to install updates, then select Install again.</string>
+    <string name="update_download_version">Downloading version %1$s. The download continues in the background.</string>
+    <string name="update_signature_mismatch">This APK has a different signing key. To move from an older personal test build, follow the installation guide on the Releases page. Uninstalling removes local settings and login.</string>
+    <string name="update_invalid">The update file is invalid and will not be installed. Check again.</string>
+    <string name="update_no_installer">An Android package installer is not available on this device.</string>
+    <string name="update_browser_missing">Open github.com/soeleia/30namaTV/releases on your phone or computer.</string>
+    <string name="update_failed">The update check or download failed. Check your connection and retry.</string>
+</resources>

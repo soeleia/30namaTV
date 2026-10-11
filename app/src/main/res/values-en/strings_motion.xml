@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_reduce_motion">Reduce motion</string>
+    <string name="settings_reduce_motion_help">Nothing slides or slowly grows; only a short fade remains, so changes still show. The launch animation is skipped too. For slower TVs, or if motion on screen bothers you.</string>
+    <string name="settings_reduce_motion_system">Animations are off in the TV\'s own settings, so motion is reduced either way.</string>
+</resources>

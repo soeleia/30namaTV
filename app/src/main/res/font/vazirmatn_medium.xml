@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- An alias kept so existing @font/vazirmatn_medium references need no edit: Yekan Bakh, see vazir.xml.
+     Medium draws Regular: the purchased licence covers Yekan Bakh weights 4 and 6 only. -->
+<font-family xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <font android:font="@font/yekanbakh_regular" android:fontStyle="normal" android:fontWeight="500"
+        app:font="@font/yekanbakh_regular" app:fontStyle="normal" app:fontWeight="500" />
+</font-family>

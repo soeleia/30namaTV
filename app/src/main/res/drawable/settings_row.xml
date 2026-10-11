@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- An option row: nothing at rest on the panel, the white card under the remote and a shade of
+     it while OK is held, fading as every control's fill does (150 ms in, 100 ms out). Rounded
+     rather than a pill: a row is a line of the panel, not a button, and lifted under the remote
+     its 12dp corner runs parallel to the panel's 20dp one, 8dp inside it. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:enterFadeDuration="150" android:exitFadeDuration="100">
+    <item android:state_pressed="true">
+        <shape><solid android:color="@color/text_body" /><corners android:radius="@dimen/settings_row_radius" /></shape>
+    </item>
+    <item android:state_focused="true">
+        <shape><solid android:color="@color/text" /><corners android:radius="@dimen/settings_row_radius" /></shape>
+    </item>
+    <item android:drawable="@android:color/transparent" />
+</selector>

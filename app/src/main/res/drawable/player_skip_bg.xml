@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The skip and next-episode pill: dark glass with a white rim over the video, solid white under the
+     remote (and for the instant OK presses it). Over it, the countdown: a fill clipped from the start
+     edge, the level running 0 to 10000 as the next episode or an auto-skip comes due. Light on the
+     glass, a shade of ink on the white, so it reads in both states without hiding the label. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <selector android:enterFadeDuration="150" android:exitFadeDuration="100">
+            <!-- A shade down while OK is held, focused or not, as the app's buttons do. -->
+            <item android:state_pressed="true">
+                <shape><solid android:color="@color/text_body" /><corners android:radius="@dimen/player_skip_radius" /></shape>
+            </item>
+            <item android:state_focused="true">
+                <shape><solid android:color="@color/text" /><corners android:radius="@dimen/player_skip_radius" /></shape>
+            </item>
+            <item>
+                <shape>
+                    <solid android:color="#D9141414" />
+                    <stroke android:width="2dp" android:color="@color/text" />
+                    <corners android:radius="@dimen/player_skip_radius" />
+                </shape>
+            </item>
+        </selector>
+    </item>
+    <item android:id="@+id/player_skip_fill">
+        <clip android:clipOrientation="horizontal" android:gravity="start">
+            <selector>
+                <item android:state_focused="true">
+                    <shape><solid android:color="#2E141414" /><corners android:radius="@dimen/player_skip_radius" /></shape>
+                </item>
+                <item android:state_pressed="true">
+                    <shape><solid android:color="#2E141414" /><corners android:radius="@dimen/player_skip_radius" /></shape>
+                </item>
+                <item>
+                    <shape><solid android:color="#47FFFFFF" /><corners android:radius="@dimen/player_skip_radius" /></shape>
+                </item>
+            </selector>
+        </clip>
+    </item>
+</layer-list>

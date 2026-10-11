@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Failures worded for the screen (Api.ApiError, Context.describe) and the sign-in code's plate.
+     Same orthography as strings.xml: ZWNJ in compounds, Persian digits and punctuation. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fa">
+    <string name="error_server">مشکلی از سمت ۳۰نما پیش آمد. کمی بعد دوباره امتحان کنید.</string>
+    <string name="error_session">از حساب خود خارج شده‌اید. دوباره وارد شوید.</string>
+    <string name="error_sign_in">برای این کار وارد حساب شوید.</string>
+    <string name="login_code_failed">کد ورود دریافت نشد</string>
+</resources>

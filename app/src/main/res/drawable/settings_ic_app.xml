@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app: a gear, eight teeth round a hub. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="22dp" android:height="22dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M19.09,13.24L21.30,14.40L20.27,16.88L17.89,16.14A7.2,7.2 0 0,1 16.14,17.89L16.88,20.27L14.40,21.30L13.24,19.09A7.2,7.2 0 0,1 10.76,19.09L9.60,21.30L7.12,20.27L7.86,17.89A7.2,7.2 0 0,1 6.11,16.14L3.73,16.88L2.70,14.40L4.91,13.24A7.2,7.2 0 0,1 4.91,10.76L2.70,9.60L3.73,7.12L6.11,7.86A7.2,7.2 0 0,1 7.86,6.11L7.12,3.73L9.60,2.70L10.76,4.91A7.2,7.2 0 0,1 13.24,4.91L14.40,2.70L16.88,3.73L16.14,6.11A7.2,7.2 0 0,1 17.89,7.86L20.27,7.12L21.30,9.60L19.09,10.76A7.2,7.2 0 0,1 19.09,13.24z" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8"
+        android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <path android:pathData="M9,12a3,3 0 1,0 6,0a3,3 0 1,0 -6,0" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8"
+        android:strokeLineCap="round" android:strokeLineJoin="round" />
+</vector>

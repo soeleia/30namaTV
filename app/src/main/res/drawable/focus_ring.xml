@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Netflix's focus frame: 3 dp of white on the artwork's edge, fading in over 150 ms. A shape's
+     stroke already stays inside its bounds, so no inset: an inset left a sliver of art outside it. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:enterFadeDuration="150" android:exitFadeDuration="100">
+    <item android:state_focused="true">
+        <shape>
+            <stroke android:width="3dp" android:color="@color/text" />
+            <corners android:radius="@dimen/corner" />
+        </shape>
+    </item>
+    <item android:drawable="@android:color/transparent" />
+</selector>

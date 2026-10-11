@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A button's label and icon: ink on the white (and on the pressed shade of it), white on the
+     glass at rest, faint when the button is disabled. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/text_faint" android:state_enabled="false" />
+    <item android:color="@color/ink" android:state_pressed="true" />
+    <item android:color="@color/ink" android:state_focused="true" />
+    <item android:color="@color/text" />
+</selector>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A section: the white pill on focus, a grey one while its options have the remote. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:enterFadeDuration="150" android:exitFadeDuration="100">
+    <item android:state_focused="true">
+        <shape><solid android:color="@color/text" /><corners android:radius="@dimen/rail_item_radius" /></shape>
+    </item>
+    <item android:state_activated="true">
+        <shape><solid android:color="@color/surface_high" /><corners android:radius="@dimen/rail_item_radius" /></shape>
+    </item>
+    <item android:drawable="@android:color/transparent" />
+</selector>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "See all": an arrow onward along the row, in the rail's stroke; mirrored for Persian. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="44dp" android:height="44dp" android:viewportWidth="24" android:viewportHeight="24"
+    android:autoMirrored="true">
+    <path android:pathData="M5,12h13M13,6.5l5.5,5.5 -5.5,5.5" android:strokeColor="@color/text" android:strokeWidth="1.6"
+        android:strokeLineCap="round" android:strokeLineJoin="round" />
+</vector>

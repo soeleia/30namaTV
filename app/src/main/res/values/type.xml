@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Leanback's text appearances, redefined under their own names so every stock widget picks up
+     the pinned faces: Peyda for Persian titles, Yekan Bakh for Persian body text
+     (@font/vazir and the vazirmatn_* aliases), and Inter for English text and Latin runs.
+     A redefinition replaces the library style whole, so
+     each one restates the items it overrides. Persian is never letter-spaced; its narrow word
+     spaces (Yekan Bakh 0.15 em, Peyda 0.10) are widened at layout by TextSpacing.kt. -->
+<resources>
+    <style name="TextAppearance.Leanback" parent="TextAppearance.LeanbackBase">
+        <item name="android:fontFamily">@font/vazir</item>
+    </style>
+
+    <style name="TextAppearance.Leanback.Title" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/peyda_bold</item>
+        <item name="android:textSize">@dimen/lb_browse_title_text_size</item>
+        <item name="android:textColor">@color/lb_browse_title_color</item>
+    </style>
+
+    <style name="TextAppearance.Leanback.Header" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/peyda_bold</item>
+        <item name="android:textSize">@dimen/lb_browse_header_text_size</item>
+        <item name="android:textColor">@color/lb_browse_header_color</item>
+    </style>
+
+    <!-- A poster's English name (and a cast member's), in Inter. -->
+    <style name="TextAppearance.Leanback.ImageCardView.Title">
+        <item name="android:fontFamily">@font/inter_medium</item>
+        <item name="android:textColor">@color/lb_basic_card_title_text_color</item>
+        <item name="android:textSize">@dimen/lb_basic_card_title_text_size</item>
+    </style>
+
+    <!-- A poster's facts. Its line height (1.5 em, centred on the digits) is metaLine's Leading
+         span: the platform's TextAppearance has no lineHeight. -->
+    <style name="TextAppearance.Leanback.ImageCardView.Content">
+        <item name="android:fontFamily">@font/vazir</item>
+        <item name="android:textColor">@color/lb_basic_card_content_text_color</item>
+        <item name="android:textSize">@dimen/lb_basic_card_content_text_size</item>
+    </style>
+
+    <style name="TextAppearance.Leanback.DetailsDescriptionTitle">
+        <item name="android:fontFamily">@font/inter_bold</item>
+        <item name="android:textSize">@dimen/lb_details_description_title_text_size</item>
+        <item name="android:textColor">@color/lb_details_description_color</item>
+    </style>
+
+    <style name="TextAppearance.Leanback.DetailsDescriptionSubtitle">
+        <item name="android:fontFamily">@font/vazir</item>
+        <item name="android:textSize">@dimen/lb_details_description_subtitle_text_size</item>
+        <item name="android:textColor">@color/text_dim</item>
+    </style>
+
+    <style name="TextAppearance.Leanback.DetailsDescriptionBody">
+        <item name="android:fontFamily">@font/vazir</item>
+        <item name="android:textSize">@dimen/lb_details_description_body_text_size</item>
+        <item name="android:textColor">@color/lb_details_description_body_color</item>
+    </style>
+
+    <style name="TextAppearance.Leanback.DetailsActionButton">
+        <item name="android:fontFamily">@font/vazirmatn_bold</item>
+        <item name="android:textSize">@dimen/lb_action_text_size</item>
+        <item name="android:textColor">@color/on_button</item>
+        <item name="android:textAllCaps">false</item>
+    </style>
+
+    <style name="TextAppearance.Leanback.ErrorMessage">
+        <item name="android:fontFamily">@font/vazir</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:textColor">@color/lb_error_message</item>
+    </style>
+
+    <style name="TextAppearance.Leanback.PlaybackControlLabel">
+        <item name="android:fontFamily">@font/vazir</item>
+        <item name="android:textSize">@dimen/lb_control_button_text_size</item>
+        <item name="android:textColor">@color/lb_control_button_text</item>
+    </style>
+
+    <!-- The running clock. Yekan Bakh's digits are proportional ("1" is 0.2 em narrower than "0"),
+         so tnum keeps the time from twitching every second. -->
+    <style name="TextAppearance.Leanback.PlaybackControlsTime">
+        <item name="android:fontFamily">@font/vazir</item>
+        <item name="android:fontFeatureSettings">tnum</item>
+        <item name="android:textSize">@dimen/lb_playback_controls_time_text_size</item>
+        <item name="android:textColor">@color/lb_playback_controls_time_text_color</item>
+    </style>
+
+    <!-- The app's own text. One scale, Apple TV's discipline: a big bold title, a quiet meta
+         line, a readable body, and nothing in between competing with them. The hero is an
+         English name in Inter; Billboard switches to Peyda for a Persian one. -->
+    <style name="TextAppearance.App.Hero" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/inter_bold</item>
+        <item name="android:textSize">38sp</item>
+        <item name="android:textColor">@color/text</item>
+    </style>
+
+    <!-- An episode's number over its art. -->
+    <style name="TextAppearance.App.Numeral" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/peyda_bold</item>
+        <item name="android:textSize">40sp</item>
+        <item name="android:textColor">@color/text</item>
+    </style>
+
+    <!-- A cast member's initials, when there is no photo: the Latin face of the name under them. -->
+    <style name="TextAppearance.App.Initials" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/inter_bold</item>
+        <item name="android:textSize">30sp</item>
+        <item name="android:textColor">@color/text_dim</item>
+    </style>
+
+    <!-- The rail's labels: the row titles' face, a step smaller. Colour comes from rail_ink. -->
+    <style name="TextAppearance.App.Nav" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/peyda_semibold</item>
+        <item name="android:textSize">17sp</item>
+    </style>
+
+    <!-- The Persian name under the English hero: same face, a step down, a shade softer. -->
+    <style name="TextAppearance.App.Subtitle" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/peyda_semibold</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:textColor">@color/text_body</item>
+    </style>
+
+    <style name="TextAppearance.App.Display" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/peyda_bold</item>
+        <item name="android:textSize">30sp</item>
+        <item name="android:textColor">@color/text</item>
+    </style>
+
+    <!-- The facts under a name. Line height as for ImageCardView.Content: metaLine's Leading. -->
+    <style name="TextAppearance.App.Meta" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/vazirmatn_medium</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">@color/text_dim</item>
+    </style>
+
+    <style name="TextAppearance.App.Body" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/vazir</item>
+        <item name="android:textSize">17sp</item>
+        <item name="android:textColor">@color/text_body</item>
+    </style>
+
+    <!-- The billboard's synopsis: a step above body, for two or three lines read over artwork
+         from the sofa. Billboard sets its face and leading per script (1.65 for Persian, 1.45 for
+         English), since Yekan Bakh's own 1.50 em line would otherwise be stretched again. -->
+    <style name="TextAppearance.App.Synopsis" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/vazirmatn_regular</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:textColor">@color/text_body</item>
+    </style>
+
+    <!-- 16sp, not 15: the smallest body size has to hold at three metres. -->
+    <style name="TextAppearance.App.Caption" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/vazir</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">@color/text_dim</item>
+    </style>
+
+    <!-- Button labels: a step under body and a weight under bold, so a row of actions reads as
+         quiet and sure under a 38sp title instead of competing with it. -->
+    <style name="TextAppearance.App.Button" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/vazirmatn_medium</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">@color/on_button</item>
+    </style>
+
+    <style name="TextAppearance.App.Tile" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/peyda_bold</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:textColor">@color/text</item>
+    </style>
+
+    <style name="TextAppearance.App.DialogTitle" parent="TextAppearance.Leanback">
+        <item name="android:fontFamily">@font/peyda_bold</item>
+        <item name="android:textSize">21sp</item>
+        <item name="android:textColor">@color/text</item>
+    </style>
+</resources>

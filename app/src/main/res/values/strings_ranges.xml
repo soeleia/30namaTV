@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fa">
+    <!-- A long season's stretch of fifty: a title-page row's range, and what a screen reader says
+         for the player's compact chip («۱–۵۰»). The numbers arrive in Persian digits. -->
+    <string name="episode_range">قسمت %1$s تا %2$s</string>
+    <!-- A long season's row: «فصل ۱، قسمت ۱ تا ۵۰». A comma, not a dot: beside Persian digits
+         a dot reads as a zero («۱ ·» as «۱۰»). -->
+    <string name="season_range">%1$s، %2$s</string>
+</resources>

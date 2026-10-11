@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The sort pair's labels: ink on the white under the remote, white on the order in use, dim on
+     the other, so the pair reads as one control with one choice lit. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/ink" android:state_pressed="true" />
+    <item android:color="@color/ink" android:state_focused="true" />
+    <item android:color="@color/text" android:state_selected="true" />
+    <item android:color="@color/text_dim" />
+</selector>

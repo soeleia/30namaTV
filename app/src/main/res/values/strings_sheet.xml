@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The sheets (Sheets.kt). A confirmation names its action by the verb, never «تأیید». -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fa">
+    <string name="sheet_cancel">انصراف</string>
+    <!-- continue_watching_dismiss only takes the title off the row; say no more than that. -->
+    <string name="continue_remove_question">این عنوان از ادامهٔ تماشا حذف شود؟</string>
+    <string name="continue_remove">حذف از ادامهٔ تماشا</string>
+</resources>

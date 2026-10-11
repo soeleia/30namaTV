@@ -1,0 +1,7 @@
+<resources>
+    <item type="font" name="peyda_bold">@font/vazirmatn_open_bold</item>
+    <item type="font" name="peyda_medium">@font/vazirmatn_open_medium</item>
+    <item type="font" name="peyda_semibold">@font/vazirmatn_open_semibold</item>
+    <item type="font" name="yekanbakh_regular">@font/vazirmatn_open_regular</item>
+    <item type="font" name="yekanbakh_bold">@font/vazirmatn_open_bold</item>
+</resources>

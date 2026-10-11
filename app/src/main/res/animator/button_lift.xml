@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A button comes forward 5% under the remote and settles when it leaves, with Motion's
+     easeOut and FOCUS_IN / FOCUS_OUT (180 / 120 ms); OK held presses it back to rest. A state
+     animator rather than View.lift(), so the framework's own buttons (dialogs, Retry) lift too.
+     Cards lift 8% (Motion.LIFT); a button is a smaller, closer target and needs less. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_enabled="false">
+        <set>
+            <objectAnimator android:propertyName="scaleX" android:valueTo="1" android:valueType="floatType" android:duration="120" android:interpolator="@interpolator/ease_out" />
+            <objectAnimator android:propertyName="scaleY" android:valueTo="1" android:valueType="floatType" android:duration="120" android:interpolator="@interpolator/ease_out" />
+        </set>
+    </item>
+    <item android:state_pressed="true">
+        <set>
+            <objectAnimator android:propertyName="scaleX" android:valueTo="1" android:valueType="floatType" android:duration="120" android:interpolator="@interpolator/ease_out" />
+            <objectAnimator android:propertyName="scaleY" android:valueTo="1" android:valueType="floatType" android:duration="120" android:interpolator="@interpolator/ease_out" />
+        </set>
+    </item>
+    <item android:state_focused="true">
+        <set>
+            <objectAnimator android:propertyName="scaleX" android:valueTo="1.05" android:valueType="floatType" android:duration="180" android:interpolator="@interpolator/ease_out" />
+            <objectAnimator android:propertyName="scaleY" android:valueTo="1.05" android:valueType="floatType" android:duration="180" android:interpolator="@interpolator/ease_out" />
+        </set>
+    </item>
+    <item>
+        <set>
+            <objectAnimator android:propertyName="scaleX" android:valueTo="1" android:valueType="floatType" android:duration="120" android:interpolator="@interpolator/ease_out" />
+            <objectAnimator android:propertyName="scaleY" android:valueTo="1" android:valueType="floatType" android:duration="120" android:interpolator="@interpolator/ease_out" />
+        </set>
+    </item>
+</selector>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Leanback's search bar, resized by name (SearchFragment.styleBar does the rest): the field as
+     tall as the voice orb and a short step from it, so the two read as one control; the query a
+     step above body; the orb coming forward by the cards' 8% (Motion.LIFT), not Leanback's 20%. -->
+<resources>
+    <dimen name="lb_search_bar_items_height">52dp</dimen>
+    <dimen name="lb_search_bar_items_margin_start">16dp</dimen>
+    <dimen name="lb_search_bar_text_size">20sp</dimen>
+    <!-- Half the field's height: a pill. -->
+    <dimen name="search_field_radius">26dp</dimen>
+    <item name="lb_search_orb_focused_zoom" type="fraction">108%</item>
+</resources>

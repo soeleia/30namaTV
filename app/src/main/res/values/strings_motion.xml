@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Reduce motion (Settings, App section). Same orthography as strings.xml. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fa">
+    <string name="settings_reduce_motion">کاهش انیمیشن</string>
+    <string name="settings_reduce_motion_help">چیزی روی صفحه نمی‌لغزد یا آرام بزرگ نمی‌شود؛ فقط محو شدنی کوتاه می‌ماند تا تغییرها دیده شوند. انیمیشن آغاز برنامه هم پخش نمی‌شود. برای تلویزیون‌های کندتر، یا اگر حرکت روی صفحه آزارتان می‌دهد.</string>
+    <string name="settings_reduce_motion_system">انیمیشن‌ها در تنظیمات خود تلویزیون خاموش است، پس حرکت‌ها در هر حال کم شده‌اند.</string>
+</resources>

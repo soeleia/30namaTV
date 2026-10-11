@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The title page (DetailsActivity): the reading lines under the names, the synopsis among them,
+     keep to 500dp from the 56dp margin, the start 58% of the screen, where the side scrim holds
+     its ink (DetailsActivity.shadeText): about 60 characters a line rather than 85 over the art. -->
+<resources>
+    <dimen name="details_text_width">500dp</dimen>
+</resources>
