@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -261,8 +262,7 @@ object AppUpdates {
                 }
                 digest.digest().hex() != hash
             }) return Status.Failed(Failure.INVALID_APK)
-        val flags = if (Build.VERSION.SDK_INT >= 28) android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES
-            else @Suppress("DEPRECATION") android.content.pm.PackageManager.GET_SIGNATURES
+        val flags = signingFlags()
         val installed = app.packageManager.getPackageInfo(app.packageName, flags)
         val candidate = app.packageManager.getPackageArchiveInfo(file.absolutePath, flags)
             ?: return Status.Failed(Failure.INVALID_APK)
@@ -285,6 +285,14 @@ object AppUpdates {
 
     private fun versionCode(info: PackageInfo): Long = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode
         else @Suppress("DEPRECATION") info.versionCode.toLong()
+
+    @Suppress("DEPRECATION")
+    internal fun signingFlags(): Int = when {
+        Build.VERSION.SDK_INT < 28 -> PackageManager.GET_SIGNATURES
+        // Android 9 only collects archive certificates when this legacy flag is present.
+        Build.VERSION.SDK_INT == 28 -> PackageManager.GET_SIGNING_CERTIFICATES or PackageManager.GET_SIGNATURES
+        else -> PackageManager.GET_SIGNING_CERTIFICATES
+    }
 
     @Suppress("DEPRECATION")
     private fun signers(info: PackageInfo): Set<String> {

@@ -72,7 +72,7 @@ gh secret set RELEASE_STORE_PASSWORD --repo soeleia/30namaTV
 1. Increase `versionCode` and `versionName` in `app/build.gradle.kts`.
 2. Run local checks and test playback/navigation on the TV.
 3. Commit and push to `main`; wait for the Actions build to pass.
-4. Tag the tested commit, for example `git tag v1.0.1` and `git push origin v1.0.1`.
+4. Replace `VERSION` with the new `versionName`, then tag the tested commit: `git -c tag.gpgsign=false tag -a vVERSION -m "30namaTV VERSION"` and `git push origin vVERSION`. Use a new tag for every release.
 
 Actions uploads the optimized APK and SHA-256 checksum to the tag's GitHub release after emulator checks pass. The SHA file uses `dist/30namaTV.apk` as its path; verify from a folder containing `dist/30namaTV.apk` using `sha256sum -c SHA256SUMS`, or compare the hash directly.
 

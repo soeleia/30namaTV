@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.Instrumentation
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Bundle
@@ -39,6 +40,7 @@ object UpdatesChecks {
             check(prefs.edit().remove("download_id").remove("download_version").commit())
             releaseMetadata()
             providerAndInvalidApk()
+            archiveSignersMatchInstalledApk()
             for (code in listOf("fa", "en")) {
                 onMain { Api.language = code; state.value = AppUpdates.Status.Idle }
                 activity = startActivitySync(Intent(targetContext, SettingsActivity::class.java)
@@ -122,7 +124,7 @@ object UpdatesChecks {
                 await("Settings did not stop") { host.isDestroyed }
                 activity = null
             }
-            result.putString("stream", "PASS: App update row in Persian/English, D-pad/About navigation, live status/progress/notes without focus loss, release-guide action, private narrow FileProvider, install permission and invalid APK rejection\n")
+            result.putString("stream", "PASS: App update row in Persian/English, D-pad/About navigation, live status/progress/notes without focus loss, release-guide action, private narrow FileProvider, install permission, invalid APK rejection and matching nonempty archive signers\n")
         } catch (error: Throwable) {
             result.putString("stream", error.stackTraceToString())
             resultCode = Activity.RESULT_CANCELED
@@ -160,6 +162,24 @@ object UpdatesChecks {
             val json = JSONObject(source).also(mutate)
             check(runCatching { AppUpdates.release(json) }.isFailure) { "Unsafe release fixture $index was accepted" }
         }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun Instrumentation.archiveSignersMatchInstalledApk() {
+        val apk = File.createTempFile("updates-signed-self-", ".apk", targetContext.cacheDir)
+        try {
+            File(targetContext.applicationInfo.sourceDir).copyTo(apk, overwrite = true)
+            val pm = targetContext.packageManager
+            val flags = AppUpdates.signingFlags()
+            val installed = pm.getPackageInfo(targetContext.packageName, flags)
+            val archive = checkNotNull(pm.getPackageArchiveInfo(apk.absolutePath, flags)) { "Own signed APK could not be parsed" }
+            val signers = AppUpdates::class.java.getDeclaredMethod("signers", PackageInfo::class.java).apply { isAccessible = true }
+            val installedSigners = signers.invoke(AppUpdates, installed) as Set<*>
+            val archiveSigners = signers.invoke(AppUpdates, archive) as Set<*>
+            check(installedSigners.isNotEmpty() && archiveSigners == installedSigners) {
+                "Archive signer lookup differed from installed APK: installed=$installedSigners, archive=$archiveSigners, flags=$flags"
+            }
+        } finally { apk.delete() }
     }
 
     @Suppress("DEPRECATION")
