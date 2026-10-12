@@ -9,6 +9,7 @@ import android.os.SystemClock
 import android.view.View
 import android.widget.Button
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.PlayerMessage
 import androidx.media3.exoplayer.source.SilenceMediaSource
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -75,11 +76,28 @@ object SkipChecks {
             SystemClock.sleep(500)
             runOnMainSync { check(level() < before - 100) { "Intro fill did not shrink during playback" } }
 
-            runOnMainSync { player.pause() }
-            await("Playback did not pause") { !player.isPlaying }
-            runOnMainSync { before = level() }
+            lateinit var paused: PlayerMessage
+            runOnMainSync {
+                player.pause()
+                paused = player.createMessage { _, _ -> }.send()
+            }
+            check(paused.blockUntilDelivered(7_000)) { "Playback thread did not complete pause" }
+            waitForIdleSync()
+            var pausedAt = 0L
+            runOnMainSync { pausedAt = player.currentPosition }
+            val pausedFill = ((20_000L - pausedAt).coerceIn(0, 20_000) * 10_000 / 20_000).toInt()
+            await("Paused intro fill did not settle at $pausedAt ms (expected level $pausedFill)") {
+                !player.isPlaying && offered(R.string.skip_intro) && abs(level() - pausedFill) <= 30
+            }
+            runOnMainSync { before = level(); pausedAt = player.currentPosition }
             SystemClock.sleep(600)
-            runOnMainSync { check(abs(level() - before) <= 30) { "Intro fill moved while paused" } }
+            var after = 0
+            var afterAt = 0L
+            var stillPlaying = false
+            runOnMainSync { after = level(); afterAt = player.currentPosition; stillPlaying = player.isPlaying }
+            check(abs(after - before) <= 30) {
+                "Intro fill moved while paused: position=$pausedAt->$afterAt ms, level=$before->$after, isPlaying=$stillPlaying"
+            }
             runOnMainSync { player.seekTo(10_000) }
             await("Paused forward seek did not update remaining time") { offered(R.string.skip_intro) && level() in 4_800..5_200 }
             runOnMainSync { player.seekTo(5_000) }
