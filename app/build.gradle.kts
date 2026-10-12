@@ -25,8 +25,8 @@ android {
         // Sony's 2017 Bravias shipped on 7.0; 23 still covers every Android TV since 2015.
         minSdk = 23
         targetSdk = 37
-        versionCode = 3
-        versionName = "1.0.1"
+        versionCode = 4
+        versionName = "1.0.2"
         testInstrumentationRunner = "com.doxigo.tv30.PerformanceChecks"
         // The TMDB v4 read token behind the trending row, from the gitignored local.properties
         // (`tmdb.token`). Without it the row is simply off.

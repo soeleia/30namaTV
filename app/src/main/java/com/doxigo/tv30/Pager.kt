@@ -95,7 +95,8 @@ class Pager(
         if (loading || page >= pages) return
         loading = true
         val mine = generation
-        pending = scope.launch {
+        // Leanback selects during layout; cached pages must publish on a later main-loop turn.
+        pending = scope.launch(Dispatchers.Main) {
             val result = runCatching { fetch(page + 1) }
             if (mine != generation) return@launch // reset (new sort, new query) while this page was in flight
             result.onSuccess { r ->

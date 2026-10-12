@@ -69,20 +69,30 @@ class PerformanceChecks : Instrumentation() {
     private suspend fun pagerCancelsReplacedRequests() = withContext(Dispatchers.Main) {
         val scope = CoroutineScope(Job() + Dispatchers.Main.immediate)
         val cancelled = mutableListOf<Int>()
+        val started = List(3) { CompletableDeferred<Unit>() }
+        val stopped = List(3) { CompletableDeferred<Unit>() }
         var requests = 0
         var errors = 0
         val pager = Pager(scope, ArrayObjectAdapter(), { error("No response expected") }, onError = { errors++ }) {
             val request = ++requests
-            try { awaitCancellation() } finally { cancelled += request }
+            started[request - 1].complete(Unit)
+            try { awaitCancellation() } finally {
+                cancelled += request
+                stopped[request - 1].complete(Unit)
+            }
         }
         try {
             pager.reset()
+            withTimeout(5_000) { started[0].await() }
             check(requests == 1)
             pager.reset()
+            withTimeout(5_000) { stopped[0].await(); started[1].await() }
             check(requests == 2 && cancelled == listOf(1)) { "Reset left the old request running" }
             pager.cancel()
+            withTimeout(5_000) { stopped[1].await() }
             check(cancelled == listOf(1, 2) && errors == 0) { "Search cancellation leaked work or showed an error" }
             pager.reset()
+            withTimeout(5_000) { started[2].await() }
             check(requests == 3) { "Pager did not restart after cancellation" }
         } finally {
             scope.cancel()

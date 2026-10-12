@@ -17,6 +17,16 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.leanback.widget.VerticalGridView
 import androidx.leanback.widget.ItemBridgeAdapter
+import androidx.leanback.widget.ArrayObjectAdapter
+import androidx.leanback.widget.FocusHighlight
+import androidx.leanback.widget.ObjectAdapter
+import androidx.leanback.widget.OnItemViewSelectedListener
+import androidx.leanback.widget.VerticalGridPresenter
+import android.widget.FrameLayout
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -64,6 +74,7 @@ object SearchGridChecks {
                 .body(payload.toString().toResponseBody()).build()
         }.build()
         try {
+            cachedPagePublishesAfterLayout()
             for (language in listOf("fa", "en")) {
                 runOnMainSync {
                     Api.language = language
@@ -128,12 +139,13 @@ object SearchGridChecks {
                 press(KeyEvent.KEYCODE_DPAD_UP)
                 await("Up did not return to typing") { editor.hasFocus() }
 
-                text(editor, "alpha")
-                SystemClock.sleep(100)
-                text(editor, "beta")
-                SystemClock.sleep(200)
-                check(requests.none { it.first == "alpha" }) { "Search fetched a replaced query before typing settled" }
+                runOnMainSync {
+                    editor.requestFocus()
+                    editor.text = "alpha"
+                    editor.text = "beta"
+                }
                 await("Debounced search did not load") { first(fragment)?.title == "beta 0" }
+                check(requests.none { it.first == "alpha" }) { "Search fetched a replaced query before typing settled" }
                 runOnMainSync {
                     check(editor.hasFocus()) { "Typing moved focus into results" }
                     fragment.onSearchQuerySubmit("beta")
@@ -194,7 +206,7 @@ object SearchGridChecks {
                     true
                 }
             }
-            result.putString("stream", "PASS: six-column RTL/LTR search, D-pad/editor/rail/clicks, row spacing, pagination, debounce/cancel, empty/error and voice results\n")
+            result.putString("stream", "PASS: cached pagination after layout, six-column RTL/LTR search, D-pad/editor/rail/clicks, row spacing, pagination, debounce/cancel, empty/error and voice results\n")
         } catch (error: Throwable) {
             capture("search-failure")
             result.putString("stream", error.stackTraceToString())
@@ -211,6 +223,71 @@ object SearchGridChecks {
             client.dispatcher.cancelAll()
         }
         finish(resultCode, result)
+    }
+
+    private fun Instrumentation.cachedPagePublishesAfterLayout() {
+        val host = startActivitySync(Intent(targetContext, SettingsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        val scope = CoroutineScope(Job() + Dispatchers.Main.immediate)
+        val items = ArrayObjectAdapter(PosterPresenter(112, 168))
+        val presenter = VerticalGridPresenter(FocusHighlight.ZOOM_FACTOR_NONE, false).apply {
+            numberOfColumns = 6
+            shadowEnabled = false
+        }
+        var holder: VerticalGridPresenter.ViewHolder? = null
+        var pager: Pager? = null
+        lateinit var grid: VerticalGridView
+        var selectedDuringLayout = false
+        var fetchedDuringLayout = false
+        var insertedDuringLayout = false
+        val requests = mutableListOf<Int>()
+        val errors = mutableListOf<Throwable>()
+        try {
+            runOnMainSync {
+                val views = presenter.onCreateViewHolder(FrameLayout(host))
+                holder = views
+                grid = views.gridView
+                grid.selectedPosition = 0
+                presenter.setOnItemViewSelectedListener(OnItemViewSelectedListener { _, item, _, _ ->
+                    if (!selectedDuringLayout && grid.isComputingLayout && item is Card) {
+                        selectedDuringLayout = true
+                        pager?.onSelected(item)
+                    }
+                })
+                presenter.onBindViewHolder(views, items)
+                items.registerObserver(object : ObjectAdapter.DataObserver() {
+                    override fun onItemRangeInserted(positionStart: Int, itemCount: Int) {
+                        insertedDuringLayout = insertedDuringLayout || grid.isComputingLayout
+                    }
+                })
+                pager = Pager(scope, items, { Card("Cached ${it.getInt("id")}") {} }, onError = { errors += it }) { page ->
+                    requests += page
+                    if (page == 2) fetchedDuringLayout = grid.isComputingLayout
+                    JSONObject().put("page", page).put("pages", 2)
+                        .put("posts", JSONArray().put(JSONObject().put("id", page)))
+                }
+                host.setContentView(views.view)
+                pager?.reset()
+                grid.requestFocus()
+            }
+            await("Immediate cached pagination did not finish outside layout", detail = {
+                "selectedDuringLayout=$selectedDuringLayout, requests=$requests, cards=${items.size()}, errors=$errors"
+            }) { selectedDuringLayout && requests == listOf(1, 2) && items.size() == 2 }
+            var failure: Throwable? = null
+            runOnMainSync {
+                if (fetchedDuringLayout || insertedDuringLayout || errors.isNotEmpty()) {
+                    failure = IllegalStateException("Cached fetch/publication ran during layout: fetch=$fetchedDuringLayout, insert=$insertedDuringLayout, errors=$errors")
+                }
+            }
+            failure?.let { throw it }
+        } finally {
+            runOnMainSync {
+                pager?.cancel()
+                scope.cancel()
+                holder?.let(presenter::onUnbindViewHolder)
+                host.finish()
+            }
+            await("Cached pagination fixture did not close") { host.isDestroyed }
+        }
     }
 
     private fun first(fragment: SearchFragment): Card? =
