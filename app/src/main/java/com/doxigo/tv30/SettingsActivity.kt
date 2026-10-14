@@ -26,11 +26,12 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.io.IOException
 import java.util.Locale
 
 /**
  * Settings as the Apple TV and Netflix apps lay them out, in three columns that each look like
- * what they are: the four sections down the start side as the rail's pills; the focused
+ * what they are: the five sections down the start side as the rail's pills; the focused
  * section's options on a raised panel, in titled groups, each row its name then its value (a
  * switch, a chip, or plain); and at the end edge, on the ink, the section's icon over what the
  * focused option does, every value it takes and a live preview where there is one. Up and Down
@@ -43,7 +44,7 @@ class SettingsActivity : TvActivity() {
      * One row: its name, what it does, its value now, every value it takes, and what OK does.
      * [on] makes it a switch; [trail] marks an OK that acts rather than steps (clear, open);
      * [note] is what the value means here, worked out live, and [ahead] the share of a film
-     * preload's preview lights.
+     * preload's preview lights. [sub] is a second line under the name; [warn] turns the value red.
      */
     private class Option(
         @StringRes val label: Int,
@@ -57,6 +58,8 @@ class SettingsActivity : TvActivity() {
         @DrawableRes val icon: Int = 0,
         @DrawableRes val trail: Int = 0,
         val danger: Boolean = false,
+        @StringRes val sub: Int = 0,
+        val warn: () -> Boolean = { false },
         val onClick: (() -> Unit)? = null,
     )
 
@@ -69,6 +72,7 @@ class SettingsActivity : TvActivity() {
         Section(R.string.settings_playback, R.drawable.settings_ic_playback, text(R.string.settings_playback_about), ::playback),
         Section(R.string.settings_subtitles, R.drawable.settings_ic_subtitles, text(R.string.settings_subtitles_about), ::subtitles),
         Section(R.string.settings_app, R.drawable.settings_ic_app, text(R.string.settings_app_about), ::app),
+        Section(R.string.settings_services, R.drawable.settings_ic_services, text(R.string.settings_services_about), ::services),
         Section(R.string.settings_account, R.drawable.settings_ic_account, {
             getString(R.string.settings_account_about) + if (Api.loggedIn) " " + getString(R.string.settings_plan_help) else ""
         }, ::account),
@@ -278,12 +282,18 @@ class SettingsActivity : TvActivity() {
             setImageResource(option.trail)
             visibility = View.VISIBLE
         }
+        if (option.sub != 0) {
+            row.findViewById<TextView>(R.id.settings_sub).apply {
+                text = latin(context, getString(option.sub), R.font.inter_regular)
+                visibility = View.VISIBLE
+            }
+            row.layoutParams.height = resources.getDimensionPixelSize(R.dimen.settings_row_tall)
+        }
         // A value that isn't one of a set (a size, the version) is read, not chosen: no chip, and
         // centred on the line as the name is, rather than in a pill.
         if (option.values.isEmpty()) row.findViewById<TextView>(R.id.settings_value).apply {
             background = null
             setPaddingRelative(0, 0, 0, 0)
-            setTextColor(getColorStateList(R.color.settings_value))
             layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT
             includeFontPadding = true
         }
@@ -339,6 +349,7 @@ class SettingsActivity : TvActivity() {
         }
         val value = row.findViewById<TextView>(R.id.settings_value)
         val text = option.value()
+        if (option.values.isEmpty()) value.setTextColor(getColorStateList(if (option.warn()) R.color.settings_danger_ink else R.color.settings_value))
         value.text = text?.let { latin(this, it, R.font.inter_medium) }
         value.typeface = medium(text ?: "")
         // In a chip, Persian comes down onto the pill's middle (see settings_chip_nudge).
@@ -632,6 +643,82 @@ class SettingsActivity : TvActivity() {
         }
     }
 
+    /**
+     * A service the viewer brings their own key to: the page its key comes from, the key in use
+     * now (theirs, else the build's), and one light call that tries a key.
+     */
+    private class Service(
+        val id: String, @StringRes val name: Int, @StringRes val unlocks: Int, @StringRes val help: Int,
+        val link: String, val key: () -> String, val check: suspend (String) -> Boolean,
+    )
+
+    private enum class Check { RUNNING, WORKS, REJECTED, UNREACHABLE }
+
+    private val keyed = listOf(
+        Service(Tmdb.NAME, R.string.service_tmdb, R.string.settings_tmdb_unlocks, R.string.settings_tmdb_help,
+            "https://www.themoviedb.org/settings/api", { Tmdb.key }, Tmdb::check),
+        Service(Subtitles.SUBDL, R.string.service_subdl, R.string.settings_subdl_unlocks, R.string.settings_subdl_help,
+            "https://subdl.com/panel/api", { Subtitles.subdlKey }, Subtitles::checkSubdl),
+        Service(Subtitles.OPENSUBTITLES, R.string.service_opensubtitles, R.string.settings_opensubtitles_unlocks,
+            R.string.settings_opensubtitles_help, "https://www.opensubtitles.com/consumers", { Subtitles.openSubtitlesKey }, Subtitles::checkOpenSubtitles),
+    )
+
+    /** What checking a key on saving found, by service, with the key it tried. ponytail: for this page's life; persist it if a rejected key should still say so next time. */
+    private val checks = HashMap<String, Pair<String, Check>>()
+
+    /** One row per service: OK opens the sheet that takes its key. */
+    private fun services(): List<Group> = listOf(Group(0, keyed.map { s ->
+        Option(s.name, text(s.help), value = { keyValue(s) }, note = { keyNote(s) }, sub = s.unlocks, warn = { outcome(s) == Check.REJECTED }) {
+            ask(getString(s.name), getString(R.string.settings_key_ask), Settings.savedKey(s.id), s.link) { save(s, it) }
+        }
+    }))
+
+    private fun outcome(s: Service) = checks[s.id]?.takeIf { it.first == Settings.savedKey(s.id) }?.second
+
+    /** Not set, being checked, refused, or the key's last four characters: enough to tell keys apart, never the key. */
+    private fun keyValue(s: Service): CharSequence {
+        val key = s.key()
+        return when {
+            key.isEmpty() -> getString(R.string.settings_key_none)
+            outcome(s) == Check.RUNNING -> getString(R.string.settings_key_checking)
+            outcome(s) == Check.REJECTED -> getString(R.string.settings_key_rejected)
+            else -> getString(R.string.settings_key_last, key.takeLast(4))
+        }
+    }
+
+    private fun keyNote(s: Service): CharSequence? = when {
+        Settings.savedKey(s.id).isEmpty() -> if (s.key().isEmpty()) null else getString(R.string.settings_key_built)
+        else -> when (outcome(s)) {
+            Check.WORKS -> getString(R.string.settings_key_works)
+            Check.REJECTED -> getString(R.string.settings_key_rejected_note)
+            Check.UNREACHABLE -> getString(R.string.settings_key_unreachable, getString(s.name))
+            else -> null
+        }
+    }
+
+    /**
+     * Saves the key at once and then tries it: saved whatever the answer, since from Iran the
+     * service may be out of reach while the key is fine. Keys are printable ASCII; anything else
+     * (a paste's line break, a Persian keyboard's letter) would not survive an HTTP header.
+     */
+    private fun save(s: Service, typed: String) {
+        val key = typed.filter { it in '!'..'~' }
+        Settings.saveKey(s.id, key)
+        if (key.isNotEmpty()) {
+            checks[s.id] = key to Check.RUNNING
+            lifecycleScope.launch {
+                val works = try { s.check(key) } catch (e: IOException) { null }
+                checks[s.id] = key to when (works) {
+                    true -> Check.WORKS
+                    false -> Check.REJECTED
+                    null -> Check.UNREACHABLE
+                }
+                refresh()
+            }
+        }
+        refresh()
+    }
+
     /** Signed in, the panel's one row signs out (the card above it says as whom); a guest's opens sign-in. */
     private fun account(): List<Group> = listOf(Group(0, listOf(
         if (!Api.loggedIn) {
@@ -768,7 +855,7 @@ class SettingsActivity : TvActivity() {
         private const val EXTRA_ROW = "row"
         private const val SUBTITLES = 1
         private const val APP = 2
-        private const val ACCOUNT = 3
+        private const val ACCOUNT = 4
         private const val SEAM = "seam"
         /**
          * A row's lift: 2.7% of a 296dp row is 4dp a side, so its white card stops 8dp inside the

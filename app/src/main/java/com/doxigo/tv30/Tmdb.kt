@@ -9,6 +9,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Request
 import org.json.JSONObject
 import java.io.IOException
@@ -18,12 +19,16 @@ import kotlin.math.abs
 
 /**
  * TMDB, for everything 30nama doesn't carry: the trending row, episode stills, Persian names, More
- * Like This and trailers. Off without a token (`tmdb.token` in local.properties). From Iran TMDB is
- * often out of reach without a VPN, so a failure backs every caller off for a minute: a page of
- * five seasons, or a home of forty names, waits on one timeout, not forty.
+ * Like This and trailers. Off without a key: the viewer's own from Settings, else (the developer's
+ * builds only) `tmdb.token` in local.properties. From Iran TMDB is often out of reach without a VPN,
+ * so a failure backs every caller off for a minute: a page of five seasons, or a home of forty
+ * names, waits on one timeout, not forty.
  */
 object Tmdb {
-    val enabled get() = BuildConfig.TMDB_TOKEN.isNotEmpty()
+    const val NAME = "TMDB"
+    /** A v4 read access token (a JWT, "eyJ…") or a v3 API key (32 hex digits): TMDB's page offers both, and viewers paste either. */
+    val key get() = Settings.pickKey(Settings.savedKey(NAME), BuildConfig.TMDB_TOKEN)
+    val enabled get() = key.isNotEmpty()
 
     // Short: nothing waits on TMDB, but a blocked TMDB should give up quickly.
     private val client by lazy { Api.http.newBuilder().connectTimeout(4, TimeUnit.SECONDS).callTimeout(8, TimeUnit.SECONDS).build() }
@@ -33,9 +38,7 @@ object Tmdb {
     /** `GET /3/[path]`. A 404 (a season TMDB numbers differently, an id it lacks) is an empty answer, not TMDB being down. */
     suspend fun get(path: String): JSONObject {
         if (!enabled || backingOff) throw IOException("TMDB off")
-        val request = Request.Builder().url("https://api.themoviedb.org/3/$path")
-            .header("Authorization", "Bearer ${BuildConfig.TMDB_TOKEN}")
-            .build()
+        val request = request(path, key)
         return try {
             Api.run { client.newCall(request).await() }.use { response ->
                 if (response.code == 404) return JSONObject()
@@ -47,6 +50,30 @@ object Tmdb {
             throw e
         }
     }
+
+    /**
+     * `GET /3/configuration`, TMDB's lightest call: true when it takes [key], false when it answers
+     * 401, an IOException when it can't be reached. Off the main thread, closing included: an unread
+     * HTTP/2 body is cancelled with a write to the socket.
+     */
+    suspend fun check(key: String): Boolean = withContext(Dispatchers.IO) {
+        Api.run { client.newCall(request("configuration", key)).await() }.use { response ->
+            when {
+                response.isSuccessful -> true
+                response.code == 401 -> false
+                else -> throw IOException("TMDB ${response.code}")
+            }
+        }
+    }
+
+    /** `/3/[path]` with [key] as its kind is sent: a v3 key as the api_key parameter, a read token as a Bearer header. */
+    internal fun request(path: String, key: String): Request {
+        val url = "https://api.themoviedb.org/3/$path".toHttpUrl()
+        if (isApiKey(key)) return Request.Builder().url(url.newBuilder().addQueryParameter("api_key", key).build()).build()
+        return Request.Builder().url(url).header("Authorization", "Bearer $key").build()
+    }
+
+    internal fun isApiKey(key: String) = Regex("[0-9a-fA-F]{32}").matches(key)
 
     /**
      * TMDB's entry for an IMDb id, as [language] names it: the [series] kind first, then the other

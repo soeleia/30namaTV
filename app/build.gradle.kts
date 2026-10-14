@@ -28,12 +28,16 @@ android {
         versionCode = 5
         versionName = "1.0.3"
         testInstrumentationRunner = "com.doxigo.tv30.PerformanceChecks"
-        // The TMDB v4 read token behind the trending row, from the gitignored local.properties
-        // (`tmdb.token`). Without it the row is simply off.
-        val tmdbToken = Properties().apply {
+        // TMDB (Tmdb.kt) and the subtitle sites (Subtitles.kt) take each viewer's own key, entered in
+        // Settings. These are the developer's fallback for their own builds, from the gitignored
+        // local.properties (`tmdb.token`, `subdl.key`, `opensubtitles.key`); Actions passes none, so a
+        // public APK carries no key and nobody spends anyone else's.
+        val local = Properties().apply {
             providers.fileContents(rootProject.layout.projectDirectory.file("local.properties")).asText.orNull?.let { load(it.reader()) }
-        }.getProperty("tmdb.token").orEmpty().trim()
-        buildConfigField("String", "TMDB_TOKEN", "\"$tmdbToken\"")
+        }
+        for ((field, property) in listOf("TMDB_TOKEN" to "tmdb.token", "SUBDL_KEY" to "subdl.key", "OPENSUBTITLES_KEY" to "opensubtitles.key")) {
+            buildConfigField("String", field, "\"${local.getProperty(property).orEmpty().trim()}\"")
+        }
     }
 
     if (releaseSigning["RELEASE_KEYSTORE"] != null) {

@@ -11,6 +11,9 @@ import android.view.Gravity
 import android.view.View
 import android.widget.TextView
 import androidx.core.content.res.ResourcesCompat
+import androidx.media3.common.text.Cue
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.extractor.text.CuesWithTiming
 
 /** A single rounded subtitle box around centered lines, with an outline when the box is off. */
 @SuppressLint("AppCompatCustomView") // The Leanback theme uses native TextView attributes.
@@ -68,4 +71,17 @@ internal class CueView(context: Context) : TextView(context) {
         const val RADIUS = 0.12f
         const val TRIM = 0.06f
     }
+}
+
+/**
+ * What a subtitle shows at [positionUs] of the video once moved [offsetUs] later (earlier when
+ * negative): every cue from its start up to, not including, its end, stacked as ExoPlayer stacks
+ * overlapping ones (the earliest start on top, then the longest).
+ */
+@androidx.annotation.OptIn(markerClass = [UnstableApi::class])
+internal fun cuesAt(timed: List<CuesWithTiming>, positionUs: Long, offsetUs: Long): List<Cue> {
+    val at = positionUs - offsetUs
+    return timed.filter { at >= it.startTimeUs && at < it.endTimeUs }
+        .sortedWith(compareBy({ it.startTimeUs }, { -it.durationUs }))
+        .flatMap { it.cues }
 }

@@ -27,4 +27,42 @@
     <string name="player_error_server">این ویدیو فعلاً در دسترس نیست. کمی بعد دوباره پخش را بزنید.</string>
     <string name="player_error_format">این فایل روی این تلویزیون پخش نمی‌شود. کیفیت دیگری را امتحان کنید.</string>
     <string name="player_error">پخش متوقف شد. دوباره پخش را بزنید.</string>
+
+    <!-- Find subtitles (Subtitles.kt): the Subtitles column's entry and the page it opens, which
+         searches SubDL and OpenSubtitles for what plays. Site names stay Latin and never open a
+         line: a line that starts with a Latin word turns left to right. -->
+    <string name="subtitle_find">یافتن زیرنویس</string>
+    <string name="subtitle_searching">در حال جست‌وجوی زیرنویس…</string>
+    <string name="subtitle_none_film">زیرنویسی برای این فیلم پیدا نشد.</string>
+    <string name="subtitle_none_episode">زیرنویسی برای این قسمت پیدا نشد.</string>
+    <string name="subtitle_search_again">جست‌وجوی دوباره</string>
+    <!-- On the chosen result's row, in place of its source, while it downloads. -->
+    <string name="subtitle_downloading">در حال دانلود…</string>
+    <!-- A downloaded one in the Subtitles column: its language and the site it came from, «فارسی از SubDL». -->
+    <string name="subtitle_found">%1$s از %2$s</string>
+    <!-- How often a result was downloaded, %s already grouped in Persian digits («۱۲٬۳۴۵ دانلود»). -->
+    <plurals name="subtitle_downloads">
+        <item quantity="one">%s دانلود</item>
+        <item quantity="other">%s دانلود</item>
+    </plurals>
+    <string name="subtitle_hearing_impaired">ویژهٔ ناشنوایان</string>
+    <!-- Failures, on the page or on a result's row; %s is the site. The quota is a site's daily
+         allowance (OpenSubtitles: five downloads a day without an account). -->
+    <string name="subtitle_error_network">ارتباط با سایت‌های زیرنویس برقرار نشد. اتصال اینترنت را بررسی کنید.</string>
+    <string name="subtitle_error_down">سایت %s فعلاً پاسخ نمی‌دهد. کمی بعد دوباره امتحان کنید.</string>
+    <string name="subtitle_error_quota">سهمیهٔ امروز %s تمام شده است. زیرنویس دیگری را امتحان کنید.</string>
+    <string name="subtitle_error_file">این زیرنویس باز نشد. یکی دیگر را امتحان کنید.</string>
+
+    <!-- Subtitle timing: the Subtitles column's entry, under it what it is set to, and the page it
+         opens, whose rows move the shown subtitle a quarter second a press. %s is the seconds,
+         already in Persian digits («۰٫۲۵»). -->
+    <string name="subtitle_timing">زمان‌بندی زیرنویس</string>
+    <string name="subtitle_timing_none">بدون جابه‌جایی</string>
+    <string name="subtitle_timing_earlier">%s ثانیه زودتر</string>
+    <string name="subtitle_timing_later">%s ثانیه دیرتر</string>
+    <string name="subtitle_earlier">زودتر</string>
+    <string name="subtitle_earlier_hint">وقتی زیرنویس از صدا عقب است</string>
+    <string name="subtitle_later">دیرتر</string>
+    <string name="subtitle_later_hint">وقتی زیرنویس از صدا جلو است</string>
+    <string name="subtitle_timing_error">این زیرنویس جابه‌جا نشد. دوباره امتحان کنید.</string>
 </resources>

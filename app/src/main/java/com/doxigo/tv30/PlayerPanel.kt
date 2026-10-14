@@ -12,6 +12,7 @@ import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
@@ -21,14 +22,22 @@ import androidx.leanback.widget.ItemBridgeAdapter
 
 // ---- The player's settings: a side panel of choices, and the episodes along the bottom. ----
 
-/** A row in a column: [checked] marks the current choice; null makes it a row that opens a page. */
-class Choice(val label: CharSequence, val checked: Boolean?, val onClick: () -> Unit)
+/**
+ * A row in a column: [checked] marks the current choice; null makes it a row that opens a page.
+ * [detail], a quieter line under the label, says what the label alone can't (a found subtitle's
+ * source, what a page is set to).
+ */
+class Choice(val label: CharSequence, val checked: Boolean?, val detail: CharSequence? = null, val onClick: () -> Unit)
 
 /** Choices under a header; a group with no header is set apart by space alone. */
 class Group(val header: String?, val choices: List<Choice>)
 
-/** One page: its title, an optional view over the columns, the columns, and the one the remote lands in. */
-class Page(val title: String, val columns: List<List<Group>>, val preview: View? = null, val landing: Int = 0)
+/**
+ * One page: its title, an optional view over the columns, the columns, and the one the remote lands
+ * in. [note] says where the page stands (searching, nothing found, a failure, a subtitle's shift),
+ * beside a spinner while [busy].
+ */
+class Page(val title: String, val columns: List<List<Group>>, val preview: View? = null, val landing: Int = 0, val note: CharSequence? = null, val busy: Boolean = false)
 
 /**
  * Settings as Netflix and Apple TV do them on a TV: a panel that slides in from the end edge over
@@ -51,6 +60,8 @@ class PlayerPanel(private val root: ViewGroup, under: View, private val onClosed
     private val stack = ArrayList<Level>()
     private val rows = ArrayList<View>()
     private var showing: View? = null
+    /** The top page's list, whose place a [refresh] keeps. */
+    private var scroll: ScrollView? = null
 
     /** The side panel's width; the subtitles keep to the rest of the screen while it shows. */
     val width = (580 * dp).toInt()
@@ -84,6 +95,18 @@ class PlayerPanel(private val root: ViewGroup, under: View, private val onClosed
         stack.last().row = rows.indexOf(side.findFocus())
         stack.add(Level(page))
         render(1)
+    }
+
+    /** Whether the panel shows [page] now: an answer that comes in later redraws it only then. */
+    fun shows(page: () -> Page) = showing === side && stack.lastOrNull()?.page === page
+
+    /** Draws the top page again as it now reads, the remote kept on its row and the list where it was. */
+    fun refresh() {
+        if (showing !== side) return
+        stack.last().row = rows.indexOf(side.findFocus())
+        val y = scroll?.scrollY ?: 0
+        render(0)
+        scroll?.let { it.post { it.scrollTo(0, y) } }
     }
 
     /** Back: a page at a time, then the panel. */
@@ -145,6 +168,7 @@ class PlayerPanel(private val root: ViewGroup, under: View, private val onClosed
         }
         content.addView(text(page.title, R.style.TextAppearance_App_DialogTitle), linear(MATCH, WRAP).apply { bottomMargin = px(20) })
         page.preview?.let { content.addView(it, linear(MATCH, px(120)).apply { bottomMargin = px(20) }) }
+        val note = page.note?.let { note(it, page.busy) }?.also { content.addView(it, linear(MATCH, WRAP).apply { bottomMargin = px(20) }) }
         val columns = LinearLayout(context)
         var landing: View? = null
         page.columns.forEachIndexed { c, groups ->
@@ -161,7 +185,7 @@ class PlayerPanel(private val root: ViewGroup, under: View, private val onClosed
                         if (choice.checked != null) views.forEachIndexed { j, v -> if (group.choices[j].checked != null) mark(v, v === view) }
                         choice.onClick()
                     }
-                    column.addView(view, linear(MATCH, px(44)).apply {
+                    column.addView(view, linear(MATCH, if (choice.detail == null) px(44) else WRAP).apply {
                         bottomMargin = px(4)
                         if (i == 0 && group.header == null) topMargin = gap
                     })
@@ -182,11 +206,13 @@ class PlayerPanel(private val root: ViewGroup, under: View, private val onClosed
             overScrollMode = View.OVER_SCROLL_NEVER
             addView(columns)
         }
+        this.scroll = scroll
         content.addView(scroll, linear(MATCH, 0, 1f))
         side.addView(content)
         // Focus moves before the old page goes: removing a focused view hands focus to the window's
-        // first focusable, the hidden controls.
-        (rows.getOrNull(level.row) ?: landing)?.requestFocus()
+        // first focusable, the hidden controls. With nothing to choose, the note holds it.
+        note?.isFocusable = rows.isEmpty()
+        (rows.getOrNull(level.row) ?: landing ?: note)?.requestFocus()
         side.removeView(old)
         if (direction != 0) {
             content.alpha = 0f
@@ -286,11 +312,28 @@ class PlayerPanel(private val root: ViewGroup, under: View, private val onClosed
         gravity = Gravity.CENTER_VERTICAL
         setBackgroundResource(R.drawable.player_row)
         setPaddingRelative(px(12), 0, px(16), 0)
-        contentDescription = header?.let { "$it${if (Api.language == "fa") "، " else ", "}${choice.label}" } ?: choice.label
+        contentDescription = listOfNotNull(header, choice.label, choice.detail).joinToString(if (Api.language == "fa") "، " else ", ")
         val label = text(latin(context, choice.label, R.font.inter_regular), R.style.TextAppearance_App_Body).apply {
             setTextColor(ink)
             isDuplicateParentStateEnabled = true
         }
+        // The detail under the label, a step quieter in the same ink; the row grows to hold both, the
+        // label taking a second line rather than losing its end (a release's group is at its end).
+        val body = choice.detail?.let { detail ->
+            minimumHeight = px(44)
+            label.maxLines = 2
+            LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                isDuplicateParentStateEnabled = true
+                setPadding(0, px(10), 0, px(10))
+                addView(label)
+                addView(text(latin(context, detail, R.font.inter_regular), R.style.TextAppearance_App_Caption).apply {
+                    setTextColor(ink?.withAlpha(0xB3))
+                    isDuplicateParentStateEnabled = true
+                    maxLines = 2
+                })
+            }
+        } ?: label
         val icon = ImageView(context).apply {
             setImageResource(if (choice.checked == null) R.drawable.player_chevron else R.drawable.player_check)
             imageTintList = ink
@@ -298,13 +341,14 @@ class PlayerPanel(private val root: ViewGroup, under: View, private val onClosed
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
         if (choice.checked == null) {
-            // The label lines up with the choices' labels, past their check's gutter.
-            label.setPaddingRelative(px(28), 0, 0, 0)
-            addView(label, linear(0, WRAP, 1f))
+            // The label lines up with the choices' labels, past their check's gutter; a detail here
+            // says what the page it opens is set to.
+            body.setPaddingRelative(px(28), body.paddingTop, 0, body.paddingBottom)
+            addView(body, linear(0, WRAP, 1f))
             addView(icon, linear(px(18), px(18)))
         } else {
             addView(icon, linear(px(18), px(18)).apply { marginEnd = px(10) })
-            addView(label, linear(0, WRAP, 1f))
+            addView(body, linear(0, WRAP, 1f))
             mark(this, choice.checked)
         }
     }
@@ -313,6 +357,23 @@ class PlayerPanel(private val root: ViewGroup, under: View, private val onClosed
     private fun mark(row: View, checked: Boolean) {
         row.isSelected = checked
         (row as ViewGroup).getChildAt(0).visibility = if (checked) View.VISIBLE else View.INVISIBLE
+    }
+
+    /**
+     * Where a page stands, in the rows' body text lined up with their labels, a spinner in the checks'
+     * gutter while it is [busy]. TalkBack reads it as it changes.
+     */
+    private fun note(value: CharSequence, busy: Boolean) = LinearLayout(context).apply {
+        gravity = Gravity.CENTER_VERTICAL
+        accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        setPaddingRelative(px(12), 0, px(16), 0)
+        if (busy) addView(ProgressBar(context).apply {
+            indeterminateTintList = ContextCompat.getColorStateList(context, R.color.brand)
+        }, linear(px(18), px(18)))
+        addView(text(value, R.style.TextAppearance_App_Body).apply {
+            maxLines = 4
+            setPaddingRelative(px(if (busy) 10 else 28), 0, 0, 0)
+        }, linear(0, WRAP, 1f))
     }
 
     /** Peyda, a step quieter than the rows, lined up with their labels. */

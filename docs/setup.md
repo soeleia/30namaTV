@@ -67,6 +67,22 @@ base64 < /path/to/30namatv-release.jks | tr -d '\n' | gh secret set RELEASE_KEYS
 gh secret set RELEASE_STORE_PASSWORD --repo soeleia/30namaTV
 ```
 
+## Service keys
+
+TMDB, SubDL and OpenSubtitles each need a free API key, and each viewer enters their own under **Settings > Services** (see the [README](../README.md#service-keys)). The app keeps it in its private preferences on that TV and tries it once on saving: TMDB's `/3/configuration`, a one-result SubDL search, and OpenSubtitles' `utilities/guessit` (its `/infos` lists answer any key). Actions passes no keys, so public APKs carry none and nobody spends anyone else's allowance.
+
+- TMDB: `https://www.themoviedb.org/settings/api`. A v3 API key (32 hex digits) is sent as `api_key`, a v4 read access token (`eyJ…`) as a Bearer header.
+- SubDL: `https://subdl.com/panel/api`.
+- OpenSubtitles: create an API consumer at `https://www.opensubtitles.com/consumers`; its API key is the one needed. Without a signed-in user a free key downloads five subtitles a day per IP, and the app never signs in: it carries keys only, never a username or password.
+
+For your own builds, ignored `local.properties` can hold fallbacks, used only while no key is saved in Settings:
+
+```properties
+tmdb.token=YOUR_TMDB_KEY_OR_READ_TOKEN
+subdl.key=YOUR_SUBDL_API_KEY
+opensubtitles.key=YOUR_OPENSUBTITLES_API_KEY
+```
+
 ## Publish an update
 
 1. Increase `versionCode` and `versionName` in `app/build.gradle.kts`.

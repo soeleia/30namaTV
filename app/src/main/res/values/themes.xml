@@ -25,7 +25,7 @@
         <!-- Unfocused rows are never dimmed: artwork keeps its own colour. -->
         <item name="overlayDimDimmedLevel">0%</item>
         <item name="playbackProgressPrimaryColor">@color/red</item>
-        <item name="playbackProgressSecondaryColor">@color/progress_track</item>
+        <item name="playbackProgressSecondaryColor">@color/progress_loaded</item>
         <item name="playbackControlsIconHighlightColor">@color/text</item>
         <item name="playbackControlsAutoHideTickleTimeout">5000</item>
     </style>

@@ -2,13 +2,16 @@ package com.doxigo.tv30
 
 import android.content.Context
 import android.net.Uri
-import android.os.SystemClock
 import androidx.media3.common.C
+import androidx.media3.common.Format
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.common.PriorityTaskManager
 import androidx.media3.common.util.UriUtil
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DataSourceInputStream
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.TransferListener
@@ -26,6 +29,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.LoadControl
 import androidx.media3.exoplayer.hls.HlsManifest
 import androidx.media3.exoplayer.hls.playlist.HlsMediaPlaylist
+import androidx.media3.exoplayer.hls.playlist.HlsMultivariantPlaylist
+import androidx.media3.exoplayer.hls.playlist.HlsPlaylist
+import androidx.media3.exoplayer.hls.playlist.HlsPlaylistParser
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
@@ -38,6 +44,7 @@ import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import java.io.IOException
+import kotlin.math.abs
 
 /**
  * How much of a title waits ahead of the picture, in two layers. In memory, ExoPlayer's own buffer,
@@ -67,9 +74,18 @@ object Buffering {
 
     private val upstream by lazy { OkHttpDataSource.Factory(cdn).setUserAgent(Api.userAgent) }
 
-    /** By path: the query is the CDN's signature, new with every `stream` call, while the bytes stay the same. */
-    // ponytail: assumes the CDN never serves different bytes at one path by query; key on the full URL if it ever does.
-    private val key = CacheKeyFactory { spec -> spec.key ?: spec.uri.buildUpon().clearQuery().build().toString() }
+    private val key = CacheKeyFactory { spec -> spec.key ?: cacheKey(spec.uri.toString()) }
+
+    /**
+     * A segment's cache key: its URL less what the CDN signs, new with every `stream` call while the
+     * bytes stay the same. That is the query, and the `/<viewer's IPv4>/<expiry>/<signature>/` it
+     * writes into the path; with them in, a title played again never found what an earlier viewing
+     * left on disk. Only those three parts together, so two files never share a key.
+     */
+    // ponytail: an IPv6 viewer's path keeps its signature (a cache miss, as before); add its shape if 30nama ever serves one.
+    fun cacheKey(url: String) = url.substringBefore('?').replaceFirst(SIGNED, "/")
+
+    private val SIGNED = Regex("/\\d{1,3}(?:\\.\\d{1,3}){3}/\\d{10}/[0-9a-f]{32,}/")
 
     /**
      * ExoPlayer's buffer lives on the Java heap, which a 2 GB TV caps at about 192 MB per app. A
@@ -103,17 +119,30 @@ object Buffering {
      * Keeps the read-ahead filled while [player] plays, until the caller's scope ends (the player's
      * screen stopping): the playing variant's segments from the playhead on, one at a time, up to
      * Settings.bufferPercent of what is left of the title or [readAhead] bytes, whichever comes
-     * first. It only uses the connection while the player does not ([priority]). Paused, it goes on
-     * for [PAUSED] (pausing to let it load is a habit on slow connections), then rests. Its errors
-     * stay here: a 403 three times running (a signature for another exit IP, or an expired one) ends
-     * it, anything else backs off, and the player sees neither.
+     * first; then, once [upcoming] names the next file's playlist (near the end, with autoplay),
+     * that file's first [OPENING_US], so autoplay starts from disk. It only uses the connection while
+     * the player does not ([priority]). Paused, it goes on until the window is full: pausing to let it
+     * load is a habit on slow connections. It used to stop 10 minutes into a pause, against one
+     * forgotten on a metered connection, but the window already bounds that in bytes (a fast
+     * connection filled it inside those 10 minutes anyway); the clock only cut slow connections
+     * short, where a 50% window can take over half an hour. Its errors stay here: a 403 three times
+     * running (a signature for another exit IP, or an expired one) ends it, anything else backs off,
+     * and the player sees neither.
      */
-    suspend fun prefetch(context: Context, player: ExoPlayer) {
+    suspend fun prefetch(context: Context, player: ExoPlayer, upcoming: () -> String?) {
         val cache = withContext(Dispatchers.IO) { cache(context.applicationContext) } ?: return
         // Downloading flavour: waits on a segment the player is writing instead of fetching it twice.
         val source = cacheSources(cache).setUpstreamPriorityTaskManager(priority).createDataSourceForDownloading()
         val buffer = ByteArray(CacheWriter.DEFAULT_BUFFER_SIZE_BYTES)
-        var pausedAt = 0L
+        // Playlists fetched here, by URL: a film's never change. A multivariant one leads to its
+        // variant nearest the bitrate.
+        val playlists = HashMap<String, HlsPlaylist>()
+        suspend fun fetch(url: String) = playlists.getOrPut(url) { withContext(Dispatchers.IO) { playlist(url) } }
+        suspend fun media(url: String, bitrate: Int): HlsMediaPlaylist? {
+            val fetched = fetch(url)
+            val variant = (fetched as? HlsMultivariantPlaylist)?.nearest(bitrate) ?: return fetched as? HlsMediaPlaylist
+            return fetch(variant) as? HlsMediaPlaylist
+        }
         var failures = 0
         var forbidden = 0
         // proceed() lets a task through only while it is the highest one registered, so register.
@@ -121,19 +150,32 @@ object Buffering {
         try {
             while (true) {
                 runInterruptible(Dispatchers.IO) { priority.proceed(C.PRIORITY_DOWNLOAD) } // the player's turn first
-                val now = SystemClock.elapsedRealtime()
-                pausedAt = if (player.playWhenReady) 0L else pausedAt.takeIf { it > 0 } ?: now
                 val percent = Settings.bufferPercent
-                // The variant playing now: Auto may have switched since the last turn.
-                val playlist = (player.currentManifest as? HlsManifest)?.mediaPlaylist?.takeIf { it.hasEndTag }
+                val manifest = player.currentManifest as? HlsManifest
+                val bitrate = player.videoFormat?.bitrate
+                val item = player.currentMediaItem
                 val positionUs = player.currentPosition * 1000
-                val next = if (playlist == null || percent == 0 || pausedAt > 0 && now - pausedAt > PAUSED) null
-                else withContext(Dispatchers.IO) { nextSegment(cache, playlist, positionUs, percent) }
-                if (next == null) {
-                    delay(IDLE)
-                    continue
-                }
                 try {
+                    // The variant playing now. A film's manifest keeps the one it started on, while
+                    // Auto moves with the bandwidth: the variant nearest the playing bitrate is the
+                    // one it reads, and the one the next file starts on.
+                    val playing = bitrate?.let { manifest?.multivariantPlaylist?.nearest(it) }
+                    val playlist = (if (playing == null || playing == manifest?.mediaPlaylist?.baseUri) manifest?.mediaPlaylist
+                    else media(playing, bitrate))?.takeIf { it.hasEndTag }
+                    var next: DataSpec? = null
+                    if (playlist != null) {
+                        val endUs = positionUs + (playlist.durationUs - positionUs) * percent / 100
+                        val (missing, runUs) = withContext(Dispatchers.IO) { nextSegment(cache, playlist, positionUs, endUs) }
+                        ready = Ready(item, positionUs / 1000, runUs / 1000)
+                        next = missing.takeIf { percent > 0 }
+                    }
+                    // This file's window full: the next one's opening, once [upcoming] says so.
+                    val url = if (next == null && percent > 0) upcoming() else null
+                    if (url != null) next = media(url, bitrate ?: Format.NO_VALUE)?.let { withContext(Dispatchers.IO) { nextSegment(cache, it, 0, OPENING_US).first } }
+                    if (next == null) {
+                        delay(IDLE)
+                        continue
+                    }
                     download(CacheWriter(source, next, buffer, null))
                     failures = 0
                     forbidden = 0
@@ -169,29 +211,60 @@ object Buffering {
     }
 
     /**
-     * The first segment from the playhead to the window's end that is not on disk yet, or null once
-     * the window is full: [percent] of what is left of the title, or [readAhead] bytes.
+     * Walks [playlist] from [fromUs] through the segments already on disk. Returns the first one that
+     * is not, if it starts before [toUs] and within [readAhead] bytes (else null: the window is
+     * full), and where that run on disk ends: how far playback could go on without the connection.
      */
-    private fun nextSegment(cache: Cache, playlist: HlsMediaPlaylist, positionUs: Long, percent: Int): DataSpec? {
-        val endUs = positionUs + (playlist.durationUs - positionUs) * percent / 100
+    private fun nextSegment(cache: Cache, playlist: HlsMediaPlaylist, fromUs: Long, toUs: Long): Pair<DataSpec?, Long> {
         var bytes = 0L
+        var runUs = fromUs
         for (segment in playlist.segments) {
             val startUs = segment.relativeStartTimeUs
-            if (startUs + segment.durationUs <= positionUs || segment.hasGapTag) continue
-            if (startUs >= endUs || bytes >= readAhead) return null
+            if (startUs + segment.durationUs <= fromUs || segment.hasGapTag) continue
             // Exactly the request the player makes for it, so both land on one cache entry.
             val spec = DataSpec.Builder().setUri(UriUtil.resolveToUri(playlist.baseUri, segment.url))
                 .setPosition(segment.byteRangeOffset).setLength(segment.byteRangeLength).build()
-            if (!spec.uri.isMedia()) return null // the player would not read it from the cache
+            if (!spec.uri.isMedia()) break // the player would not read it from the cache
             val id = key.buildCacheKey(spec)
             val length = if (spec.length != UNSET) spec.length
-            else ContentMetadata.getContentLength(cache.getContentMetadata(id)).takeIf { it != UNSET }?.minus(spec.position) ?: return spec
-            val cached = cache.getCachedBytes(id, spec.position, length)
-            if (cached < length) return spec
+            else ContentMetadata.getContentLength(cache.getContentMetadata(id)).takeIf { it != UNSET }?.minus(spec.position)
+            val cached = length?.let { cache.getCachedBytes(id, spec.position, it) } ?: 0L
+            if (length == null || cached < length) return spec.takeIf { startUs < toUs && bytes < readAhead } to runUs
             bytes += cached
+            runUs = startUs + segment.durationUs
         }
-        return null
+        return null to runUs
     }
+
+    /** The run on disk from where the playhead was ([fromMs]) to [toMs], in [item]'s time, as [prefetch] last saw it. */
+    private class Ready(val item: MediaItem?, val fromMs: Long, val toMs: Long)
+
+    private var ready: Ready? = null
+
+    /**
+     * Where the seek bar's loaded band ends: as far as playback could go on without the connection,
+     * through the player's own buffer or the read-ahead's run on disk, whichever reaches further.
+     * Main thread, as [prefetch] runs.
+     */
+    fun bufferedPosition(player: Player): Long {
+        val run = ready?.takeIf { it.item == player.currentMediaItem && player.currentPosition in it.fromMs..it.toMs }
+        return maxOf(player.bufferedPosition, run?.toMs ?: 0L)
+    }
+
+    /**
+     * The playlist at [url], straight from the CDN and read as the player reads it: against wherever
+     * a redirect led, so its segments resolve to the player's URLs. Blocks on the network.
+     */
+    private fun playlist(url: String): HlsPlaylist {
+        val source = upstream.createDataSource()
+        return DataSourceInputStream(source, DataSpec(Uri.parse(url))).use {
+            it.open()
+            HlsPlaylistParser().parse(source.uri ?: Uri.parse(url), it)
+        }
+    }
+
+    /** The variant nearest [bitrate], the one the player reads at that rate. */
+    private fun HlsMultivariantPlaylist.nearest(bitrate: Int) = variants.minByOrNull { abs(it.format.bitrate - bitrate) }?.url?.toString()
 
     // ---- The disk cache: one per process, as SimpleCache requires. ----
 
@@ -246,7 +319,8 @@ object Buffering {
 
     private const val UNSET = C.LENGTH_UNSET.toLong()
     private const val IDLE = 5_000L
-    private const val PAUSED = 10 * 60_000L
+    /** How much of the next file the read-ahead loads before it plays. */
+    private const val OPENING_US = 30_000_000L
 
     /** Media files: segments, and the side-loaded subtitles. Never playlists: one kept from an earlier session lists segment URLs whose signatures have expired. */
     private val MEDIA = setOf("ts", "m4s", "mp4", "m4v", "m4a", "aac", "vtt", "srt")

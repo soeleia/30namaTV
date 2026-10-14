@@ -20,4 +20,31 @@
     <string name="player_error_server">This video isn\'t available right now. Press Play again in a moment.</string>
     <string name="player_error_format">This file won\'t play on this TV. Try another quality.</string>
     <string name="player_error">Playback stopped. Press Play to try again.</string>
+
+    <string name="subtitle_find">Find subtitles</string>
+    <string name="subtitle_searching">Searching for subtitles…</string>
+    <string name="subtitle_none_film">No subtitles found for this film.</string>
+    <string name="subtitle_none_episode">No subtitles found for this episode.</string>
+    <string name="subtitle_search_again">Search again</string>
+    <string name="subtitle_downloading">Downloading…</string>
+    <string name="subtitle_found">%1$s (%2$s)</string>
+    <plurals name="subtitle_downloads">
+        <item quantity="one">%s download</item>
+        <item quantity="other">%s downloads</item>
+    </plurals>
+    <string name="subtitle_hearing_impaired">Hearing impaired</string>
+    <string name="subtitle_error_network">Couldn\'t reach the subtitle sites. Check the internet connection.</string>
+    <string name="subtitle_error_down">%s isn\'t answering right now. Try again in a moment.</string>
+    <string name="subtitle_error_quota">Today\'s %s allowance is used up. Try another subtitle.</string>
+    <string name="subtitle_error_file">This subtitle wouldn\'t open. Try another one.</string>
+
+    <string name="subtitle_timing">Subtitle timing</string>
+    <string name="subtitle_timing_none">No shift</string>
+    <string name="subtitle_timing_earlier">%s s earlier</string>
+    <string name="subtitle_timing_later">%s s later</string>
+    <string name="subtitle_earlier">Earlier</string>
+    <string name="subtitle_earlier_hint">When lines lag behind the speech</string>
+    <string name="subtitle_later">Later</string>
+    <string name="subtitle_later_hint">When lines run ahead of the speech</string>
+    <string name="subtitle_timing_error">Couldn\'t shift this subtitle. Try again.</string>
 </resources>

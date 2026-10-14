@@ -1,0 +1,311 @@
+package com.doxigo.tv30
+
+import android.os.Build
+import androidx.media3.common.MimeTypes
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.IOException
+import java.io.InputStream
+import java.nio.ByteBuffer
+import java.nio.charset.Charset
+import java.util.concurrent.TimeUnit
+import java.util.zip.ZipInputStream
+
+/**
+ * Subtitles from outside 30nama, for when its own are off or missing: SubDL first (a free key, no
+ * login, and the Persian archive it took over from Subscene), then OpenSubtitles. Each source is
+ * off without its key: the viewer's own from Settings, else (the developer's builds only)
+ * `subdl.key`, `opensubtitles.key` in local.properties. With neither, the player offers no search.
+ * API keys only, never a login.
+ *
+ * The shapes, as checked in October 2026:
+ * - SubDL documents its API behind a bot wall (subdl.com/api-doc), so from the clients that track
+ *   it: Bazarr's provider and its tests (github.com/morpheus65535/bazarr,
+ *   custom_libs/subliminal_patch/providers/subdl.py, tests/subliminal_patch/test_subdl.py) and
+ *   Cloudstream's (github.com/recloudstream/cloudstream, …/syncproviders/providers/Subdl.kt).
+ *   `GET api.subdl.com/api/v1/subtitles` takes api_key, imdb_id (the series' own for an episode)
+ *   or film_name and year, type movie|tv, season_number, episode_number, languages=FA,EN and
+ *   subs_per_page (30 at most). It answers {status, subtitles: [{release_name, name, language
+ *   ("FA"), lang, url ("/subtitle/….zip"), hi, season, episode, episode_from, episode_end}]}, and
+ *   the zip is at dl.subdl.com + url. A bad key answers 403 {"error":"not_authorized"} (seen
+ *   live); a spent allowance 429 {"error":"daily_limit" | "rate_limit"}.
+ * - OpenSubtitles from its own OpenAPI file (opensubtitles.stoplight.io, open_api.json), its live
+ *   /infos/languages ("fa", "en") and Bazarr's opensubtitlescom.py. `GET /api/v1/subtitles` takes
+ *   imdb_id (a film) or parent_imdb_id with season_number and episode_number, ids as plain numbers,
+ *   parameters sorted (else it answers with a redirect first); results are data[].attributes
+ *   {language, release, download_count, hearing_impaired, files: [{file_id, file_name}]}. `POST
+ *   /api/v1/download {file_id}` gives a temporary link to the file, always UTF-8. Every call sends
+ *   Api-Key and a "name vVERSION" User-Agent. With no signed-in user, a free key downloads 5 a day
+ *   per IP; 406 says they are spent.
+ */
+object Subtitles {
+    const val SUBDL = "SubDL"
+    const val OPENSUBTITLES = "OpenSubtitles"
+    // ponytail: 20 per language, the first page of each source; ask for a second page if a title ever outgrows it.
+    private const val PER_LANGUAGE = 20
+    /** No subtitle, nor a season's zip of them, comes near this: anything bigger is not one. */
+    private const val LIMIT = 8 shl 20
+    private val TYPES = setOf("srt", "ass", "ssa", "vtt")
+    private val AGENT = "30namaTV v${BuildConfig.VERSION_NAME}"
+
+    val subdlKey get() = Settings.pickKey(Settings.savedKey(SUBDL), BuildConfig.SUBDL_KEY)
+    val openSubtitlesKey get() = Settings.pickKey(Settings.savedKey(OPENSUBTITLES), BuildConfig.OPENSUBTITLES_KEY)
+    val enabled get() = subdlKey.isNotEmpty() || openSubtitlesKey.isNotEmpty()
+
+    // Short, as for TMDB: the remote waits on this, and from Iran either site may be out of reach.
+    private val client by lazy { Api.http.newBuilder().connectTimeout(5, TimeUnit.SECONDS).callTimeout(15, TimeUnit.SECONDS).build() }
+
+    /** What plays: a film, or one episode ([season] and [episode] above 0), by IMDb id when 30nama links one, else by name and year. */
+    class Wanted(val imdb: String?, val name: String, val year: Int?, val season: Int, val episode: Int) {
+        val isEpisode get() = season > 0 && episode > 0
+    }
+
+    /** One subtitle on offer: [ref] is what its source downloads it by (SubDL's path, OpenSubtitles' file id). */
+    class Found(val source: String, val language: String, val release: String, val downloads: Int, val hearingImpaired: Boolean, internal val ref: String)
+
+    /** A source said no: its allowance for today is spent ([quota]), or it is down or refused the key. */
+    class Refused(val source: String, val quota: Boolean) : IOException("$source refused")
+
+    /** A download with no subtitle in it this player reads: a rar, an image format, a broken zip. */
+    class Unreadable : IOException("no readable subtitle")
+
+    /**
+     * Both sources at once: Persian, then English, at most [PER_LANGUAGE] of each, SubDL's ahead of
+     * OpenSubtitles'. One source failing leaves the other's answer; with nothing found, the first
+     * failure is what went wrong.
+     */
+    suspend fun search(wanted: Wanted): List<Found> = coroutineScope {
+        val sources = listOfNotNull<suspend (Wanted) -> List<Found>>(
+            ::subdl.takeIf { subdlKey.isNotEmpty() },
+            ::openSubtitles.takeIf { openSubtitlesKey.isNotEmpty() },
+        )
+        val answers = sources.map { async { runCatching { it(wanted) } } }.awaitAll()
+        val found = answers.flatMap { it.getOrDefault(emptyList()) }
+        if (found.isEmpty()) answers.firstNotNullOfOrNull { it.exceptionOrNull() }?.let { throw it }
+        listOf("fa", "en").flatMap { language -> found.filter { it.language == language }.take(PER_LANGUAGE) }
+    }
+
+    private suspend fun subdl(wanted: Wanted): List<Found> {
+        val url = "https://api.subdl.com/api/v1/subtitles".toHttpUrl().newBuilder()
+            .addQueryParameter("api_key", subdlKey)
+            .apply {
+                if (wanted.imdb != null) addQueryParameter("imdb_id", wanted.imdb) else {
+                    addQueryParameter("film_name", wanted.name)
+                    wanted.year?.let { addQueryParameter("year", "$it") }
+                }
+                addQueryParameter("type", if (wanted.isEpisode) "tv" else "movie")
+                if (wanted.isEpisode) {
+                    addQueryParameter("season_number", "${wanted.season}")
+                    addQueryParameter("episode_number", "${wanted.episode}")
+                }
+            }
+            .addQueryParameter("languages", "FA,EN")
+            .addQueryParameter("subs_per_page", "30")
+            .build()
+        // Nothing found is {status: false, error: "can't find…"}: no subtitles, not a failure.
+        return json(SUBDL, Request.Builder().url(url).build()).optJSONArray("subtitles").objects().mapNotNull { item ->
+            // A pack whose own range leaves this episode out (a season's other half) is no use.
+            val from = item.optInt("episode_from")
+            val to = item.optInt("episode_end")
+            if (wanted.isEpisode && from > 0 && to >= from && wanted.episode !in from..to) return@mapNotNull null
+            Found(
+                SUBDL,
+                subdlLanguage(item) ?: return@mapNotNull null,
+                item.str("release_name") ?: item.str("name") ?: return@mapNotNull null,
+                // Not in Bazarr's reading; some clients see one or the other.
+                item.optInt("download_count", item.optInt("downloads")),
+                item.optBoolean("hi") || item.optInt("hi") == 1,
+                item.str("url") ?: return@mapNotNull null,
+            )
+        }
+    }
+
+    /** "fa" or "en": the code Bazarr reads from `language` ("FA"), or the name Cloudstream's clients see ("farsi_persian"). */
+    private fun subdlLanguage(item: JSONObject) = listOf("language", "lang").firstNotNullOfOrNull { key ->
+        when (item.str(key)?.lowercase()) {
+            "fa", "farsi", "persian", "farsi_persian" -> "fa"
+            "en", "english" -> "en"
+            else -> null
+        }
+    }
+
+    private suspend fun openSubtitles(wanted: Wanted): List<Found> {
+        val imdb = wanted.imdb?.removePrefix("tt")?.trimStart('0')
+        // Sorted, lower case and without defaults, as the API asks: otherwise it redirects first.
+        val params = sortedMapOf("languages" to "en,fa")
+        if (wanted.isEpisode) {
+            params["season_number"] = "${wanted.season}"
+            params["episode_number"] = "${wanted.episode}"
+        }
+        when {
+            imdb != null -> params[if (wanted.isEpisode) "parent_imdb_id" else "imdb_id"] = imdb
+            else -> {
+                params["query"] = wanted.name.lowercase()
+                params["type"] = if (wanted.isEpisode) "episode" else "movie"
+                if (!wanted.isEpisode) wanted.year?.let { params["year"] = "$it" }
+            }
+        }
+        val url = "https://api.opensubtitles.com/api/v1/subtitles".toHttpUrl().newBuilder()
+            .apply { for ((key, value) in params) if (key == "languages") addEncodedQueryParameter(key, value) else addQueryParameter(key, value) }
+            .build()
+        return json(OPENSUBTITLES, openSubtitlesCall(url.toString()).build()).optJSONArray("data").objects().mapNotNull { item ->
+            val attributes = item.optJSONObject("attributes") ?: return@mapNotNull null
+            // ponytail: a subtitle split over two CDs (two files) is skipped: 30nama's files are whole.
+            val file = attributes.optJSONArray("files").objects().singleOrNull() ?: return@mapNotNull null
+            Found(
+                OPENSUBTITLES,
+                attributes.str("language")?.takeIf { it == "fa" || it == "en" } ?: return@mapNotNull null,
+                attributes.str("release") ?: file.str("file_name") ?: return@mapNotNull null,
+                attributes.optInt("download_count"),
+                attributes.optBoolean("hearing_impaired"),
+                file.optLong("file_id").takeIf { it > 0 }?.toString() ?: return@mapNotNull null,
+            )
+        }
+    }
+
+    private fun openSubtitlesCall(url: String, key: String = openSubtitlesKey) = Request.Builder().url(url)
+        .header("Api-Key", key)
+        .header("Accept", "application/json")
+
+    /**
+     * Whether SubDL takes [key]: the smallest search there is. True for any answer, nothing found
+     * included; false for its 403 (not_authorized); an IOException when it can't say.
+     */
+    suspend fun checkSubdl(key: String): Boolean {
+        val url = "https://api.subdl.com/api/v1/subtitles".toHttpUrl().newBuilder()
+            .addQueryParameter("api_key", key)
+            .addQueryParameter("film_name", "test")
+            .addQueryParameter("subs_per_page", "1")
+            .build()
+        return check(Request.Builder().url(url).build(), 403)
+    }
+
+    /**
+     * Whether OpenSubtitles takes [key]: a guess at a file name's parts, the lightest call that
+     * checks the key (the /infos lists answer any key, seen live); false for its 403 ("You cannot
+     * consume this service") or a 401.
+     */
+    suspend fun checkOpenSubtitles(key: String): Boolean =
+        check(openSubtitlesCall("https://api.opensubtitles.com/api/v1/utilities/guessit?filename=test.mkv", key).build(), 401, 403)
+
+    /** Off the main thread, closing included: an unread HTTP/2 body is cancelled with a write to the socket. */
+    private suspend fun check(request: Request, vararg refused: Int): Boolean = withContext(Dispatchers.IO) {
+        Api.run { client.newCall(request.newBuilder().header("User-Agent", AGENT).build()).await() }.use { response ->
+            when {
+                response.isSuccessful -> true
+                response.code in refused -> false
+                else -> throw IOException("${response.code}")
+            }
+        }
+    }
+
+    /**
+     * [found]'s subtitle, out of its zip and in UTF-8, written to [dir] for the player to read from
+     * disk. [episode] picks the right file from a season's zip.
+     */
+    suspend fun download(found: Found, episode: Int, dir: File): File {
+        val (bytes, name) = if (found.source == SUBDL) {
+            bytes(SUBDL, Request.Builder().url(found.ref.takeIf { it.startsWith("https://") } ?: "https://dl.subdl.com${found.ref}").build()) to found.ref
+        } else {
+            val body = JSONObject().put("file_id", found.ref.toLong()).toString().toRequestBody("application/json".toMediaType())
+            val link = json(OPENSUBTITLES, openSubtitlesCall("https://api.opensubtitles.com/api/v1/download").post(body).build())
+            val url = link.str("link") ?: throw Refused(OPENSUBTITLES, quota = false)
+            bytes(OPENSUBTITLES, Request.Builder().url(url).build()) to (link.str("file_name") ?: "subtitle.srt")
+        }
+        return withContext(Dispatchers.IO) {
+            val (file, text) = runCatching { open(bytes, name, episode, found.language) }.getOrElse { throw Unreadable() }
+            // A SubDL file sent bare, not zipped, is named after its zip: SubRip, as nearly all are.
+            val type = file.substringAfterLast('.').lowercase().takeIf { it in TYPES } ?: "srt"
+            File(dir.apply { mkdirs() }, "${found.source}-${found.ref.hashCode().toUInt()}.$type")
+                .apply { writeText(text) }
+        }
+    }
+
+    /** What ExoPlayer is told a found file is, by its extension. */
+    fun mimeType(file: File) = when (file.extension) {
+        "vtt" -> MimeTypes.TEXT_VTT
+        "ass", "ssa" -> MimeTypes.TEXT_SSA
+        else -> MimeTypes.APPLICATION_SUBRIP
+    }
+
+    /**
+     * A download's subtitle file and its text: the file itself, or out of a zip the one whose name
+     * says [episode] (a season's zip holds them all), else its first. Mac zips' `__MACOSX` shadows
+     * of each file are no subtitles.
+     */
+    internal fun open(bytes: ByteArray, name: String, episode: Int, language: String): Pair<String, String> {
+        val isZip = bytes.size > 3 && bytes[0] == 'P'.code.toByte() && bytes[1] == 'K'.code.toByte()
+        // Latin-1 names (7.0 and later take a charset): an old zip's Persian file name in some code
+        // page must not fail the whole zip, as strict UTF-8 would.
+        val stream = bytes.inputStream()
+        val files = if (!isZip) listOf(name to bytes) else (if (Build.VERSION.SDK_INT >= 24) ZipInputStream(stream, Charsets.ISO_8859_1) else ZipInputStream(stream)).use { zip ->
+            generateSequence { zip.nextEntry }
+                .filter { !it.isDirectory && "__MACOSX" !in it.name && it.name.substringAfterLast('.').lowercase() in TYPES }
+                .map { it.name to zip.readAtMost(LIMIT) }
+                .toList()
+        }
+        // "S01E05", "1x05", "E05", "Episode 5", «قسمت ۵» spelt with Latin digits; not the 5 in "x265" or "Release 5".
+        val names = Regex("(?i)(?<![a-z])(?:e|ep|episode|x|قسمت)[ ._-]*0*$episode(?!\\d)")
+        val (file, data) = files.firstOrNull { episode > 0 && names.containsMatchIn(it.first.substringAfterLast('/')) } ?: files.firstOrNull() ?: throw Unreadable()
+        return file to decode(data, language)
+    }
+
+    /**
+     * Subtitle bytes as text. A byte-order mark says UTF-8 or UTF-16; without one, text that reads
+     * as UTF-8 is UTF-8, and the rest is the Windows code page of its language: Persian subtitles
+     * very often come in Windows-1256. That page has no Persian ی, so its Persian is spelt with the
+     * Arabic ي (and Arabic-keyboard typing adds ك): both read wrong, and are put right.
+     */
+    internal fun decode(bytes: ByteArray, language: String): String {
+        fun starts(vararg prefix: Int) = bytes.size >= prefix.size && prefix.indices.all { bytes[it] == prefix[it].toByte() }
+        val text = when {
+            starts(0xEF, 0xBB, 0xBF) -> String(bytes, 3, bytes.size - 3, Charsets.UTF_8)
+            starts(0xFF, 0xFE) -> String(bytes, 2, bytes.size - 2, Charsets.UTF_16LE)
+            starts(0xFE, 0xFF) -> String(bytes, 2, bytes.size - 2, Charsets.UTF_16BE)
+            // newDecoder() reports a malformed byte where String() would quietly replace it.
+            else -> runCatching { Charsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(bytes)).toString() }
+                .getOrElse { String(bytes, Charset.forName(if (language == "fa") "windows-1256" else "windows-1252")) }
+        }
+        return if (language == "fa") text.replace('ي', 'ی').replace('ى', 'ی').replace('ك', 'ک') else text
+    }
+
+    private suspend fun json(source: String, request: Request): JSONObject {
+        val bytes = bytes(source, request)
+        // A page in place of JSON (a challenge, an error page) is the source not answering.
+        return runCatching { JSONObject(String(bytes)) }.getOrElse { throw Refused(source, quota = false) }
+    }
+
+    /**
+     * The body, or why not: [Refused] for the source's own no (406 and 429 its allowance), a plain
+     * IOException for the network. Both sites ask for a User-Agent that names the app.
+     */
+    private suspend fun bytes(source: String, request: Request): ByteArray =
+        Api.run { client.newCall(request.newBuilder().header("User-Agent", AGENT).build()).await() }.use { response ->
+            when {
+                response.isSuccessful -> withContext(Dispatchers.IO) { response.body!!.byteStream().readAtMost(LIMIT) }
+                response.code == 406 || response.code == 429 -> throw Refused(source, quota = true)
+                else -> throw Refused(source, quota = false)
+            }
+        }
+
+    private fun InputStream.readAtMost(limit: Int): ByteArray {
+        val out = ByteArrayOutputStream()
+        val buffer = ByteArray(8192)
+        while (true) {
+            val read = read(buffer)
+            if (read < 0) return out.toByteArray()
+            out.write(buffer, 0, read)
+            if (out.size() > limit) throw Unreadable()
+        }
+    }
+}

@@ -44,6 +44,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
@@ -57,12 +58,23 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.common.text.Cue
+import androidx.media3.extractor.text.CuesWithTiming
+import androidx.media3.extractor.text.DefaultSubtitleParserFactory
+import androidx.media3.extractor.text.SubtitleParser
 import androidx.media3.ui.leanback.LeanbackPlayerAdapter
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.Request
 import org.json.JSONObject
+import java.io.File
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -135,13 +147,22 @@ class PlayerFragment : VideoSupportFragment() {
             .setLoadControl(Buffering.loadControl())
             .setPriorityTaskManager(Buffering.priority)
             .setAudioAttributes(AudioAttributes.Builder().setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).setUsage(C.USAGE_MEDIA).build(), true)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(Buffering.dataSource(context)).setLoadErrorHandlingPolicy(Retry403))
+            // DefaultDataSource reads the subtitles found on the subtitle sites from disk (Subtitles.kt)
+            // and hands everything over http to Buffering's.
+            .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(context, Buffering.dataSource(context))).setLoadErrorHandlingPolicy(Retry403))
             .build()
         player.setPlaybackSpeed(Settings.speed) // the panel's speed then holds for this viewing
         applyTrackPreferences()
         session = PlayerSession(context, player, ::previousEpisode, ::nextEpisode)
         player.addListener(object : Player.Listener {
-            override fun onCues(cueGroup: CueGroup) = showCues(cueGroup.cues)
+            // Not while the subtitle is moved off its times: its cues are drawn from here then (see retime).
+            override fun onCues(cueGroup: CueGroup) {
+                if (!retimed) showCues(cueGroup.cues)
+            }
+            // A found subtitle is picked by its track, which exists only once the item has loaded.
+            override fun onTracksChanged(tracks: Tracks) {
+                if (finds.picked != null) applyTrackPreferences()
+            }
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_ENDED && autoplays) autoplayNext()
             }
@@ -164,7 +185,7 @@ class PlayerFragment : VideoSupportFragment() {
         // The disk read-ahead, while the screen shows: it follows the playhead (seeks included) on
         // its own and stops with the screen, as the player does in onStop.
         lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) { Buffering.prefetch(context, player) }
+            repeatOnLifecycle(Lifecycle.State.STARTED) { Buffering.prefetch(context, player, ::upcoming) }
         }
     }
 
@@ -366,11 +387,19 @@ class PlayerFragment : VideoSupportFragment() {
 
     private fun play(next: JSONObject, positionMs: Long) {
         report()
+        // Subtitles found for the last file were for it alone, and so was its search page.
+        finds.cancel()
+        val picked = finds.picked != null
+        finds = Finds()
+        if (picked) {
+            applyTrackPreferences()
+            applySubtitleStyle()
+        }
         file = next
+        if (::panel.isInitialized && panel.shows(findPage)) panel.back()
         reportedAt = -1
-        val m3u8 = next.obj("file")?.opt("m3u8")
-        qualities = (m3u8 as? org.json.JSONArray).objects()
-        quality = Settings.pickQuality(qualities.map { it.str("label") }, chosenQuality ?: Settings.quality)
+        qualities = qualities(next)
+        quality = pickQuality(qualities)
         val info = next.optJSONObject("info")
         val season = info?.optInt("season") ?: 0
         val episode = info?.optInt("episode_number", info.optInt("episode")) ?: 0
@@ -411,22 +440,32 @@ class PlayerFragment : VideoSupportFragment() {
         if (Api.language == "fa") SimpleDateFormat("HH:mm", Locale.US).format(Date(ms)).localDigits()
         else DateFormat.getTimeFormat(requireContext()).format(Date(ms))
 
+    /** A file's qualities: each a label, and a playlist per audio variant. */
+    private fun qualities(f: JSONObject) = (f.obj("file")?.opt("m3u8") as? org.json.JSONArray).objects()
+
+    /** Among [qualities]' own labels, the one the panel picked for this viewing, else Settings'. */
+    private fun pickQuality(qualities: List<JSONObject>) = Settings.pickQuality(qualities.map { it.str("label") }, chosenQuality ?: Settings.quality)
+
+    /** [f]'s playlist in quality [q] and the audio picked; the file's own when it lists no qualities. */
+    private fun playlist(f: JSONObject, q: JSONObject?) = q?.str(chosenAudio ?: Settings.audio) ?: q?.str("default") ?: f.str("file", "m3u8")
+
+    /** [f]'s own subtitles, an srt or vtt URL per language, each known by its language. */
+    private fun ownSubtitles(f: JSONObject) = f.obj("file", "subtitle")?.let { subs ->
+        subs.keys().asSequence().mapNotNull { lang ->
+            val src = subs.str(lang) ?: return@mapNotNull null
+            MediaItem.SubtitleConfiguration.Builder(Uri.parse(src))
+                .setMimeType(if (src.substringBefore('?').endsWith(".srt")) MimeTypes.APPLICATION_SUBRIP else MimeTypes.TEXT_VTT)
+                .setLanguage(lang)
+                .setLabel(languageName(lang))
+                .setId(lang)
+                .build()
+        }.toList()
+    }.orEmpty()
+
     private fun setSource(positionMs: Long) {
         val f = file ?: return
-        val q = qualities.getOrNull(quality)
-        val audio = chosenAudio ?: Settings.audio
-        val url = q?.str(audio) ?: q?.str("default") ?: f.str("file", "m3u8") ?: return
-        val subtitles = f.obj("file", "subtitle")?.let { subs ->
-            subs.keys().asSequence().mapNotNull { lang ->
-                val src = subs.str(lang) ?: return@mapNotNull null
-                MediaItem.SubtitleConfiguration.Builder(Uri.parse(src))
-                    .setMimeType(if (src.substringBefore('?').endsWith(".srt")) MimeTypes.APPLICATION_SUBRIP else MimeTypes.TEXT_VTT)
-                    .setLanguage(lang)
-                    .setLabel(languageName(lang))
-                    .setId(lang)
-                    .build()
-            }.toList()
-        }.orEmpty()
+        val url = playlist(f, qualities.getOrNull(quality)) ?: return
+        val subtitles = ownSubtitles(f) + finds.added.values
         player.setMediaItem(
             MediaItem.Builder().setUri(url).setMimeType(MimeTypes.APPLICATION_M3U8).setSubtitleConfigurations(subtitles)
                 .setMediaMetadata(session.metadata).build(),
@@ -434,6 +473,7 @@ class PlayerFragment : VideoSupportFragment() {
         )
         player.prepare()
         player.playWhenReady = true
+        retime() // another file, or a subtitle just found, starts at its own offset
     }
 
     private fun tick() {
@@ -441,6 +481,8 @@ class PlayerFragment : VideoSupportFragment() {
         val seconds = player.currentPosition / 1000
         updateSkip(f, seconds)
         showEndTime()
+        // The bar's loaded band (Glue): a pause to let the read-ahead load is when it grows most.
+        if (!player.isPlaying) glue?.controlsRow?.bufferedPosition = Buffering.bufferedPosition(player)
         if (player.isPlaying && abs(seconds - reportedAt) >= 15) report()
     }
 
@@ -734,6 +776,20 @@ class PlayerFragment : VideoSupportFragment() {
 
     private fun nextFile() = files.getOrNull(files.indexOf(file) + 1)
 
+    /**
+     * The next file's playlist, as [play] would pick it, once this one reaches its credits or its
+     * last [NEAR_END_MS] with autoplay on: the read-ahead then loads its opening (Buffering), so
+     * the next episode starts without a wait. Read from the same `stream` answer, so it is signed.
+     */
+    private fun upcoming(): String? {
+        val next = nextFile()?.takeIf { autoplays } ?: return null
+        val duration = player.duration.takeIf { it > 0 } ?: return null
+        val near = minOf(file?.endMark?.times(1000) ?: duration, duration - NEAR_END_MS)
+        if (player.currentPosition < near) return null
+        val qualities = qualities(next)
+        return playlist(next, qualities.getOrNull(pickQuality(qualities)))
+    }
+
     private fun nextEpisode() {
         nextFile()?.let { play(it, 0) }
     }
@@ -760,7 +816,8 @@ class PlayerFragment : VideoSupportFragment() {
         style(cues)
         // The direction of the chosen language, not of each line's first letter: a Persian line
         // that opens with an English name must still read right to left.
-        val language = Locale.forLanguageTag(prefs.getString("subtitle", "fa")!!)
+        val picked = finds.added.values.firstOrNull { it.id == finds.picked }
+        val language = Locale.forLanguageTag(picked?.language ?: prefs.getString("subtitle", "fa")!!)
         cues.textDirection = if (TextUtils.getLayoutDirectionFromLocale(language) == View.LAYOUT_DIRECTION_RTL) View.TEXT_DIRECTION_RTL else View.TEXT_DIRECTION_LTR
         // The last line's baseline 9% of the screen above its bottom edge: the broadcast and
         // streaming spot, inside the title-safe area.
@@ -840,11 +897,21 @@ class PlayerFragment : VideoSupportFragment() {
         return card
     }
 
+    /**
+     * The saved subtitle language (or none) and dub. A subtitle found for this file overrides the
+     * language with its own track once that has loaded: MergingMediaPeriod prefixes each source's
+     * format ids ("2:found0"), so it is known by the id after the colon.
+     */
     private fun applyTrackPreferences() {
         val subtitle = prefs.getString("subtitle", "fa")
+        val found = finds.picked?.let { id ->
+            player.currentTracks.groups.firstOrNull { it.type == C.TRACK_TYPE_TEXT && it.getTrackFormat(0).id?.substringAfterLast(':') == id }
+        }
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, subtitle == "off")
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, retimed || subtitle == "off" && finds.picked == null)
             .setPreferredTextLanguage(subtitle.takeIf { it != "off" })
+            .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+            .apply { found?.let { setOverrideForType(TrackSelectionOverride(it.mediaTrackGroup, 0)) } }
             .setPreferredAudioLanguage(prefs.getString("dub", null))
             .build()
     }
@@ -884,16 +951,29 @@ class PlayerFragment : VideoSupportFragment() {
                 Choice(name, key == channels) { applyAudio(key) }
             }).takeIf { keys.size > 1 },
         )
-        // A saved language this file has no subtitles in shows as off, which is what plays.
         val languages = file?.obj("file", "subtitle")?.keys()?.asSequence()?.toList().orEmpty()
-        val current = prefs.getString("subtitle", "fa").takeIf { it in languages } ?: "off"
+        val current = currentSubtitle()
         val subtitles = listOf(
             Group(getString(R.string.subtitles), listOf(Choice(getString(R.string.subtitle_off), current == "off") { applySubtitle("off") }) +
-                languages.map { Choice(languageName(it), it == current) { applySubtitle(it) } }),
-            Group(null, listOf(Choice(getString(R.string.subtitle_style), null) { panel.push(::appearance) })),
+                languages.map { Choice(languageName(it), it == current) { applySubtitle(it) } } +
+                finds.added.values.map { Choice(it.label.orEmpty(), it.id == current) { pickFound(it.id) } }),
+            Group(null, listOfNotNull(
+                Choice(getString(R.string.subtitle_find), null) { findSubtitles() }.takeIf { Subtitles.enabled && wanted() != null },
+                Choice(getString(R.string.subtitle_timing), null, timingText(offset())) { panel.push(::subtitleTiming) }.takeIf { current != "off" },
+                Choice(getString(R.string.subtitle_style), null) { panel.push(::appearance) },
+            )),
         )
         val columns = listOfNotNull(audio.ifEmpty { null }, subtitles)
         return Page(getString(R.string.player_audio_subtitles), columns, landing = columns.lastIndex)
+    }
+
+    /**
+     * What shows: a subtitle found for this file while it does, standing in for the saved language;
+     * else the saved language, or "off" when this file has no subtitles in it, which is what plays.
+     */
+    private fun currentSubtitle(): String {
+        val languages = file?.obj("file", "subtitle")?.keys()?.asSequence()?.toList().orEmpty()
+        return finds.picked ?: prefs.getString("subtitle", "fa").takeIf { it in languages } ?: "off"
     }
 
     /** Quality beside speed: HQ lands on the quality, the gauge on the speed. */
@@ -976,9 +1056,293 @@ class PlayerFragment : VideoSupportFragment() {
 
     /** A subtitle language ("fa", "en"…) or "off", saved for later titles. */
     private fun applySubtitle(language: String) {
+        finds.picked = null
         prefs.edit().putString("subtitle", language).apply()
         applyTrackPreferences()
         applySubtitleStyle() // the new language's direction
+        retime()
+    }
+
+    // ---- Find subtitles: the subtitle sites (Subtitles.kt) searched for exactly what plays, when
+    // ---- 30nama's own subtitles are off or missing. What they add holds for this file only. ----
+
+    /** This file's search, its answer (null until it lands), the download under way and the ones that failed, and what each added. */
+    private class Finds {
+        var search: Job? = null
+        var results: Result<List<Subtitles.Found>>? = null
+        var download: Job? = null
+        var downloading: Subtitles.Found? = null
+        val failed = HashMap<Subtitles.Found, Throwable>()
+        val added = LinkedHashMap<Subtitles.Found, MediaItem.SubtitleConfiguration>()
+        /** The added subtitle showing now, by its configuration's id; null leaves it to the saved language. */
+        var picked: String? = null
+
+        fun cancel() {
+            search?.cancel()
+            download?.cancel()
+        }
+    }
+
+    private var finds = Finds()
+
+    /** The search page as one value, so the panel can tell whether it still shows it ([PlayerPanel.shows]). */
+    private val findPage: () -> Page = { foundSubtitles() }
+
+    /**
+     * What plays, as the subtitle sites know it: by the IMDb id 30nama links (a series' own, with
+     * this file's season and episode), else by the English name and year. The year comes from the
+     * title's info, else from the end of its English name ("Black Clover 2017"), as 30nama writes it.
+     */
+    private fun wanted(): Subtitles.Wanted? {
+        val title = stream?.optJSONObject("info") ?: return null
+        val name = title.englishName.ifEmpty { return null }
+        val year = title.str("info", "year") ?: title.str("year") ?: title.str("title", "english")?.let { Regex("\\d{4}$").find(it)?.value }
+        val info = file?.optJSONObject("info")
+        val season = if (title.isMovie) 0 else info?.optInt("season") ?: 0
+        return Subtitles.Wanted(title.imdbId, name, year?.toIntOrNull(), season, file?.episodeNumber ?: 0)
+    }
+
+    /** The search page, searching unless this file's answer is in hand or on its way (a failed one searches again). */
+    private fun findSubtitles() {
+        if (finds.search?.isActive != true && finds.results?.isSuccess != true) search()
+        panel.push(findPage)
+    }
+
+    private fun search() {
+        val wanted = wanted() ?: return
+        val finds = finds
+        finds.results = null
+        finds.search = lifecycleScope.launch {
+            finds.results = runCatching { Subtitles.search(wanted) }.onFailure { if (it is CancellationException) throw it }
+            if (panel.shows(findPage)) panel.refresh()
+        }
+    }
+
+    /**
+     * What the subtitle sites have: Persian, then English, each row a release's name (what tells
+     * whether it is timed for this file) over its source and, when known, its downloads and whether
+     * it is for the hearing impaired. Searching, nothing found and a failure each say so in place;
+     * a failure offers to search again.
+     */
+    private fun foundSubtitles(): Page {
+        val title = getString(R.string.subtitle_find)
+        val answer = finds.results ?: return Page(title, emptyList(), note = getString(R.string.subtitle_searching), busy = true)
+        val results = answer.getOrElse { error ->
+            val again = Choice(getString(R.string.subtitle_search_again), false) {
+                search()
+                panel.refresh()
+            }
+            return Page(title, listOf(listOf(Group(null, listOf(again)))), note = findError(error))
+        }
+        if (results.isEmpty()) {
+            return Page(title, emptyList(), note = getString(if (wanted()?.isEpisode == true) R.string.subtitle_none_episode else R.string.subtitle_none_film))
+        }
+        val groups = results.groupBy { it.language }.map { (language, list) ->
+            Group(languageName(language), list.map { found ->
+                // Dots break nowhere: a zero-width space after each lets a long release name wrap at them.
+                Choice(found.release.replace(".", ".\u200B"), finds.added[found]?.let { it.id == finds.picked } == true, detail(found)) { fetch(found) }
+            })
+        }
+        return Page(title, listOf(groups))
+    }
+
+    /** A result's quiet line: its source and what else it says of itself, or how its download is going. */
+    private fun detail(found: Subtitles.Found): String {
+        if (found === finds.downloading) return getString(R.string.subtitle_downloading)
+        finds.failed[found]?.let { return findError(it) }
+        return dotted(
+            found.source,
+            found.downloads.takeIf { it > 0 }?.let { resources.getQuantityString(R.plurals.subtitle_downloads, it, it.grouped()) },
+            getString(R.string.subtitle_hearing_impaired).takeIf { found.hearingImpaired },
+        )
+    }
+
+    private fun findError(error: Throwable) = when (error) {
+        is Subtitles.Refused -> getString(if (error.quota) R.string.subtitle_error_quota else R.string.subtitle_error_down, error.source)
+        is Subtitles.Unreadable -> getString(R.string.subtitle_error_file)
+        is IOException -> getString(R.string.subtitle_error_network)
+        else -> getString(R.string.subtitle_error_file)
+    }
+
+    /**
+     * Downloads [found] (one at a time: a second pick replaces the first) and plays it from where the
+     * video is. The panel then steps back to Audio & Subtitles, where it shows as the current
+     * choice, the remote on it. A failure says why on its row.
+     */
+    private fun fetch(found: Subtitles.Found) {
+        val finds = finds
+        finds.added[found]?.let {
+            pickFound(it.id)
+            panel.back()
+            return
+        }
+        val episode = wanted()?.episode ?: 0
+        val dir = File(requireContext().cacheDir, "subtitles")
+        finds.download?.cancel()
+        finds.failed.remove(found)
+        finds.downloading = found
+        panel.refresh()
+        finds.download = lifecycleScope.launch {
+            // ponytail: the files stay in the cache dir for Android to clear; delete them per viewing if it ever fills.
+            val got = runCatching { Subtitles.download(found, episode, dir) }.onFailure { if (it is CancellationException) throw it }
+            finds.downloading = null
+            got.onSuccess { add(found, it) }.onFailure { finds.failed[found] = it }
+            if (!panel.shows(findPage)) return@launch
+            if (got.isSuccess) panel.back() else panel.refresh()
+        }
+    }
+
+    /**
+     * [file] beside 30nama's subtitles, labelled with its language and site («فارسی از SubDL», a
+     * number after a second one), the item re-set where it plays (setSource), and showing.
+     */
+    private fun add(found: Subtitles.Found, file: File) {
+        val name = getString(R.string.subtitle_found, languageName(found.language), found.source)
+        val same = finds.added.values.count { it.label?.startsWith(name) == true }
+        val config = MediaItem.SubtitleConfiguration.Builder(Uri.fromFile(file))
+            .setMimeType(Subtitles.mimeType(file))
+            .setLanguage(found.language)
+            .setLabel(if (same == 0) name else "$name ${(same + 1).toString().localDigits()}")
+            .setId("found${finds.added.size}")
+            .build()
+        finds.added[found] = config
+        finds.picked = config.id
+        setSource(player.currentPosition)
+        applySubtitleStyle() // its language's direction
+    }
+
+    /** A subtitle found for this file, from the Subtitles column. Not saved: the next file starts from the saved language. */
+    private fun pickFound(id: String?) {
+        finds.picked = id
+        applyTrackPreferences()
+        applySubtitleStyle()
+        retime()
+    }
+
+    // ---- Subtitle timing: the shown subtitle moved earlier or later, for a file timed to another
+    // ---- cut. Media3 has no offset, and its renderer shows no cue before its time, so a moved
+    // ---- subtitle is drawn from here instead, against the playhead. ----
+
+    /** Offsets (ms, later is positive) for this viewing, by [timingKey]; none leaves the subtitle to ExoPlayer. */
+    private val offsets = HashMap<String, Long>()
+    /** The subtitle [timing] is loading or following, by [timingKey]. */
+    private var timingFor: String? = null
+    private var timing: Job? = null
+    /** ExoPlayer's text track is off and [timing] draws the cues. */
+    private var retimed = false
+
+    /** An offset belongs to a subtitle on one file: the same season's zip found for two episodes is timed for each. */
+    private fun timingKey(subtitle: MediaItem.SubtitleConfiguration) = "${file?.str("info", "file_id")} ${subtitle.uri}"
+
+    /** The subtitle showing, as ExoPlayer was given it; null with none. */
+    private fun shownSubtitle(): MediaItem.SubtitleConfiguration? {
+        val f = file ?: return null
+        val id = currentSubtitle()
+        return (ownSubtitles(f) + finds.added.values).firstOrNull { it.id == id }
+    }
+
+    private fun offset() = shownSubtitle()?.let { offsets[timingKey(it)] } ?: 0L
+
+    /**
+     * The shown subtitle at its offset. At none ExoPlayer draws it, exactly as before there was an
+     * offset. Otherwise its file is read and parsed once ([cuesOf]), ExoPlayer's text track goes off,
+     * and its cues follow the playhead from here, the offset read afresh each tick, so a step shows
+     * at once: no reload, no re-buffer. Called whenever the subtitle or its offset may have changed.
+     */
+    private fun retime() {
+        val subtitle = shownSubtitle() ?: return untime()
+        val key = timingKey(subtitle)
+        if ((offsets[key] ?: 0L) == 0L) return untime()
+        if (key == timingFor) return // loading or following it already
+        untime()
+        timingFor = key
+        timing = lifecycleScope.launch {
+            val timed = runCatching { cuesOf(subtitle) }.getOrElse {
+                if (it is CancellationException) throw it
+                // It stays where ExoPlayer draws it, and the panel shows it unmoved.
+                offsets.remove(key)
+                timingFor = null
+                requireContext().toast(getString(R.string.subtitle_timing_error))
+                panel.refresh()
+                return@launch
+            }
+            retimed = true
+            applyTrackPreferences()
+            // ponytail: a 50 ms tick shows a cue up to 50 ms late; follow frames (postOnAnimation) if anyone ever sees it.
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                var shown: List<Cue>? = null
+                while (true) {
+                    val now = cuesAt(timed, player.currentPosition * 1000, (offsets[key] ?: 0L) * 1000)
+                    if (now != shown) showCues(now)
+                    shown = now
+                    delay(50)
+                }
+            }
+        }
+    }
+
+    /** Back to ExoPlayer's drawing, which brings the current cue back with the track. */
+    private fun untime() {
+        timing?.cancel()
+        timing = null
+        timingFor = null
+        if (!retimed) return
+        retimed = false
+        showCues(emptyList())
+        applyTrackPreferences()
+    }
+
+    /**
+     * [subtitle]'s cues on its own clock, parsed by Media3's own parsers: a found one from disk,
+     * 30nama's from its URL as ExoPlayer fetched it. Both through Subtitles' decode, so a Persian
+     * file in Windows-1256 reads right here too.
+     */
+    private suspend fun cuesOf(subtitle: MediaItem.SubtitleConfiguration): List<CuesWithTiming> {
+        val uri = subtitle.uri
+        val bytes = if (uri.scheme == "file") withContext(Dispatchers.IO) { File(uri.path!!).readBytes() }
+        else Api.run { http.newCall(Request.Builder().url(uri.toString()).header("User-Agent", userAgent).build()).await() }.use { response ->
+            if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
+            withContext(Dispatchers.IO) { response.body!!.bytes() }
+        }
+        return withContext(Dispatchers.Default) {
+            val text = Subtitles.decode(bytes, subtitle.language.orEmpty())
+            val parser = DefaultSubtitleParserFactory().create(Format.Builder().setSampleMimeType(subtitle.mimeType).build())
+            buildList { parser.parse(text.toByteArray(), SubtitleParser.OutputOptions.allCues()) { add(it) } }
+        }
+    }
+
+    /**
+     * Earlier and Later move the shown subtitle a quarter second a press (OK again for the next),
+     * each saying when it is the one to press; the subtitles beside the panel show every step as it
+     * lands, and the note what it adds up to. Once moved, a third row puts it back. Its own page, not
+     * Left and Right on the Subtitles row: those move between the panel's columns.
+     */
+    private fun subtitleTiming(): Page {
+        val offset = offset()
+        val steps = Group(null, listOf(
+            Choice(getString(R.string.subtitle_earlier), false, getString(R.string.subtitle_earlier_hint)) { nudge(-TIMING_STEP_MS) },
+            Choice(getString(R.string.subtitle_later), false, getString(R.string.subtitle_later_hint)) { nudge(TIMING_STEP_MS) },
+        ))
+        val reset = Group(null, listOf(Choice(getString(R.string.subtitle_timing_none), false) { nudge(0) })).takeIf { offset != 0L }
+        return Page(getString(R.string.subtitle_timing), listOf(listOfNotNull(steps, reset)), note = timingText(offset))
+    }
+
+    /** Moves the shown subtitle [by] ms, up to [TIMING_MAX_MS] either way; 0 puts it back on its own times. */
+    private fun nudge(by: Long) {
+        shownSubtitle()?.let(::timingKey)?.let { key ->
+            val offset = if (by == 0L) 0L else ((offsets[key] ?: 0L) + by).coerceIn(-TIMING_MAX_MS, TIMING_MAX_MS)
+            if (offset == 0L) offsets.remove(key) else offsets[key] = offset
+            retime()
+        }
+        panel.refresh()
+    }
+
+    /** «۰٫۵ ثانیه زودتر», "0.25 s later", or no shift: words for the direction, never a sign (a Persian line would carry it to the wrong end). */
+    private fun timingText(offset: Long): String {
+        if (offset == 0L) return getString(R.string.subtitle_timing_none)
+        val seconds = "%.2f".format(Locale.US, abs(offset) / 1000.0).trimEnd('0').trimEnd('.')
+        val number = if (Api.language == "fa") seconds.replace('.', '٫').persianDigits() else seconds
+        return getString(if (offset < 0) R.string.subtitle_timing_earlier else R.string.subtitle_timing_later, number)
     }
 
     /** Besides "label", each quality maps audio variants ("default", channel counts) to URLs. */
@@ -1033,6 +1397,8 @@ class PlayerFragment : VideoSupportFragment() {
         /** The next episode's countdown, and auto-skip's sweep before it takes an intro or recap. */
         const val NEXT_MS = 10_000L
         const val AUTO_SKIP_MS = 1_500L
+        /** How long before the end the next episode's opening starts loading, without a credits mark or before a late one. */
+        const val NEAR_END_MS = 120_000L
         /** The seek bar's step for a press, and the pause after the last one before the seek lands. */
         const val SEEK_STEP_MS = 5_000L
         const val SEEK_LAND_MS = 1_000L
@@ -1043,6 +1409,9 @@ class PlayerFragment : VideoSupportFragment() {
         )
         /** Lifted, the pill's bottom stands this far (dp) over the transport row: level with the title's foot. */
         const val LIFT_GAP = 20
+        /** Subtitle timing's step, and its reach either way. */
+        const val TIMING_STEP_MS = 250L
+        const val TIMING_MAX_MS = 10_000L
         /** In step with the player_speeds labels. */
         val SPEEDS = floatArrayOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
         /** The title, its Persian name and the episode line, which lifted subtitles clear vertically. */
@@ -1145,6 +1514,16 @@ class PlayerFragment : VideoSupportFragment() {
             super.onCreatePrimaryActions(adapter) // play / pause
             adapter.add(forward)
             if (series) adapter.add(next)
+        }
+
+        /**
+         * YouTube's loaded band: past the red, as far as playback could go on without the connection,
+         * the player's memory or the read-ahead's run on disk (Buffering). Twice a second while it
+         * plays; paused, Leanback stops asking and [tick] keeps it filling.
+         */
+        override fun onUpdateBufferedProgress() {
+            super.onUpdateBufferedProgress() // the player's own, which the run on disk may then extend
+            controlsRow?.bufferedPosition = Buffering.bufferedPosition(player)
         }
 
         override fun onCreateSecondaryActions(adapter: ArrayObjectAdapter) {

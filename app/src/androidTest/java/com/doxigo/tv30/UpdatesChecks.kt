@@ -100,7 +100,10 @@ object UpdatesChecks {
                         fits(update.findViewById(R.id.settings_value))
                         val label = update.findViewById<TextView>(R.id.settings_label)
                         val action = update.findViewById<TextView>(R.id.settings_value)
-                        check(if (code == "fa") label.left >= action.right else label.right <= action.left) { "Update label overlapped its action" }
+                        // On screen: the label sits in its own column (with a service's second line), not straight in the row.
+                        val labelAt = IntArray(2).also(label::getLocationOnScreen)[0]
+                        val actionAt = IntArray(2).also(action::getLocationOnScreen)[0]
+                        check(if (code == "fa") labelAt >= actionAt + action.width else labelAt + label.width <= actionAt) { "Update label overlapped its action" }
                         check(update.contentDescription.toString().contains(value))
                     }
                     if (expected.status is AppUpdates.Status.Ready) {

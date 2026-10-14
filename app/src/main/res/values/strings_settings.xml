@@ -29,7 +29,7 @@
     </plurals>
 
     <string name="settings_buffer">پیش‌بارگذاری</string>
-    <string name="settings_buffer_help">ادامهٔ فیلم را پیش از رسیدن به آن روی حافظهٔ تلویزیون بارگذاری می‌کند تا قطعی‌های کوتاه اینترنت پخش را متوقف نکند. درصد، سهمی از باقی‌ماندهٔ فیلم است.</string>
+    <string name="settings_buffer_help">ادامهٔ فیلم را پیش از رسیدن به آن روی حافظهٔ تلویزیون بارگذاری می‌کند تا قطعی‌های کوتاه اینترنت پخش را متوقف نکند. درصد، سهمی از باقی‌ماندهٔ فیلم است. بخش روشن نوار پخش نشان می‌دهد چه مقدار آماده است و اگر فیلم را نگه دارید، بیشتر می‌شود.</string>
     <string name="settings_buffer_off">خاموش: فقط یکی دو دقیقه، در حافظهٔ اصلی.</string>
     <string name="settings_buffer_ahead">با %1$s، در فیلمی دوساعته با کیفیت 1080p حدود %2$s جلوتر از تصویر آماده است.</string>
     <string name="settings_buffer_capped">با %1$s، در فیلمی دوساعته با کیفیت 1080p حدود %2$s جلوتر از تصویر آماده است؛ فضای خالی این تلویزیون بیش از این جا ندارد.</string>
@@ -72,4 +72,31 @@
     <string name="settings_signing_out">در حال خروج…</string>
     <string name="settings_guest_line">وارد حساب نشده‌اید</string>
     <string name="settings_sign_in_help">برای تماشا، با گوشی وارد حساب ۳۰نما شوید.</string>
+
+    <!-- Services: each viewer's own API keys (Tmdb.kt, Subtitles.kt). A service's name is its own,
+         in Latin; a line that names one opens on a Persian word so it keeps its direction. -->
+    <string name="settings_services">سرویس‌ها</string>
+    <string name="settings_services_about">کلیدهای رایگان خودتان برای آنچه ۳۰نما ندارد: TMDB برای نام فارسی، پرطرفدارها و تریلرها، و SubDL و OpenSubtitles برای یافتن زیرنویس در پخش. کلیدها فقط روی همین تلویزیون می‌مانند.</string>
+    <string name="service_tmdb" translatable="false">TMDB</string>
+    <string name="service_subdl" translatable="false">SubDL</string>
+    <string name="service_opensubtitles" translatable="false">OpenSubtitles</string>
+    <!-- Under each service's name: what its key unlocks, in one short line. -->
+    <string name="settings_tmdb_unlocks">نام فارسی، پرطرفدارها و تریلر</string>
+    <string name="settings_subdl_unlocks">یافتن زیرنویس در پخش</string>
+    <string name="settings_opensubtitles_unlocks">زیرنویس‌های بیشتر در پخش</string>
+    <string name="settings_tmdb_help">پایگاه فیلم TMDB ردیف پرطرفدارها، تریلرها، پیشنهادهای مشابه، تصویر قسمت‌ها و نام فارسی عنوان‌هایی را که ۳۰نما ندارد می‌آورد. کلید رایگان را از صفحهٔ API حساب TMDB بردارید؛ API Key و API Read Access Token هر دو کار می‌کنند.</string>
+    <string name="settings_subdl_help">نتیجه‌های SubDL، که آرشیو زیرنویس فارسی Subscene را دارد، در «یافتن زیرنویس» پخش اول می‌آیند. پس از ثبت‌نام، کلید رایگان را از صفحهٔ API پنل حسابتان بردارید.</string>
+    <string name="settings_opensubtitles_help">در «یافتن زیرنویس» پخش، نتیجه‌های OpenSubtitles بعد از SubDL می‌آیند. پس از ثبت‌نام، در صفحهٔ API consumers یک consumer بسازید و کلید API آن را بردارید. هر کلید رایگان روزی ۵ زیرنویس دانلود می‌کند.</string>
+    <!-- A key's state, as the row's value; a set key shows its last four characters only. -->
+    <string name="settings_key_none">تنظیم نشده</string>
+    <string name="settings_key_checking">در حال بررسی…</string>
+    <string name="settings_key_rejected">پذیرفته نشد</string>
+    <!-- Left to right from its mark, or a key ending in digits would read «1234 ••••». -->
+    <string name="settings_key_last" translatable="false">\u200E•••• %s</string>
+    <!-- What the check on saving found, under the help. -->
+    <string name="settings_key_works">کلید کار می‌کند.</string>
+    <string name="settings_key_rejected_note">کلید پذیرفته نشد. آن را با صفحهٔ کلید مقایسه کنید و دوباره وارد کنید.</string>
+    <string name="settings_key_unreachable">کلید ذخیره شد، ولی %s در دسترس نبود تا بررسی شود.</string>
+    <string name="settings_key_built">کلیدی که در خود این نسخه ساخته شده به کار می‌رود؛ کلید خودتان جای آن را می‌گیرد.</string>
+    <string name="settings_key_ask">کد را با گوشی اسکن کنید، کلید رایگان را از همان صفحه بردارید و این‌جا وارد کنید.</string>
 </resources>

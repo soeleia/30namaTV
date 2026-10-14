@@ -87,6 +87,18 @@ object Settings {
         get() = prefs.getInt("sub_bg", 1).coerceIn(0, 2)
         set(v) = prefs.edit().putInt("sub_bg", v).apply()
 
+    /**
+     * The viewer's own API key for a service (Tmdb.NAME, Subtitles.SUBDL, Subtitles.OPENSUBTITLES),
+     * entered on Settings' Services page; "" when none. Each service reads it through [pickKey].
+     */
+    fun savedKey(service: String) = prefs.getString("key_$service", null).orEmpty()
+    fun saveKey(service: String, key: String) = prefs.edit().apply {
+        if (key.isBlank()) remove("key_$service") else putString("key_$service", key.trim())
+    }.apply()
+
+    /** The key a service uses: the viewer's, else the one built in (local.properties, the developer's own builds only). */
+    fun pickKey(saved: String, built: String) = saved.trim().ifEmpty { built.trim() }
+
     /** Subtitle text as a share of the screen's height; "medium" is about 5%, as streaming apps set it. */
     val subtitleHeightShare get() = floatArrayOf(0.036f, 0.042f, 0.049f, 0.058f, 0.068f)[subtitleSize]
     val subtitleTextColor get() = if (subtitleColor == 1) Color.YELLOW else Color.WHITE

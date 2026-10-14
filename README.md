@@ -27,6 +27,13 @@ After opening, the app checks the latest stable GitHub release once a day and au
 
 Before installation, the app verifies the package name, newer version code and signing certificate. It rejects incompatible or invalid APKs. The first migration from an older personal test key to the public release key still requires the manual installation described above.
 
+## Service keys
+
+TMDB and the player's subtitle search use free API keys that each viewer supplies. Open **Settings > Services** and select TMDB, SubDL or OpenSubtitles: scan the QR code to open the page where that key is made, then type or paste it with the TV's keyboard or the Google TV app on your phone. The app checks the key when you save it and keeps it in its private storage on that TV. Without a key that feature stays off; browsing and 30nama playback need none.
+
+- **TMDB** adds the trending row, Persian names 30nama lacks, More Like This, trailers and episode stills. Its API page offers an API key and an API read access token; either works.
+- **SubDL** and **OpenSubtitles** power **Find subtitles** in the player (Audio & Subtitles → Subtitles), which appears once either has a key. A free OpenSubtitles key downloads five subtitles a day.
+
 ## Build locally
 
 Install Android Studio, JDK 21 and these SDK packages:
@@ -43,7 +50,7 @@ The APK is `app/build/outputs/apk/release/app-release.apk`. Android Studio's bun
 
 The public checkout includes OFL-licensed Inter and Vazirmatn, so it builds without private font files. Maintainer APKs retain the requested Peyda headings and Yekan Bakh body text; see [fonts and build inputs](docs/setup.md#fonts). English text uses Inter throughout.
 
-Optional TMDB enhancements use `tmdb.token=YOUR_TMDB_READ_TOKEN` in ignored `local.properties`. Core 30nama functionality works without it. A token compiled into an APK can be extracted; never put an account password or private server credential there.
+Public APKs carry no API keys (see [service keys](#service-keys)). For your own builds, ignored `local.properties` can hold fallbacks used while no key is saved in Settings: `tmdb.token=`, `subdl.key=` and `opensubtitles.key=` ([details](docs/setup.md#service-keys)). Keys compiled into an APK can be extracted, so don't share an APK built with yours, and never put an account password there.
 
 ## Checks and screenshots
 

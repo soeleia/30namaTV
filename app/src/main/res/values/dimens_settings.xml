@@ -13,6 +13,8 @@
     <dimen name="settings_row_radius">12dp</dimen>
     <!-- The remote's target, as a button's (button_target). -->
     <dimen name="settings_row_height">48dp</dimen>
+    <!-- A row with a second line under its name (a service and what its key unlocks). -->
+    <dimen name="settings_row_tall">64dp</dimen>
     <!-- Text inside a row, and the hairlines and group titles lined up with it. -->
     <dimen name="settings_row_pad">16dp</dimen>
     <!-- A value's chip: a 28dp pill. -->

@@ -26,7 +26,7 @@
     </plurals>
 
     <string name="settings_buffer">Preload</string>
-    <string name="settings_buffer_help">Loads what\'s coming onto the TV\'s storage before you reach it, so short drops in the connection don\'t stop playback. The percentage is a share of what\'s left of the title.</string>
+    <string name="settings_buffer_help">Loads what\'s coming onto the TV\'s storage before you reach it, so short drops in the connection don\'t stop playback. The percentage is a share of what\'s left of the title. The light part of the seek bar is what\'s ready, and it keeps growing while you pause.</string>
     <string name="settings_buffer_off">Off: only a minute or two, held in memory.</string>
     <string name="settings_buffer_ahead">At %1$s, about %2$s are ready ahead of the picture in a two-hour 1080p film.</string>
     <string name="settings_buffer_capped">At %1$s, about %2$s are ready ahead of the picture in a two-hour 1080p film: all this TV\'s free space holds.</string>
@@ -63,4 +63,21 @@
     <string name="settings_signing_out">Signing out…</string>
     <string name="settings_guest_line">Not signed in</string>
     <string name="settings_sign_in_help">Sign in with your phone to watch.</string>
+
+    <string name="settings_services">Services</string>
+    <string name="settings_services_about">Free keys of your own for what 30nama doesn\'t carry: TMDB for Persian names, trending and trailers; SubDL and OpenSubtitles for finding subtitles in the player. Keys stay on this TV only.</string>
+    <string name="settings_tmdb_unlocks">Trending and Persian names</string>
+    <string name="settings_subdl_unlocks">Find subtitles in the player</string>
+    <string name="settings_opensubtitles_unlocks">More subtitles in the player</string>
+    <string name="settings_tmdb_help">TMDB, the film database, brings the trending row, trailers, More Like This, episode stills and Persian names where 30nama has none. Take a free key from the API page of your TMDB account; the API Key and the API Read Access Token both work.</string>
+    <string name="settings_subdl_help">SubDL, which holds Subscene\'s Persian archive, comes first in the player\'s Find subtitles. Sign up, then take your free key from the API page of your account panel.</string>
+    <string name="settings_opensubtitles_help">In the player\'s Find subtitles, OpenSubtitles comes after SubDL. Sign up, create a consumer on the API consumers page and take its API key. A free key downloads 5 subtitles a day.</string>
+    <string name="settings_key_none">Not set</string>
+    <string name="settings_key_checking">Checking…</string>
+    <string name="settings_key_rejected">Rejected</string>
+    <string name="settings_key_works">Key works.</string>
+    <string name="settings_key_rejected_note">Key rejected. Compare it with the key page and enter it again.</string>
+    <string name="settings_key_unreachable">Key saved, but %s couldn\'t be reached to check it.</string>
+    <string name="settings_key_built">Using the key built into this copy of the app; your own takes its place.</string>
+    <string name="settings_key_ask">Scan the code with your phone, copy your free key from that page and enter it here.</string>
 </resources>

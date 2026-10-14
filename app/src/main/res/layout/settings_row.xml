@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One option, read as a unit from start to end: an icon where it has one, its name, then what
-     it is now: a switch, a value's chip, or a plain value, with an icon after it when OK does
-     something other than step the value (clear, open). Children take the row's state, so all of
-     it turns ink together on the white card. -->
+<!-- One option, read as a unit from start to end: an icon where it has one, its name (and under
+     it, for a service, what its key unlocks), then what it is now: a switch, a value's chip, or
+     a plain value, with an icon after it when OK does something other than step the value
+     (clear, open). Children take the row's state, so all of it turns ink together on the white
+     card. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="@dimen/settings_row_height"
@@ -22,18 +23,39 @@
         android:importantForAccessibility="no"
         android:visibility="gone" />
 
-    <TextView
-        android:id="@+id/settings_label"
+    <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:duplicateParentState="true"
-        android:ellipsize="end"
-        android:fontFamily="@font/vazirmatn_medium"
-        android:maxLines="1"
-        android:textAlignment="viewStart"
-        android:textColor="@color/settings_label"
-        android:textSize="17sp" />
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/settings_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:duplicateParentState="true"
+            android:ellipsize="end"
+            android:fontFamily="@font/vazirmatn_medium"
+            android:maxLines="1"
+            android:textAlignment="viewStart"
+            android:textColor="@color/settings_label"
+            android:textSize="17sp" />
+
+        <!-- A second line under the name, where a row has one: what a service's key unlocks. -->
+        <TextView
+            android:id="@+id/settings_sub"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:duplicateParentState="true"
+            android:ellipsize="end"
+            android:fontFamily="@font/vazir"
+            android:maxLines="1"
+            android:textAlignment="viewStart"
+            android:textColor="@color/settings_value"
+            android:textSize="14sp"
+            android:visibility="gone" />
+    </LinearLayout>
 
     <TextView
         android:id="@+id/settings_value"
