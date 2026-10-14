@@ -11,13 +11,11 @@
     android:layout_height="match_parent"
     android:background="@color/ink">
 
-    <!-- promo_drift wider than the screen each side: the hero's page turn drifts it that far. -->
+    <!-- Home's hero widens it past the screen each side (PromoHero): its page turn drifts it. -->
     <ImageView
         android:id="@+id/backdrop"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_marginStart="-16dp"
-        android:layout_marginEnd="-16dp"
         android:importantForAccessibility="no"
         android:scaleType="centerCrop" />
 
@@ -27,8 +25,6 @@
         android:id="@+id/backdrop_leaving"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_marginStart="-16dp"
-        android:layout_marginEnd="-16dp"
         android:importantForAccessibility="no"
         android:scaleType="centerCrop" />
 

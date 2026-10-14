@@ -16,6 +16,16 @@ class RecentsTest {
     }
 
     @Test
+    fun arabicLettersArePersian() {
+        // «کیک» typed on an Arabic keyboard (ك, ي), kept from before as «كيك», and «مستی» with an alef maksura.
+        assertEquals(listOf("کیک", "dune"), Recents.push(listOf("dune", "كيك"), "كيك"))
+        assertEquals(listOf("کیک", "dune"), Recents.push(listOf("كيك", "dune"), "کیک"))
+        assertEquals(listOf("مستی"), Recents.push(listOf("مستى"), "مستي"))
+        // Both kept before the two counted as one: they are one now.
+        assertEquals(listOf("dune", "کیک"), Recents.push(listOf("كيك", "کیک"), "dune"))
+    }
+
+    @Test
     fun cappedOldestOut() {
         val full = (1..Recents.CAP).map { "q$it" }
         val pushed = Recents.push(full, "new")

@@ -408,18 +408,27 @@ object Recents {
     private const val KEY = "recent"
     private val SPACES = Regex("\\s+")
 
-    fun read(context: Context): List<String> = prefs(context).getString(KEY, null)?.split('\n')?.filter(String::isNotEmpty).orEmpty()
+    fun read(context: Context): List<String> = tidy(prefs(context).getString(KEY, null)?.split('\n').orEmpty())
 
     fun add(context: Context, query: String) = prefs(context).edit().putString(KEY, push(read(context), query).joinToString("\n")).apply()
 
     fun clear(context: Context) = prefs(context).edit().remove(KEY).apply()
 
-    /** [query] at the front with its spacing tidied (so never a line break), the same query in any case dropped from further back, the oldest past [CAP] gone. */
+    /** [query] at the front with its spacing tidied (so never a line break), the same query dropped from further back (see [tidy]). */
     fun push(recents: List<String>, query: String): List<String> {
         val q = query.trim().replace(SPACES, " ")
         if (q.isEmpty()) return recents
-        return (listOf(q) + recents.filterNot { it.equals(q, ignoreCase = true) }).take(CAP)
+        return tidy(listOf(q) + recents)
     }
+
+    /**
+     * Each query once, in Persian letters, in any case, the oldest past [CAP] gone. An Arabic
+     * keyboard types ي, ى and ك where Persian has ی and ک: the same word, which 30nama finds
+     * either way, so the same query (and one kept twice before this counts once).
+     */
+    private fun tidy(queries: List<String>) = queries.filter(String::isNotEmpty)
+        .map { it.replace('ي', 'ی').replace('ى', 'ی').replace('ك', 'ک') }
+        .distinctBy { it.lowercase() }.take(CAP)
 
     private fun prefs(context: Context) = context.getSharedPreferences("search", Context.MODE_PRIVATE)
 }

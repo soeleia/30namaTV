@@ -22,7 +22,7 @@
     <string name="quick_favorite_remove">Remove from Favorites</string>
     <string name="quick_watchlist_add">Add to Watchlist</string>
     <string name="quick_watchlist_remove">Remove from Watchlist</string>
-    <string name="quick_notify_add">Add to Notify</string>
-    <string name="quick_notify_remove">Remove from Notify</string>
+    <string name="quick_notify_add">Notify me</string>
+    <string name="quick_notify_remove">Stop notifying me</string>
     <string name="quick_sign_in">Sign in to add to your lists</string>
 </resources>

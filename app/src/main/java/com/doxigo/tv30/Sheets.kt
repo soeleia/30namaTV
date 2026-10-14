@@ -259,11 +259,13 @@ fun Activity.ask(title: CharSequence, value: String, link: String, onSave: (key:
     clear?.let { form.addView(it, linear(MATCH, WRAP).apply { topMargin = px(8) }) }
 
     // The phone's page (else the key's own) on the white plate the sign-in code wears, its address
-    // under it for a phone that can't scan.
+    // under it for a phone that can't scan: on one line at the caption's size, to be typed from
+    // the sofa, the column as wide as it needs ("192.168.100.123:45678/…" is 20 em).
     val target = phone?.url ?: link
     val page = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER_HORIZONTAL
+        minimumWidth = px(QR + 56)
     }
     page.addView(ImageView(this).apply {
         setBackgroundResource(R.drawable.qr_plate)
@@ -274,10 +276,10 @@ fun Activity.ask(title: CharSequence, value: String, link: String, onSave: (key:
     }, linear(px(QR + 24), px(QR + 24)))
     page.addView(text(target.substringAfter("://").removePrefix("www."), R.style.TextAppearance_App_Caption).apply {
         typeface = font(R.font.inter_medium)
-        textSize = 13f
         textDirection = View.TEXT_DIRECTION_LTR
-        maxLines = 2
-    }, linear(MATCH, WRAP).apply { topMargin = px(10) })
+        isSingleLine = true
+        ellipsize = null
+    }, linear(WRAP, WRAP).apply { topMargin = px(10) })
 
     val card = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
@@ -292,8 +294,7 @@ fun Activity.ask(title: CharSequence, value: String, link: String, onSave: (key:
         keepScreenOn = phone != null
     }
     card.addView(form, linear(px(360), WRAP))
-    // Wider than the plate, so "themoviedb.org/settings/api" holds on one line under it.
-    card.addView(page, linear(px(QR + 56), WRAP).apply { marginStart = px(32) })
+    card.addView(page, linear(WRAP, WRAP).apply { marginStart = px(32) })
 
     val sheet = Sheet(this, card, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER), SCRIM_ALERT, dy = 16 * dp)
     val keys = getSystemService(InputMethodManager::class.java)

@@ -13,7 +13,7 @@
     <!-- Each dot's slot, as wide as the current page's pill. -->
     <dimen name="promo_dot_slot">18dp</dimen>
     <!-- A page turning: how far the words travel out and in, and the art behind them, half as
-         far. billboard.xml's art bleeds promo_drift past each side so its drift never bares an edge. -->
+         far. PromoHero bleeds home's art promo_drift past each side so its drift never bares an edge. -->
     <dimen name="promo_glide">32dp</dimen>
     <dimen name="promo_drift">16dp</dimen>
 </resources>

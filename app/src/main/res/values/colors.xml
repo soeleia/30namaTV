@@ -23,9 +23,11 @@
     <color name="green">#46D369</color>
     <color name="focus_wash">#33FFFFFF</color>
     <color name="progress_track">#66808080</color>
-    <!-- The player's loaded band, between the red and Leanback's fixed #888888 track: body
-         white, which reads apart from both at three metres. -->
-    <color name="progress_loaded">@color/text_body</color>
+    <!-- The player's loaded band, past the red and Leanback's white knob, over its #888888 track
+         (its SeekBar takes a colour for these two bands only): dim white, 2.1:1 under the knob and
+         1.7:1 over the track. Body white was 1.3:1 from the knob, which vanished into it at the
+         red's end from three metres. -->
+    <color name="progress_loaded">@color/text_dim</color>
     <color name="scrim">#141414</color>
     <color name="scrim_mid">#B3141414</color>
     <color name="scrim_clear">#00141414</color>

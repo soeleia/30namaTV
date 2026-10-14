@@ -146,6 +146,15 @@ class PromoHero(
     private val onWindowFocus = ViewTreeObserver.OnWindowFocusChangeListener { has -> if (has) idle() else timer?.cancel() }
 
     init {
+        // The art bleeds the drift past each side, so a page turn never bares an edge. Here, not
+        // in billboard.xml: the person page wears that layout too, never turns, and keeps its art whole.
+        val bleed = -context.resources.getDimensionPixelSize(R.dimen.promo_drift)
+        for (id in intArrayOf(R.id.backdrop, R.id.backdrop_leaving)) root.findViewById<View>(id).apply {
+            layoutParams = (layoutParams as ViewGroup.MarginLayoutParams).apply {
+                marginStart = bleed
+                marginEnd = bleed
+            }
+        }
         controls.visibility = View.GONE
         root.addView(controls, root.indexOfChild(text) + 1) // under the rows, which never cover it
         root.clipChildren = false // the button's focus lift reaches past the controls' start edge
