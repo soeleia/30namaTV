@@ -63,6 +63,7 @@ class PerformanceChecks : Instrumentation() {
             "search" -> return SearchGridChecks.run(this)
             "genres" -> return GenresChecks.run(this)
             "updates" -> return UpdatesChecks.run(this)
+            "watched" -> return WatchedChecks.run(this)
         }
         val result = Bundle()
         try {

@@ -371,9 +371,10 @@ class PlayerFragment : VideoSupportFragment() {
         // A film has one file, so its resume point applies whatever file id it was saved with.
         val resumes = resume != null && (resume.str("file_id") == start.str("info", "file_id") || files.size == 1)
         val saved = files.indexOf(start) to if (resumes) resume.optLong("time") else 0L
-        // Saved in the credits, Play goes on to what comes next (UpNext.kt); an episode tile means
-        // exactly that episode, credits and all.
-        val (index, at) = if (chosen == null) upNext(files.map { it.endMark }, saved.first, saved.second) else saved
+        // Saved in the credits, Play goes on to what comes next not yet seen (UpNext.kt, Watched), as
+        // the title page's Play says; an episode tile means exactly that episode, credits and all.
+        Watched.seed(context, files, resume)
+        val (index, at) = if (chosen == null) Watched.upNext(context, files, saved.first, saved.second) else saved
         glue = Glue(context, LeanbackPlayerAdapter(context, player, 500), series = files.size > 1).apply {
             host = VideoSupportFragmentGlueHost(this@PlayerFragment)
             isSeekEnabled = true
@@ -486,13 +487,20 @@ class PlayerFragment : VideoSupportFragment() {
         if (player.isPlaying && abs(seconds - reportedAt) >= 15) report()
     }
 
-    /** What the server keeps as "continue watching"; the official player sends the same six fields. */
+    /**
+     * What the server keeps as "continue watching"; the official player sends the same six fields.
+     * This TV's history of episodes seen (Watched) hears it first, a guest's free episodes too. Every
+     * 15 s, at a pause, leaving and before the next file plays, so a viewing past the credits, or to
+     * the end where autoplay moves on, is marked seen.
+     */
     private fun report() {
         val f = file ?: return
         val seconds = player.currentPosition / 1000
         val duration = player.duration.takeIf { it > 0 }?.div(1000) ?: return
-        if (seconds <= 0 || Api.user?.optBoolean("user_allowed_to_stream") != true) return
+        if (seconds <= 0) return
         reportedAt = seconds
+        context?.let { Watched.record(it, f, seconds, duration) }
+        if (Api.user?.optBoolean("user_allowed_to_stream") != true) return
         Api.scope.launch {
             runCatching {
                 Api.observer(postId, f.obj("info")?.opt("file_id"), Api.user?.opt("user_id"), seconds, duration, f.obj("options")?.opt("token"))

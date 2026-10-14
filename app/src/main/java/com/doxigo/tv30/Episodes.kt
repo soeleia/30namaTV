@@ -41,21 +41,30 @@ import kotlin.math.max
  * An entry of the `stream` answer's `hls` as its tile: the number set large, a real name when 30nama
  * has one (its names are nearly always «فصل 1 - قسمت 2», which the row and the number already say),
  * and its length. [watching] is `continue_watching` when it points at this file: that tile gets the
- * red bar and says so instead. The tile wears its own cut of the series' [art] (see [slice]) until a
- * frame of the episode itself is on disk (EpisodeFrames), found by the [file] it carries as its source.
+ * red bar and says so instead. Any other goes by this TV's history (Watched): seen through, it is
+ * marked so; started, it has its bar and the minutes left. The tile wears its own cut of the series'
+ * [art] (see [slice]) until a frame of the episode itself is on disk (EpisodeFrames), found by the
+ * [file] it carries as its source.
  */
 fun Context.episodeCard(file: JSONObject, watching: JSONObject?, art: String? = null, onClick: () -> Unit): Card {
     val own = file.str("info", "episode_name")?.takeUnless { it.isGenericEpisode }?.unescaped()?.localDigits()
     // ponytail: the credits mark stands in for the length (a minute or two short); TMDB's runtime if that bothers anyone.
     val minutes = file.str("options", "end")?.split(':')?.fold(0) { total, part -> total * 60 + (part.toIntOrNull() ?: 0) }
         ?.let { (it + 30) / 60 }?.takeIf { it > 0 }
+    val seen = if (watching == null) Watched.of(this, file) else null
+    val left = seen?.minutesLeft
     return Card(
         own.orEmpty(),
-        if (watching != null) getString(R.string.episode_watching) else minutes?.let { getString(R.string.runtime_minutes, it) },
+        when {
+            watching != null -> getString(R.string.episode_watching)
+            left != null -> getString(R.string.time_left, getString(R.string.runtime_minutes, left))
+            else -> minutes?.let { getString(R.string.runtime_minutes, it) }
+        },
         backdrop = art,
-        progress = watching?.optInt("progress")?.takeIf { it > 0 }?.let { it / 100f },
+        progress = if (watching != null) watching.optInt("progress").takeIf { it > 0 }?.let { it / 100f } else seen?.progress,
         source = file,
         numeral = file.episodeNumber.toString().localDigits(),
+        watched = seen?.done == true,
         onClick = onClick,
     )
 }
@@ -114,13 +123,15 @@ class EpisodePresenter(private val owner: LifecycleOwner? = null) : Presenter() 
         view.name.visibility = if (card.title.isBlank()) View.GONE else View.VISIBLE
         view.caption.text = card.subtitle
         view.caption.visibility = if (card.subtitle.isNullOrBlank()) View.GONE else View.VISIBLE
-        // «در حال تماشا» in white over its bar; a length stays quiet.
-        view.caption.setTextColor(ContextCompat.getColor(view.context, if (card.progress != null) R.color.text else R.color.text_dim))
+        // «در حال تماشا» or the minutes left in white over its bar; a length stays quiet, a seen one's too.
+        view.caption.setTextColor(ContextCompat.getColor(view.context, if (card.progress != null && !card.watched) R.color.text else R.color.text_dim))
         view.progress(card.progress)
-        view.contentDescription = listOfNotNull(view.context.getString(R.string.episode_numbered, card.numeral), card.title.ifBlank { null }, card.subtitle)
-            .joinToString(if (Api.language == "fa") "، " else ", ")
+        view.contentDescription = listOfNotNull(
+            view.context.getString(R.string.episode_numbered, card.numeral), card.title.ifBlank { null }, card.subtitle,
+            view.context.getString(R.string.episode_watched).takeIf { card.watched },
+        ).joinToString(if (Api.language == "fa") "، " else ", ")
         view.job?.cancel()
-        view.dress(card.backdrop != null)
+        view.dress(card.backdrop != null, card.watched)
         // The number back from its Persian digits, for where its cut of the art sits.
         val number = card.numeral?.mapNotNull(Char::digitToIntOrNull)?.fold(0) { n, digit -> n * 10 + digit } ?: 0
         val rtl = view.resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
@@ -176,6 +187,8 @@ private class EpisodeView(context: Context) : FrameLayout(context) {
     /** The frame's extraction, while this tile waits for it. */
     var job: Job? = null
     val numeral = TextView(context)
+    /** Seen through: a check in the corner the number doesn't take (see [dress]). */
+    private val check = ImageView(context)
     val name = TextView(context)
     val caption = TextView(context)
     /** Ink over the series' art, lifting a little under the remote (see [dress]). */
@@ -203,6 +216,8 @@ private class EpisodeView(context: Context) : FrameLayout(context) {
         still.importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
         frame.scaleType = ImageView.ScaleType.CENTER_CROP
         frame.importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+        check.setImageResource(R.drawable.episode_watched)
+        check.importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
         numeral.setTextAppearance(R.style.TextAppearance_App_Numeral)
         numeral.textSize = 48f
         numeral.includeFontPadding = false
@@ -239,6 +254,11 @@ private class EpisodeView(context: Context) : FrameLayout(context) {
             marginStart = side
             topMargin = (6 * dp).toInt()
         })
+        // The corner the number leaves free, as far in from the end edge as from the top.
+        addView(check, LayoutParams((24 * dp).toInt(), (24 * dp).toInt(), Gravity.TOP or Gravity.END).apply {
+            marginEnd = (10 * dp).toInt()
+            topMargin = (10 * dp).toInt()
+        })
         addView(foot, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.START))
         addView(track, LayoutParams(LayoutParams.MATCH_PARENT, (4 * dp).toInt(), Gravity.BOTTOM))
     }
@@ -252,11 +272,14 @@ private class EpisodeView(context: Context) : FrameLayout(context) {
     /**
      * The tile as it is drawn first: the series' [art], when there is any, greyed toward the page and
      * shaded so the number and the words keep their contrast, the crop placed by [slice]; no frame yet.
+     * [seen] through, its pictures step back and the check shows: done, not gone, its words as bright.
      */
-    fun dress(art: Boolean) {
+    fun dress(art: Boolean, seen: Boolean) {
         dressed = art
         still.scaleType = if (art) ImageView.ScaleType.MATRIX else ImageView.ScaleType.CENTER_CROP
-        still.colorFilter = if (art) GREY else null
+        still.colorFilter = if (!art) null else if (seen) GREY_SEEN else GREY
+        frame.colorFilter = if (seen) SEEN else null
+        check.visibility = if (seen) View.VISIBLE else View.GONE
         for (view in listOf(shade, frame, numeral)) view.animate().cancel()
         shade.visibility = if (art) View.VISIBLE else View.GONE
         shade.alpha = if (isFocused) SHADE_FOCUSED else SHADE
@@ -332,6 +355,10 @@ private class EpisodeView(context: Context) : FrameLayout(context) {
         const val NUMERAL_SMALL = 0.5f
         /** Half the colour: art behind a number, not a picture competing with it. */
         val GREY = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0.5f) })
+        /** A seen episode's pictures at 70% light: still there, a step behind the ones to come. */
+        private val DIM = ColorMatrix().apply { setScale(0.7f, 0.7f, 0.7f, 1f) }
+        val SEEN = ColorMatrixColorFilter(DIM)
+        val GREY_SEEN = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0.5f); postConcat(DIM) })
     }
 }
 

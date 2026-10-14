@@ -86,6 +86,8 @@ class Card(
     val facts: CharSequence? = null,
     /** An episode's number, set large on its tile. */
     val numeral: String? = null,
+    /** An episode seen through (Watched.kt): its tile wears a check and steps back. */
+    val watched: Boolean = false,
     /** Streams without a plan: a poster wears «رایگان». */
     val free: Boolean = false,
     val onLongClick: (() -> Unit)? = null,

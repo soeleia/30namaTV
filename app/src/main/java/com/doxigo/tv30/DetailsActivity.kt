@@ -17,6 +17,7 @@ import android.widget.TextView
 import androidx.annotation.DrawableRes
 import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.ArrayObjectAdapter
+import androidx.leanback.widget.DiffCallback
 import androidx.leanback.widget.HeaderItem
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.ListRowPresenter
@@ -45,8 +46,10 @@ class DetailsActivity : TvActivity() {
     private var resumeLabel: String? = null
     /** What Play does with [resumeLabel]'s episode: resume it, start the next one (UpNext.kt), or start it over. */
     private var playVerb = R.string.resume
-    /** The row and tile of the episode to resume, when a long season split it into rows: where Down first lands. */
+    /** The row and tile of the episode Play leads to: where Down first lands, in its season (and its stretch of a long one). */
     private var landing: Pair<Int, Int>? = null
+    /** The seasons' rows of tiles, in order; coming back to the page their tiles catch up in place (see [onRestart]). */
+    private val episodeRows = mutableListOf<ArrayObjectAdapter>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -140,6 +143,12 @@ class DetailsActivity : TvActivity() {
     override fun onResume() {
         super.onResume()
         updateActions() // signed in, or a list changed, while we were away
+    }
+
+    /** Back from the player, most likely: the server's point has moved and Watched with it, so Play and the tiles follow. */
+    override fun onRestart() {
+        super.onRestart()
+        if (episodeRows.isNotEmpty()) lifecycleScope.launch { loadEpisodes() }
     }
 
     private fun bind() {
@@ -256,16 +265,18 @@ class DetailsActivity : TvActivity() {
      * files) fades in once it is on screen and extracted, or at once when it was before.
      * A season longer than fifty is a row per fifty, «فصل ۱، قسمت ۱ تا ۵۰», as the official app chunks
      * it: Down jumps fifty episodes, every header says where it is, and Leanback draws only the rows on screen.
+     * Called again once the rows are up, it only brings their tiles and Play up to date.
      */
     private suspend fun loadEpisodes() {
         if (title.isMovie || !title.streamable) return
         val stream = runCatching { Api.stream(title.titleId, title.isFree) }.getOrNull() ?: return
         // Play's episode by the player's own rule (UpNext.kt): saved in the credits, it is the next one
-        // from its start (a finale starts over), so the button and the marked tile say what Play does.
+        // not yet seen, from its start (a finale starts over), so the button and the marked tile say what Play does.
         val all = stream.optJSONArray("hls").objects()
         val saved = stream.optJSONObject("continue_watching")
+        Watched.seed(this, all, saved)
         val savedIndex = saved?.str("file_id")?.let { id -> all.indexOfFirst { it.str("info", "file_id") == id } } ?: -1
-        val (playIndex, playAt) = upNext(all.map { it.endMark }, savedIndex, saved?.optLong("time") ?: 0L)
+        val (playIndex, playAt) = Watched.upNext(this, all, savedIndex, saved?.optLong("time") ?: 0L)
         val resumeFile = all.getOrNull(playIndex)?.str("info", "file_id")
         // The marked tile: its saved progress where Play resumes it, none where Play starts it.
         val watching = if (playIndex == savedIndex && playAt > 0) saved else resumeFile?.let { JSONObject().put("progress", 0) }
@@ -275,6 +286,10 @@ class DetailsActivity : TvActivity() {
             else -> R.string.watch
         }
         val episodes = EpisodePresenter(this)
+        val shown = episodeRows.toList()
+        resumeLabel = null
+        landing = null
+        var index = 0
         stream.optJSONArray("hls").objects().groupBy { it.obj("info")?.optInt("season") ?: 0 }.toSortedMap().forEach { (season, files) ->
             if (season == 0) return@forEach
             fun card(file: JSONObject): Card {
@@ -288,10 +303,17 @@ class DetailsActivity : TvActivity() {
             val name = getString(R.string.season_n, season)
             val stretches = ranges(files.size)
             for (range in stretches.ifEmpty { listOf(files.indices) }) {
-                if (stretches.isNotEmpty() && resumeAt in range) landing = rows.size() to resumeAt - range.first
+                val at = index++
+                if (resumeAt in range) landing = at to resumeAt - range.first
+                val cards = files.slice(range).map(::card)
+                if (shown.isNotEmpty()) {
+                    shown.getOrNull(at)?.setItems(cards, SameEpisode) // a season out since then waits for the next visit
+                    continue
+                }
                 val header = if (stretches.isEmpty()) name else getString(R.string.season_range, name, rangeLabel(files, range))
-                val row = ArrayObjectAdapter(episodes).apply { setItems(files.slice(range).map(::card), null) }
+                val row = ArrayObjectAdapter(episodes).apply { setItems(cards, null) }
                 rows.add(ListRow(HeaderItem(rows.size().toLong(), header), row))
+                episodeRows += row
             }
         }
         updateActions()
@@ -347,6 +369,17 @@ class DetailsActivity : TvActivity() {
         fun intent(context: Context, title: JSONObject): Intent =
             Intent(context, DetailsActivity::class.java).putExtra(EXTRA_TITLE, title.toString())
     }
+}
+
+/**
+ * An episode's tile is the same tile by its file; one whose state moved is bound again where it is
+ * (a payload, not a swap), so the one under the remote keeps it.
+ */
+private object SameEpisode : DiffCallback<Card>() {
+    override fun areItemsTheSame(oldItem: Card, newItem: Card) = oldItem.source?.str("info", "file_id") == newItem.source?.str("info", "file_id")
+    override fun areContentsTheSame(oldItem: Card, newItem: Card) =
+        oldItem.subtitle?.toString() == newItem.subtitle?.toString() && oldItem.progress == newItem.progress && oldItem.watched == newItem.watched
+    override fun getChangePayload(oldItem: Card, newItem: Card): Any = newItem
 }
 
 /**

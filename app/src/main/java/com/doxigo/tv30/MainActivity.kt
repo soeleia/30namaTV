@@ -693,6 +693,8 @@ fun forgetSession(context: android.content.Context) {
     Api.user = null
     Library.clear()
     Api.scope.launch { WatchNext.clear(context.applicationContext) }
-    // The home kept for the next launch (HomeFragment.KEPT) is this account's: it goes with it.
+    // The home kept for the next launch (HomeFragment.KEPT) and the watched episodes are this
+    // account's: they go with it.
     context.applicationContext.filesDir.resolve("home").deleteRecursively()
+    Watched.clear(context.applicationContext)
 }

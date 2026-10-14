@@ -2,4 +2,5 @@
 <resources>
     <string name="episode_watching">Watching</string>
     <string name="episode_numbered">Episode %s</string>
+    <string name="episode_watched">Watched</string>
 </resources>
