@@ -23,6 +23,7 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.annotation.DrawableRes
 import androidx.core.content.ContextCompat
@@ -72,17 +73,20 @@ import java.util.Locale
 //     settings come in: the current one checked and under the remote. OK applies and closes;
 //     onChoose gets the index of any pick, the current one too. Back and Esc close without it.
 //
-//   Activity.ask(title, value: String, link: String, onSave: (String) -> Unit)
-//     ask("TMDB", Settings.savedKey(Tmdb.NAME), "https://www.themoviedb.org/settings/api") { key ->
-//         Settings.saveKey(Tmdb.NAME, key) }
+//   Activity.ask(title, value: String, link: String,
+//                onSave: (key: String, answer: (note: CharSequence?, works: Boolean?) -> Unit) -> Unit)
+//     ask(getString(s.name), Settings.savedKey(s.id), s.link) { key, answer -> save(s, key, answer) }
 //     An API key, the viewer's from [link], three ways in, on confirm's card. A QR code and its
 //     address open a page this TV serves its home network while the sheet is open (KeyForm): it
 //     links to [link] and sends the key back, saved as Save saves it; with no home network, the
 //     code is [link] itself. OK on the field, under the remote with [value] in it, asks for the
 //     TV's keyboard, which the Google TV app on a phone can type or paste into. Paste, beside it,
-//     takes the TV's clipboard. Save (or the keyboard's Done) closes and hands onSave the text as
-//     it stands; Clear, there only when [value] is not empty, hands it "". Back and Esc close
-//     without either.
+//     takes the TV's clipboard. Save (or the keyboard's Done) hands onSave the text as it stands;
+//     Clear, there only when [value] is not empty, hands it "". The sheet stays, «در حال بررسی…»
+//     and a spinner under the field, until onSave calls answer once: with a null note (nothing
+//     to try) it closes; with works true it says the note and closes 1.2 s later; false (refused,
+//     the note red) or null (out of reach) say it and leave the remote on the field to fix or
+//     send again. Back and Esc close without either, the check going on behind.
 //
 //   FragmentActivity.quickActions(title: JSONObject)
 //     (context as? FragmentActivity)?.quickActions(t) // toCard's default hold, Cards.kt
@@ -178,7 +182,7 @@ fun Activity.choose(title: CharSequence, options: List<CharSequence>, current: I
     sheet.open(rows.getOrElse(current) { rows.first() }, title)
 }
 
-fun Activity.ask(title: CharSequence, value: String, link: String, onSave: (String) -> Unit) {
+fun Activity.ask(title: CharSequence, value: String, link: String, onSave: (key: String, answer: (note: CharSequence?, works: Boolean?) -> Unit) -> Unit) {
     val dp = resources.displayMetrics.density
     // A key from the phone goes in as a typed one would and is saved by Save; set once Save is.
     var send: (String) -> Unit = {}
@@ -227,13 +231,28 @@ fun Activity.ask(title: CharSequence, value: String, link: String, onSave: (Stri
         addView(paste, linear(WRAP, WRAP).apply { marginStart = px(12) })
     }
     form.addView(row, linear(MATCH, WRAP).apply { topMargin = px(24) })
-    val hint = latin(this, getString(R.string.sheet_keyboard_hint), R.font.inter_regular)
-    val note = text(hint, R.style.TextAppearance_App_Caption).apply {
+    val note = text(latin(this, getString(R.string.sheet_keyboard_hint), R.font.inter_regular), R.style.TextAppearance_App_Caption).apply {
         textSize = 14f
+        // Two lines held whatever it says, so Save stays put while a check comes and goes.
+        minLines = 2
         maxLines = 2
+        balanceLines()
         start()
+        accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE // TalkBack reads a check as it lands
     }
-    form.addView(note, linear(MATCH, WRAP).apply { topMargin = px(10) })
+    val quiet = note.textColors
+    // The player panel's spinner, on the note's first line while a key is tried.
+    val busy = ProgressBar(this).apply {
+        indeterminateTintList = ContextCompat.getColorStateList(context, R.color.brand)
+        visibility = View.GONE
+    }
+    form.addView(LinearLayout(this).apply {
+        addView(busy, linear(px(16), px(16)).apply {
+            marginEnd = px(10)
+            topMargin = (note.lineHeight - px(16)) / 2
+        })
+        addView(note, linear(0, WRAP, 1f))
+    }, linear(MATCH, WRAP).apply { topMargin = px(10) })
     val save = button(getString(R.string.sheet_save))
     form.addView(save, linear(MATCH, WRAP).apply { topMargin = px(24) })
     val clear = if (value.isEmpty()) null else button(getString(R.string.sheet_clear))
@@ -278,27 +297,53 @@ fun Activity.ask(title: CharSequence, value: String, link: String, onSave: (Stri
 
     val sheet = Sheet(this, card, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER), SCRIM_ALERT, dy = 16 * dp)
     val keys = getSystemService(InputMethodManager::class.java)
+    /** The note line: [words] in the caption's grey, or in [ink] once they are a check's answer; the spinner while [trying]. */
+    fun say(words: CharSequence, ink: Int = 0, trying: Boolean = false) {
+        note.text = latin(this, words, R.font.inter_regular)
+        if (ink == 0) note.setTextColor(quiet) else note.setTextColor(getColor(ink))
+        busy.visibility = if (trying) View.VISIBLE else View.GONE
+    }
+    // A key being tried, or one that worked and is on its way out: Save, Clear and a phone's key wait.
+    var waiting = false
     fun done(text: String) {
-        // The keyboard would otherwise stay up over the page the sheet hands back.
+        if (waiting) return
+        waiting = true
+        // The keyboard would otherwise stay up over the note, and over the page the sheet hands back.
         keys.hideSoftInputFromWindow(field.windowToken, 0)
-        sheet.close { onSave(text) }
+        say(getString(R.string.settings_key_checking), trying = true)
+        onSave(text) { said, works ->
+            when {
+                said == null -> sheet.close()
+                works == true -> {
+                    say(said, R.color.text)
+                    card.postDelayed({ sheet.close() }, KEY_WORKED)
+                }
+                else -> {
+                    waiting = false
+                    say(said, if (works == false) R.color.settings_danger else R.color.text)
+                    field.requestFocus()
+                }
+            }
+        }
     }
     save.setOnClickListener { done(field.text.toString()) }
     clear?.setOnClickListener { done("") }
     send = { key ->
-        field.setText(key)
-        save.performClick()
+        if (!waiting) {
+            field.setText(key)
+            save.performClick()
+        }
     }
     paste.setOnClickListener {
         val copied = getSystemService(ClipboardManager::class.java).primaryClip?.takeIf { it.itemCount > 0 }
             ?.getItemAt(0)?.coerceToText(this)?.toString()?.trim().orEmpty()
         if (copied.isEmpty()) {
-            note.text = latin(this, getString(R.string.sheet_paste_empty), R.font.inter_regular)
+            say(getString(R.string.sheet_paste_empty))
             return@setOnClickListener
         }
         field.setText(copied)
         field.setSelection(copied.length)
-        note.text = hint
+        say(getString(R.string.sheet_keyboard_hint))
         save.requestFocus() // one more OK saves it
     }
     // OK on the field asks for the keyboard outright. TextView's own answer to OK, a plain request,
@@ -632,6 +677,8 @@ private const val SHEET = "sheet"
 private const val SCRIM_ALERT = 0xF2141414.toInt()
 /** A question card's inset, dp: its text and buttons 360dp across inside it. */
 private const val CARD_PAD = 32
+/** How long a key that works keeps its sheet, ms: «کلید کار می‌کند.» read, then the row's «•••• abcd». */
+private const val KEY_WORKED = 1200L
 /** The QR code's side, dp: phones read it from the sofa; its plate adds 12dp round it. */
 private const val QR = 136
 /** Ink at 70% beside a panel: the page stays legible as what the choice is about. */

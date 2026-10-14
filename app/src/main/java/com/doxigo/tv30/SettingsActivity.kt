@@ -669,7 +669,7 @@ class SettingsActivity : TvActivity() {
     /** One row per service: OK opens the sheet that takes its key. */
     private fun services(): List<Group> = listOf(Group(0, keyed.map { s ->
         Option(s.name, text(s.help), value = { keyValue(s) }, note = { keyNote(s) }, sub = s.unlocks, warn = { outcome(s) == Check.REJECTED }) {
-            ask(getString(s.name), Settings.savedKey(s.id), s.link) { save(s, it) }
+            ask(getString(s.name), Settings.savedKey(s.id), s.link) { key, answer -> save(s, key, answer) }
         }
     }))
 
@@ -699,9 +699,10 @@ class SettingsActivity : TvActivity() {
     /**
      * Saves the key at once and then tries it: saved whatever the answer, since from Iran the
      * service may be out of reach while the key is fine. Keys are printable ASCII; anything else
-     * (a paste's line break, a Persian keyboard's letter) would not survive an HTTP header.
+     * (a paste's line break, a Persian keyboard's letter) would not survive an HTTP header. The
+     * row and its panel say what the try found, and so does the sheet on top of them ([answer]).
      */
-    private fun save(s: Service, typed: String) {
+    private fun save(s: Service, typed: String, answer: (CharSequence?, Boolean?) -> Unit) {
         val key = typed.filter { it in '!'..'~' }
         Settings.saveKey(s.id, key)
         if (key.isNotEmpty()) {
@@ -714,8 +715,9 @@ class SettingsActivity : TvActivity() {
                     null -> Check.UNREACHABLE
                 }
                 refresh()
+                answer(keyNote(s), works)
             }
-        }
+        } else answer(null, null)
         refresh()
     }
 
