@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
 import android.view.KeyEvent
+import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
 import android.view.inputmethod.InputMethodManager
@@ -91,6 +92,19 @@ open class TvActivity : FragmentActivity() {
         handler.removeCallbacks(settle)
         if (Motion.fast) settle.run()
     }
+}
+
+/**
+ * Focus for a page still being built, and the page's default whenever its window looks for one.
+ * Until the window is attached, a view takes the device's default touch mode (Android 16 here; 9
+ * asked the window), and where that is touch (a phone, a tablet, the emulator) the request is
+ * refused: the window then left touch mode for the remote and focused the page's first view
+ * instead, Settings opening on Playback rather than the row it was sent to. As the default, this
+ * is the view it picks. A TV's default is the remote's, and it takes the request at once.
+ */
+fun View.takeFocus() {
+    if (Build.VERSION.SDK_INT >= 26) isFocusedByDefault = true
+    requestFocus()
 }
 
 private fun KeyEvent.asBack() =

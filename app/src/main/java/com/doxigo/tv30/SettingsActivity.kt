@@ -136,7 +136,7 @@ class SettingsActivity : TvActivity() {
         val start = intent.getIntExtra(EXTRA_SECTION, 0)
         show(start)
         Rail(this, Rail.Section.SETTINGS) { categories.getChildAt(section) }.ready()
-        (rows.getOrNull(intent.getIntExtra(EXTRA_ROW, -1)) ?: categories.getChildAt(start)).requestFocus()
+        (rows.getOrNull(intent.getIntExtra(EXTRA_ROW, -1)) ?: categories.getChildAt(start)).takeFocus()
         rise(listOf(content.findViewById(R.id.settings_title), categories, panel, detail))
         measure()
         lifecycleScope.launch {

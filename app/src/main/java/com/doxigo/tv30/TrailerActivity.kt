@@ -122,7 +122,7 @@ class TrailerActivity : TvActivity() {
         loading.visibility = View.GONE
         video.hideController()
         error.visibility = View.VISIBLE
-        retry.requestFocus()
+        retry.takeFocus() // an id refused at once fails in onStart, before the window is up
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {

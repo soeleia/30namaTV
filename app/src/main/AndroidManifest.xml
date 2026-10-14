@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
@@ -11,14 +12,20 @@
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
-    <!-- A remote or keyboard connecting must not restart a screen (and with it, playback). -->
+    <!-- A remote or keyboard connecting must not restart a screen (and with it, playback).
+         Back is a key here, as on any TV: the rail, the sheets, the player's panel, Settings and
+         Leanback's search all read KEYCODE_BACK as the window dispatches it. From Android 16 an app
+         targeting it gets Back as a predictive-back callback instead, the key never reaching them:
+         Back left home rather than opening the rail. This keeps it a key. -->
     <application
         android:name=".App"
         android:banner="@drawable/nama_tv_banner"
+        android:enableOnBackInvokedCallback="false"
         android:icon="@mipmap/ic_nama"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.App">
+        android:theme="@style/Theme.App"
+        tools:targetApi="33">
 
         <provider
             android:name="androidx.core.content.FileProvider"
