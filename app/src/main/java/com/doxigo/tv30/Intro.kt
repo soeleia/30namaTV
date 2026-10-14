@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Build
 import android.view.PixelCopy
+import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.View
 import android.view.ViewGroup
@@ -83,8 +84,19 @@ class Intro(activity: Activity) {
                     override fun onPlayerError(error: PlaybackException) = showLogo()
                 })
                 motion.setMediaItem(MediaItem.fromUri("android.resource://${activity.packageName}/${R.raw.nama_motion}"))
-                motion.prepare()
                 motion.play()
+                // Prepared only once the SurfaceView has its surface: before it, the decoder opens on
+                // a placeholder and is moved over a moment later, and Android 9's software decoder
+                // can crash the system's codec service (media.codec) in that move.
+                val holder = (video.videoSurfaceView as? SurfaceView)?.holder
+                if (holder == null || holder.surface.isValid) motion.prepare() else holder.addCallback(object : SurfaceHolder.Callback {
+                    override fun surfaceCreated(holder: SurfaceHolder) {
+                        holder.removeCallback(this)
+                        player?.prepare()
+                    }
+                    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
+                    override fun surfaceDestroyed(holder: SurfaceHolder) {}
+                })
             }
             view.postDelayed(showLoading, 6_500)
         }
