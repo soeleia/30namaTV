@@ -22,15 +22,18 @@ import coil3.request.crossfade
 //
 // Call them on the activity (from a fragment, requireActivity()):
 //
-//   Activity.confirm(title, question, action, art: String? = null, onConfirm: () -> Unit)
+//   Activity.confirm(title, question, action, art: String? = null, secondary: CharSequence? = null,
+//                    onSecondary: (() -> Unit)? = null, onConfirm: () -> Unit)
 //     requireActivity().confirm(title.englishName, getString(R.string.continue_remove_question),
-//         getString(R.string.continue_remove), art = title.poster) { remove(title) }
+//         getString(R.string.continue_remove), art = title.poster,
+//         secondary = getString(R.string.continue_info), onSecondary = { openDetails(title) }) { remove(title) }
 //     Asks before a step the viewer can't take back, as the Apple TV app does: the page dims and
 //     a card rises in the middle with the poster ([art], a URL; left out when null), the name
 //     ([title], its face by its script), the [question] and two stacked buttons. [action] names
-//     the step by its verb («حذف از ادامهٔ تماشا», never «تأیید»); Cancel is added and holds the
-//     remote at first, so a stray OK changes nothing. Back and Esc cancel. onConfirm runs only
-//     for the action.
+//     the step by its verb («حذف از ادامهٔ تماشا», never «تأیید»); under it, Cancel, or the safe
+//     [secondary] step in its place (Back already cancels), holds the remote at first, so a stray
+//     OK changes nothing. Back and Esc cancel. onConfirm runs only for the action, onSecondary
+//     only for [secondary].
 //
 //   Activity.choose(title, options: List<CharSequence>, current: Int, onChoose: (Int) -> Unit)
 //     requireActivity().choose(getString(R.string.sort_by), SORTS.map { getString(it.second) }, sort) { picked ->
@@ -45,7 +48,10 @@ import coil3.request.crossfade
 // beneath can take focus or TalkBack's attention, the window's keys reach it before the
 // activity's own handling, and on closing the remote goes back to whatever opened it.
 
-fun Activity.confirm(title: CharSequence, question: CharSequence, action: CharSequence, art: String? = null, onConfirm: () -> Unit) {
+fun Activity.confirm(
+    title: CharSequence, question: CharSequence, action: CharSequence, art: String? = null,
+    secondary: CharSequence? = null, onSecondary: (() -> Unit)? = null, onConfirm: () -> Unit,
+) {
     val dp = resources.displayMetrics.density
     // The question on its own card, the contract's first surface step: solid, so no poster or
     // red row of the page can show through a button or run into the question. 32dp inside its
@@ -86,15 +92,15 @@ fun Activity.confirm(title: CharSequence, question: CharSequence, action: CharSe
         maxLines = 3
     }, linear(MATCH, WRAP).apply { topMargin = px(8) })
     val act = button(action)
-    val cancel = button(getString(R.string.sheet_cancel))
+    val safe = button(secondary ?: getString(R.string.sheet_cancel))
     column.addView(act, linear(MATCH, WRAP).apply { topMargin = px(32) })
     // 8dp between the 48dp targets is 12dp between the pills they draw, the buttons' own gap.
-    column.addView(cancel, linear(MATCH, WRAP).apply { topMargin = px(8) })
+    column.addView(safe, linear(MATCH, WRAP).apply { topMargin = px(8) })
 
     val sheet = Sheet(this, column, FrameLayout.LayoutParams(px(360 + 2 * CARD_PAD), WRAP, Gravity.CENTER), SCRIM_ALERT, dy = 16 * dp)
     act.setOnClickListener { sheet.close(onConfirm) }
-    cancel.setOnClickListener { sheet.close() }
-    sheet.open(cancel, dotted(title.toString(), question.toString()))
+    safe.setOnClickListener { sheet.close(onSecondary) }
+    sheet.open(safe, dotted(title.toString(), question.toString()))
 }
 
 fun Activity.choose(title: CharSequence, options: List<CharSequence>, current: Int, onChoose: (Int) -> Unit) {

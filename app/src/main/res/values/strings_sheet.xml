@@ -5,4 +5,6 @@
     <!-- continue_watching_dismiss only takes the title off the row; say no more than that. -->
     <string name="continue_remove_question">این عنوان از ادامهٔ تماشا حذف شود؟</string>
     <string name="continue_remove">حذف از ادامهٔ تماشا</string>
+    <!-- In Cancel's place, to the title page; the hero's «بیشتر» (promo_more) in full, without its icon. -->
+    <string name="continue_info">اطلاعات بیشتر</string>
 </resources>

@@ -3,4 +3,5 @@
     <string name="sheet_cancel">Cancel</string>
     <string name="continue_remove_question">Remove this title from Continue Watching?</string>
     <string name="continue_remove">Remove from Continue Watching</string>
+    <string name="continue_info">More info</string>
 </resources>

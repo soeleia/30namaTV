@@ -456,8 +456,11 @@ class HomeFragment : BrowseSupportFragment() {
         return cards
     }
 
+    /** OK held on a continue card: take it off the row, or go to its page instead of Cancel (Back cancels). */
     private fun confirmDismiss(title: JSONObject) {
-        requireActivity().confirm(title.englishName, getString(R.string.continue_remove_question), getString(R.string.continue_remove), art = title.poster) {
+        val activity = requireActivity()
+        activity.confirm(title.englishName, getString(R.string.continue_remove_question), getString(R.string.continue_remove), art = title.poster,
+            secondary = getString(R.string.continue_info), onSecondary = { activity.openDetails(title) }) {
             lifecycleScope.launch {
                 runCatching { Api.dismissContinueWatching(title.titleId) }
                 loadContinueWatching()
