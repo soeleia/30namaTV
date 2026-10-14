@@ -25,8 +25,8 @@ android {
         // Sony's 2017 Bravias shipped on 7.0; 23 still covers every Android TV since 2015.
         minSdk = 23
         targetSdk = 37
-        versionCode = 5
-        versionName = "1.0.3"
+        versionCode = 6
+        versionName = "1.1.0"
         testInstrumentationRunner = "com.doxigo.tv30.PerformanceChecks"
         // TMDB (Tmdb.kt) and the subtitle sites (Subtitles.kt) take each viewer's own key, entered in
         // Settings. These are the developer's fallback for their own builds, from the gitignored
