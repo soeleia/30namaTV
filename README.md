@@ -6,7 +6,16 @@ An **unofficial, independent** native Kotlin app for browsing and watching 30nam
 
 Android 6.0+ (API 23). Universal APK; no React Native runtime. Release builds use R8 optimization and resource shrinking. Browsing stays available while account/menu extras load, posters are decoded to display size, and search requests are cancelled when replaced.
 
-Search uses a six-column vertical grid. Genres opens a dedicated four-column page from the short home preview, with every genre and its existing catalogue preserved.
+Search uses a six-column vertical grid. Home shows every genre in its row, ending in a link to the dedicated four-column genre page.
+
+## Features
+
+- **Home.** 30nama's promoted titles page left and right on a hero with one **More info** button; the remote's play key starts the title. Home draws at once from the last saved copy, then refreshes in place. The artwork of the titles next to the one in focus is fetched ahead, so moving along a row rarely waits.
+- **Posters.** Hold OK on any poster for quick actions: More info, add or remove it from your three lists, and the trailer when one exists. On Continue Watching, holding OK offers to remove the title or open its page.
+- **Search.** Recent searches return when the box is empty, above 30nama's suggestions.
+- **Player.** The controls open on play/pause. Left and right scrub in five-second steps that speed up while held, and the seek lands a second after the last press. The light part of the seek bar shows what is ready, including the disk read-ahead (Settings > Playback > Preload), and the next episode's opening is fetched during the credits. The title's Persian name sits under the English one.
+- **Subtitles.** **Find subtitles** searches SubDL and OpenSubtitles for the film or exact episode, Persian first, and loads the chosen file without stopping playback, converting old Windows-1256 Persian files. **Subtitle timing** shifts any subtitle earlier or later in quarter-second steps.
+- **Episodes.** Watched episodes carry a check, partly watched ones a progress bar and the minutes left, and Play resumes where you are. The history is kept on the TV (30nama keeps one position per title) and cleared on sign-out.
 
 ## Install
 
@@ -29,7 +38,7 @@ Before installation, the app verifies the package name, newer version code and s
 
 ## Service keys
 
-TMDB and the player's subtitle search use free API keys that each viewer supplies. Open **Settings > Services** and select TMDB, SubDL or OpenSubtitles: scan the QR code to open the page where that key is made, then type or paste it with the TV's keyboard or the Google TV app on your phone. The app checks the key when you save it and keeps it in its private storage on that TV. Without a key that feature stays off; browsing and 30nama playback need none.
+TMDB and the player's subtitle search use free API keys that each viewer supplies. Open **Settings > Services** and select TMDB, SubDL or OpenSubtitles. Scan the QR code with a phone on the same Wi-Fi: it opens a page served by the TV that links to where the key is made and sends the pasted key straight to the TV. You can also type the key with the TV's keyboard or the Google TV app, or use **Paste**. The sheet checks the key, says whether it works, and keeps it in the app's private storage on that TV. Without a key that feature stays off; browsing and 30nama playback need none.
 
 - **TMDB** adds the trending row, Persian names 30nama lacks, More Like This, trailers and episode stills. Its API page offers an API key and an API read access token; either works.
 - **SubDL** and **OpenSubtitles** power **Find subtitles** in the player (Audio & Subtitles → Subtitles), which appears once either has a key. A free OpenSubtitles key downloads five subtitles a day.
@@ -59,7 +68,7 @@ Public APKs carry no API keys (see [service keys](#service-keys)). For your own 
 python3 scripts/tv-checks.py --serial emulator-5554
 ```
 
-Use a disposable emulator. Fixture checks replace local preferences and use mocked account data; the runner rejects physical devices. They cover startup/cancellation, logo playback and cleanup, five-second control hiding, forward-seek resume, cancelled/backward seeks, column alignment, subtitle direction and centering, title clipping, intro/recap countdown, My Lists, vertical search, the complete genre page, update validation/status and trailer playback/lifecycle.
+Use a disposable emulator. Fixture checks replace local preferences and use mocked account data; the runner rejects physical devices. They cover startup/cancellation, logo playback and cleanup, five-second control hiding, play/pause focus, accelerating and self-landing seeks, cancelled/backward seeks, column alignment, Persian lines fitting their width, subtitle direction and centering, title clipping, intro/recap countdown, watched episodes, My Lists, vertical search and recent searches, the complete genre page, update validation/status and trailer playback/lifecycle.
 
 The trailer check attempts the public Animals trailer. If its CDN is unreachable, logs state `PUBLIC_UNAVAILABLE` and use a silence fixture for interaction/lifecycle checks. That result does not certify live CDN playback.
 
