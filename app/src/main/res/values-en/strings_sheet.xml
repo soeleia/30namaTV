@@ -4,4 +4,14 @@
     <string name="continue_remove_question">Remove this title from Continue Watching?</string>
     <string name="continue_remove">Remove from Continue Watching</string>
     <string name="continue_info">More info</string>
+    <string name="sheet_save">Save</string>
+    <string name="sheet_clear">Clear</string>
+    <string name="sheet_keyboard_hint">Press OK to type. You can also type or paste the key from the Google TV app on your phone.</string>
+    <string name="quick_favorite_add">Add to Favorites</string>
+    <string name="quick_favorite_remove">Remove from Favorites</string>
+    <string name="quick_watchlist_add">Add to Watchlist</string>
+    <string name="quick_watchlist_remove">Remove from Watchlist</string>
+    <string name="quick_notify_add">Add to Notify</string>
+    <string name="quick_notify_remove">Remove from Notify</string>
+    <string name="quick_sign_in">Sign in to add to your lists</string>
 </resources>

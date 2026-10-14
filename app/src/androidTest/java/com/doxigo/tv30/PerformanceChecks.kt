@@ -146,6 +146,8 @@ class PerformanceChecks : Instrumentation() {
                 clientField.set(Api, client)
                 Api.token = if (signedIn) "performance-test" else null
                 Intro.shown = true
+                // Home kept from an earlier run would be up before the blocked extras are; this checks the fetch.
+                targetContext.filesDir.resolve("home").deleteRecursively()
             }
             activity = startActivitySync(Intent(targetContext, MainActivity::class.java)
                 .putExtra(MainActivity.EXTRA_GUEST, true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
@@ -179,6 +181,7 @@ class PerformanceChecks : Instrumentation() {
                 Api.user = originalUser
                 Intro.shown = originalIntro
                 clientField.set(Api, originalClient)
+                targetContext.filesDir.resolve("home").deleteRecursively()
             }
             client.dispatcher.cancelAll()
         }

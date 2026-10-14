@@ -11,10 +11,24 @@
     android:layout_height="match_parent"
     android:background="@color/ink">
 
+    <!-- promo_drift wider than the screen each side: the hero's page turn drifts it that far. -->
     <ImageView
         android:id="@+id/backdrop"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:layout_marginStart="-16dp"
+        android:layout_marginEnd="-16dp"
+        android:importantForAccessibility="no"
+        android:scaleType="centerCrop" />
+
+    <!-- The art a hero page turn leaves behind, drifting off over the new art as it fades
+         (Billboard.turn). Empty the rest of the time, so it draws nothing. -->
+    <ImageView
+        android:id="@+id/backdrop_leaving"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginStart="-16dp"
+        android:layout_marginEnd="-16dp"
         android:importantForAccessibility="no"
         android:scaleType="centerCrop" />
 

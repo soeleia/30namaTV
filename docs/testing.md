@@ -12,7 +12,7 @@ The CI device is Android 11 TV (API 30), 1080p, two cores, 1536 MB RAM, 128 MB h
 
 Install the APK on the Android 11 Sony TV and verify:
 
-1. Cold launch, quick relaunch, home focus movement and opening a title. Home content should appear as soon as its catalogue response is ready; the motion logo must not delay it.
+1. Cold launch, quick relaunch, home focus movement and opening a title. Home content should appear as soon as its catalogue response is ready; the motion logo must not delay it. A relaunch draws the last home from disk at once (the logo still plays its first 1.5 s), then the fresh rows land in place without moving focus. Offline with a saved home, home still shows with a quiet notice.
 2. Search `friends`: results scroll vertically; Down enters the grid, Up from its first row returns to search, and the edge arrow reaches the sidebar. Search replacement and voice search should show only the current query.
 3. My Lists: all three actions still open their original lists. Move rapidly between posters and rows, including the end of a paginated list.
    Genres: home shows every genre, then More; open More. The full four-column page should open immediately, every genre should open its catalogue, and Back should restore the focused genre/home tile.

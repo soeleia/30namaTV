@@ -59,6 +59,8 @@ object GenresChecks {
                     Api.user = null
                     Intro.shown = true
                     clientField.set(Api, client)
+                    // Home kept from an earlier run would be up before this run's answers.
+                    targetContext.filesDir.resolve("home").deleteRecursively()
                 }
                 homeActivity = startActivitySync(Intent(targetContext, MainActivity::class.java)
                     .putExtra(MainActivity.EXTRA_GUEST, true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
@@ -151,6 +153,7 @@ object GenresChecks {
                 Locale.setDefault(originalLocale)
                 Intro.shown = originalIntro
                 clientField.set(Api, originalClient)
+                targetContext.filesDir.resolve("home").deleteRecursively()
             }
             client.dispatcher.cancelAll()
         }

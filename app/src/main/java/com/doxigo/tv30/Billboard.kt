@@ -1,5 +1,6 @@
 package com.doxigo.tv30
 
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.text.TextPaint
@@ -8,8 +9,12 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.widget.TextViewCompat
-import coil3.load
-import coil3.request.crossfade
+import coil3.asDrawable
+import coil3.imageLoader
+import coil3.request.Disposable
+import coil3.request.ImageRequest
+import coil3.size.Scale
+import coil3.transition.CrossfadeDrawable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -23,6 +28,8 @@ import kotlin.math.roundToInt
  */
 class Billboard(private val root: View, private val scope: CoroutineScope) {
     private val backdrop: ImageView = root.findViewById(R.id.backdrop)
+    /** Home's only (billboard.xml): what a page turn of the promoted hero carries off, see [turn]. */
+    private val leaving: ImageView? = root.findViewById(R.id.backdrop_leaving)
     private val text: View = root.findViewById(R.id.billboard)
     private val title: TextView = root.findViewById(R.id.bb_title)
     private val local: TextView = root.findViewById(R.id.bb_local)
@@ -41,6 +48,8 @@ class Billboard(private val root: View, private val scope: CoroutineScope) {
     private var art: String? = null
     private var strength = 1f
     private var pending: Job? = null
+    /** The fetch under way for [art], dropped the moment other art is asked for. */
+    private var loading: Disposable? = null
     /** TMDB's answer for the title on screen, when 30nama has no Persian name (see [askName]). */
     private var naming: Job? = null
     /** The title whose words are written, and the card waiting for them to finish fading out. */
@@ -66,7 +75,11 @@ class Billboard(private val root: View, private val scope: CoroutineScope) {
             GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, intArrayOf(solid, solid, clear, clear))
     }
 
-    fun show(card: Card) {
+    /**
+     * [turn]: the promoted hero turning a page, px toward where the next art comes in from (0 under
+     * reduced motion). Its art turns with the words, without the rest focus waits for (see [stage]).
+     */
+    fun show(card: Card, turn: Float? = null) {
         // Only titles speak here. A tile (a list, a genre, "see all") quiets the words rather than
         // posing as a title, and the last title's art steps back with them: a category or genre
         // shows its own picture, dimmed, and a list or "see all" leaves bare ink.
@@ -81,32 +94,88 @@ class Billboard(private val root: View, private val scope: CoroutineScope) {
         if (text.alpha < 1f) text.animate().alpha(1f).setInterpolator(Motion.easeOut).setDuration(Motion.ENTER).start()
         swapWords(card, hidden)
         askName(card)
-        card.backdrop?.let { stage(it, 1f) }
+        // A title without art leaves bare ink, never the last title's.
+        stage(card.backdrop, if (card.backdrop == null) 0f else 1f, turn)
     }
 
     /**
-     * Puts [url] behind at [level] (null keeps the art and only sets its level). Dimming starts
-     * at once; brightening for new art waits until it has arrived, so the dim picture it replaces
-     * never flashes up whole. The art follows focus only once it rests: no decoding a 1280 px
-     * image per key press.
+     * Puts [url] behind at [level] (null keeps the art and only sets its level). New art follows
+     * focus only once it rests (no decoding a 1280 px image per key press); until then the art on
+     * screen stays, and then crossfades into it. A fetch still under way for other art is dropped
+     * at once: on a slow connection it used to land under the new title's words. New art not
+     * already in memory (home fetches the covers beside the focused card) has the old fade out
+     * while it downloads, so it never stays under the new words; it rises from ink when it lands.
+     *
+     * A page turn of the promoted hero ([turn]) starts at once, with its words: the hero lands a
+     * turn only once paging rests (Promo.refresh), and its neighbours' art is in memory. It
+     * crossfades too, the art moving with the words: see [turn]. The art is wider than the screen
+     * by that much (billboard.xml), so the drift never bares an edge.
      */
-    private fun stage(url: String?, level: Float) {
+    private fun stage(url: String?, level: Float, turn: Float? = null) {
         strength = level
         if (url == null || url == art) return light()
         art = url
-        if (backdrop.alpha > level) light()
+        loading?.dispose()
         pending?.cancel()
+        val from = turn ?: 0f
         pending = scope.launch {
-            delay(350)
-            // Out of bare ink there is nothing to crossfade from: the art rises in with the level.
-            val fade = if (backdrop.alpha < 0.05f) 0 else Motion.BACKDROP
-            backdrop.load(url) { crossfade(fade); size(1280, 720); listener(onSuccess = { _, _ -> light() }) }
+            if (turn == null) delay(REST)
+            var landed = false
+            // Coil's own ImageView target would blank the art as the fetch starts and skip the crossfade for a memory hit.
+            val request = ImageRequest.Builder(root.context).data(url).size(1280, 720).scale(Scale.FILL).target(onSuccess = { image ->
+                landed = true
+                val new = image.asDrawable(root.resources)
+                val old = backdrop.drawable?.takeIf { backdrop.alpha > 0.05f }
+                when {
+                    old == null -> {
+                        backdrop.setImageDrawable(new)
+                        backdrop.translationX = from // out of ink a page's art still settles in from its side
+                    }
+                    from != 0f && leaving != null -> turn(leaving, old, new, from)
+                    else -> {
+                        backdrop.setImageDrawable(CrossfadeDrawable(old, new, Scale.FILL, Motion.BACKDROP))
+                        (backdrop.drawable as CrossfadeDrawable).start()
+                    }
+                }
+                light()
+            }).build()
+            // A memory hit lands inside enqueue; anything slower fades the old art out meanwhile. A
+            // page turn first gives it the rest it skipped: one from disk turns as cleanly, and
+            // pages pressed through quickly don't each dip on their way past.
+            loading = root.context.imageLoader.enqueue(request)
+            if (turn != null && !landed) delay(REST)
+            if (!landed) dim()
         }
     }
 
-    /** Takes the art to [strength] from wherever it is, overriding a fade still under way. */
+    /** Fades the art on screen out while new art downloads. */
+    private fun dim() {
+        backdrop.animate().alpha(0f).setStartDelay(0).setInterpolator(Motion.easeOut)
+            .setDuration(if (Motion.reduced) Motion.FADE else REST).start()
+    }
+
+    /**
+     * A page turn's crossfade: the old art moves to [leaving], over the backdrop, and drifts away
+     * from [from] as it fades, while the new art settles in from [from] beneath it, the two
+     * travelling together. Nothing dips: the new art is whole under the old as it goes. A turn
+     * landing while the last one still fades takes its place, so at most two pictures draw.
+     */
+    private fun turn(leaving: ImageView, old: Drawable, new: Drawable, from: Float) {
+        leaving.animate().cancel()
+        // The backdrop lets go of the old art first: handing it on afterwards would unhook it from its new view.
+        backdrop.setImageDrawable(new)
+        leaving.setImageDrawable(old)
+        leaving.alpha = backdrop.alpha
+        leaving.translationX = backdrop.translationX
+        backdrop.translationX = from
+        leaving.animate().alpha(0f).translationX(leaving.translationX - from).setStartDelay(0).setInterpolator(Motion.easeOut)
+            .setDuration(Motion.BACKDROP.toLong()).withEndAction { leaving.setImageDrawable(null) }.start()
+    }
+
+    /** Takes the art to [strength] and home from wherever it is, overriding a fade still under way. */
     private fun light() {
-        backdrop.animate().alpha(strength).setStartDelay(0).setInterpolator(Motion.easeOut).setDuration(Motion.BACKDROP.toLong()).start()
+        backdrop.animate().alpha(strength).translationX(0f).setStartDelay(0).setInterpolator(Motion.easeOut)
+            .setDuration(Motion.BACKDROP.toLong()).start()
     }
 
     /**
@@ -241,6 +310,8 @@ class Billboard(private val root: View, private val scope: CoroutineScope) {
     private companion object {
         /** How strongly a category's or genre's own picture shows behind its row: ambient, never a title's art. */
         const val TILE_ART = 0.3f
+        /** How long focus rests before new art is fetched, and how long the old art takes to go. */
+        const val REST = 350L
         /** The Tizen client's text swap: out in 120 ms, then each line in over 260 ms, 40 ms after the one above. */
         const val OUT = 120L
         const val IN = 260L

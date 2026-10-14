@@ -27,6 +27,10 @@ import androidx.leanback.widget.VerticalGridView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
+import coil3.imageLoader
+import coil3.request.Disposable
+import coil3.request.ImageRequest
+import coil3.size.Scale
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -36,11 +40,21 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import org.json.JSONArray
+import org.json.JSONTokener
 
 class MainActivity : TvActivity() {
     private var rail: Rail? = null
     private var intro: Intro? = null
+    private var introAt = 0L
     private val home get() = supportFragmentManager.findFragmentById(R.id.browse_host) as? HomeFragment
+
+    /**
+     * How long home drawn from the last run waits before it arrives. It is ready a few hundred ms
+     * in, and the motion logo dissolving that soon only flashes, so it plays its first [INTRO_HOLD]
+     * ms. The whole arrival waits, not just the logo, so the rows still rise as it dissolves.
+     * Home fetched fresh never waits.
+     */
+    val introLeft get() = if (intro == null) 0L else introAt + INTRO_HOLD - SystemClock.elapsedRealtime()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,6 +79,7 @@ class MainActivity : TvActivity() {
         if (!Intro.shown) {
             Intro.shown = true
             intro = Intro(this)
+            introAt = SystemClock.elapsedRealtime()
         }
         lifecycleScope.launch {
             delay(5_000)
@@ -81,6 +96,9 @@ class MainActivity : TvActivity() {
     fun jumpTo(row: Int) {
         home?.jumpTo(row)
     }
+
+    /** A list toggled from a quick-actions sheet over home (Sheets.kt), which never stops it. */
+    fun listsChanged() = home?.listsChanged()
 
     /** Reveal ready rows or the offline notice immediately. */
     fun homeReady(rows: Boolean) {
@@ -104,6 +122,7 @@ class MainActivity : TvActivity() {
     companion object {
         const val EXTRA_GUEST = "guest"
         private const val EXTRA_JUMP = "jump"
+        private const val INTRO_HOLD = 1_500L
 
         /** A fresh task on home, with [then] (a page to come back to, say) on top of it. */
         fun restart(activity: android.app.Activity, guest: Boolean = false, then: Intent? = null) {
@@ -135,8 +154,14 @@ class HomeFragment : BrowseSupportFragment() {
     /** 30nama's promoted titles over the rows. It owns the billboard; the rows reach it through [PromoHero.follow]. */
     private var hero: PromoHero? = null
     private var loaded = false
-    /** The card focus rests on while a held D-pad races past: the billboard catches up on release. */
-    private var waiting: Card? = null
+    /** The card focus rests on while a held D-pad races past, and its row: the billboard catches up on release. */
+    private var waiting: Pair<Card, ArrayObjectAdapter?>? = null
+    /** Where in which row the remote last rested, which says the way it is heading (see [follow]). */
+    private var restRow: ArrayObjectAdapter? = null
+    private var restAt = -1
+    /** The covers either side of it on their way into the image cache, by URL, and the wait before they start. */
+    private var nearby = emptyMap<String, Disposable>()
+    private var nearing: Job? = null
     /** The rows grid: its selection is the row the remote is on. */
     private val rowsGrid get() = (mainFragment as? RowsSupportFragment)?.verticalGridView
     /** The row [fadePast] last faded the others for, and the grid whose children follow it. */
@@ -155,22 +180,53 @@ class HomeFragment : BrowseSupportFragment() {
         headersState = HEADERS_DISABLED
         adapter = rows
         onItemViewClickedListener = OnItemViewClickedListener { _, item, _, _ -> (item as? Card)?.onClick?.invoke() }
-        onItemViewSelectedListener = OnItemViewSelectedListener { _, item, _, _ ->
-            (item as? Card)?.let(::feature)
+        onItemViewSelectedListener = OnItemViewSelectedListener { _, item, _, row ->
+            (item as? Card)?.let { feature(it, (row as? ListRow)?.adapter as? ArrayObjectAdapter) }
             fadePast()
         }
         load()
     }
 
     /** The billboard follows focus, but not through a held D-pad: rewriting it per card would make the row stutter. */
-    private fun feature(card: Card) {
-        if (Motion.fast) waiting = card else hero?.follow(card)
+    private fun feature(card: Card, row: ArrayObjectAdapter?) {
+        nearing?.cancel()
+        if (Motion.fast) waiting = card to row else follow(card, row)
     }
 
     /** The D-pad was let go (see TvActivity.onSettled). */
     fun settled() {
-        waiting?.let { hero?.follow(it) }
+        waiting?.let { (card, row) -> follow(card, row) }
         waiting = null
+    }
+
+    /**
+     * The billboard takes [card]. Once the remote has rested on it as long as the billboard waits,
+     * the covers either side start downloading too: two ahead the way it is heading, one behind.
+     * A cover the CDN no longer holds comes from 30nama's origin in Iran, seconds away, and every
+     * press used to wait for its own; now the next one is usually here already. Billboard's
+     * request shape (1280x720, centre-crop) makes it a memory hit. Covers the remote has left
+     * behind are dropped; the focused one never is, since the billboard's load may be riding on
+     * it (App's DeDupe).
+     */
+    // ponytail: neighbours in the row only; the rows above and below wait for their own rest.
+    private fun follow(card: Card, row: ArrayObjectAdapter?) {
+        hero?.follow(card)
+        val at = row?.indexOf(card) ?: -1
+        val step = if (row === restRow && at < restAt) -1 else 1
+        restRow = row
+        restAt = at
+        if (row == null || at < 0) return
+        val near = listOf(at + step, at + 2 * step, at - step)
+            .mapNotNull { i -> (if (i in 0 until row.size()) row.get(i) as? Card else null)?.backdrop }
+        nearing = lifecycleScope.launch {
+            delay(REST)
+            val context = context ?: return@launch
+            val keep = near + listOfNotNull(card.backdrop)
+            nearby.forEach { (url, load) -> if (url !in keep) load.dispose() }
+            nearby = near.associateWith { url ->
+                nearby[url] ?: context.imageLoader.enqueue(ImageRequest.Builder(context).data(url).size(1280, 720).scale(Scale.FILL).build())
+            }
+        }
     }
 
     /**
@@ -188,6 +244,8 @@ class HomeFragment : BrowseSupportFragment() {
         focusedRow = rowsGrid.selectedPosition
         if (rowsGrid !== grid) {
             grid = rowsGrid
+            // The row below the screen is attached too, so its posters are on their way before Down shows it.
+            rowsGrid.prefetchAttachedRows()
             rowsGrid.addOnChildAttachStateChangeListener(object : RecyclerView.OnChildAttachStateChangeListener {
                 override fun onChildViewAttachedToWindow(view: View) {
                     view.animate().cancel()
@@ -253,14 +311,14 @@ class HomeFragment : BrowseSupportFragment() {
     override fun onStart() {
         val onHero = hero?.active == true
         super.onStart()
-        // Leanback hands the rows the remote on every start; back from Play or More, it returns to the hero.
+        // Leanback hands the rows the remote on every start; back from the title page or the player, it returns to the hero.
         if (onHero) hero?.focus()
         if (!loaded) return
         // Back from the player: progress moved, and the continue row with it; back from a title
         // page whose toggle changed the watchlist, My List too. A stale home reloads them with the rest.
         if (Api.loggedIn && !stale) {
             lifecycleScope.launch { loadContinueWatching() }
-            if (Library.changes != watchlistAt) lifecycleScope.launch { loadWatchlist() }
+            listsChanged()
         }
         keepFresh()
     }
@@ -305,50 +363,109 @@ class HomeFragment : BrowseSupportFragment() {
                     launch { loadContinueWatching() }
                     launch { loadWatchlist() }
                 }
-                launch { runCatching { Api.home() }.onSuccess { showHome(it) } }
-                launch { runCatching { Api.menu() }.onSuccess(::showMenu) }
+                launch { runCatching { Api.home() }.onSuccess { keep(HomeCache.HOME, it); showHome(it) } }
+                launch { loadMenu() }
             }
             showLists()
             showTrending(trending.await())
         }
     }
 
+    /**
+     * With home from the last run on disk (see [drawKept]) it is drawn at once and arrives as the
+     * intro allows; the fetch below then lands on it as a refresh does, unchanged cards untouched.
+     * Without one, home arrives when the catalogue answers, as it always did.
+     */
     private fun load() {
         lifecycleScope.launch {
-            progressBarManager.show()
+            val arrival = if (!drawKept()) null else {
+                // The fetch under way counts as fresh: a return to home meanwhile reloads only what moves (onStart).
+                loadedAt = SystemClock.elapsedRealtime()
+                launch {
+                    delay((activity as? MainActivity)?.introLeft ?: 0)
+                    arrive()
+                }
+            }
+            if (arrival == null) progressBarManager.show()
             if (!Api.initialize()) {
-                progressBarManager.hide()
-                (activity as? MainActivity)?.homeReady(rows = false)
-                showOffline()
-                return@launch
+                if (arrival == null) {
+                    progressBarManager.hide()
+                    (activity as? MainActivity)?.homeReady(rows = false)
+                    showOffline()
+                    return@launch
+                }
+                // Home from the last run stays up and says so quietly, once it is in; it fetches as
+                // soon as a server answers again.
+                arrival.join()
+                context?.toast(getString(R.string.no_internet))
+                do delay(RETRY) while (!Api.initialize())
             }
             // Account and menu requests must not hold ready catalogue rows behind the intro.
             val home = async { runCatching { Api.home() } }
-            launch { runCatching { Api.menu() }.onSuccess(::showMenu) }
+            launch { loadMenu() }
             if (Api.loggedIn) {
                 launch { loadUser(); showLists() }
                 launch { runCatching { Library.load() } }
                 launch { loadContinueWatching(); keepFirstRow() }
                 launch { loadWatchlist() }
             }
-            home.await().onSuccess { showHome(it) }.onFailure { context?.toast(it) }
+            home.await().onSuccess { keep(HomeCache.HOME, it); showHome(it) }.onFailure { context?.toast(it) }
             showLists()
-            setSelectedPosition(0, false)
-            // Once the rows are laid out, the remote starts on Play (or the first poster, with
-            // nothing promoted). The rows and the hero's buttons rise in as the launch intro (if
-            // any) starts to dissolve, so it all reads as one move.
-            (activity as? MainActivity)?.homeReady(rows = true)
-            view?.post { if (hero?.focus() != true) mainFragment?.view?.requestFocus() }
-            view?.findViewById<View>(androidx.leanback.R.id.browse_container_dock)?.animate()
-                ?.alpha(1f)?.translationY(0f)?.setStartDelay(0)?.setInterpolator(Motion.emph)?.setDuration(Motion.PAGE)?.start()
-            hero?.arrive(0)
-            loaded = true
+            if (arrival == null) arrive()
             loadedAt = SystemClock.elapsedRealtime()
             keepFresh()
-            progressBarManager.hide()
             // Trending's catalogue searches share the API dispatcher; start them after home.
             showTrending(Trending.titles(requireContext()))
         }
+    }
+
+    /**
+     * Home's first appearance. Once the rows are laid out, the remote starts on the hero (or the
+     * first poster, with nothing promoted). The rows and the hero's button rise in as the launch
+     * intro (if any) starts to dissolve, so it all reads as one move.
+     */
+    private fun arrive() {
+        setSelectedPosition(0, false)
+        (activity as? MainActivity)?.homeReady(rows = true)
+        view?.post { if (hero?.focus() != true) mainFragment?.view?.requestFocus() }
+        view?.findViewById<View>(androidx.leanback.R.id.browse_container_dock)?.animate()
+            ?.alpha(1f)?.translationY(0f)?.setStartDelay(0)?.setInterpolator(Motion.emph)?.setDuration(Motion.PAGE)?.start()
+        hero?.arrive(0)
+        loaded = true
+        progressBarManager.hide()
+    }
+
+    /** Where this account's home is kept, in this language; null when it is no one's (HomeCache.key). */
+    private fun keptKey() = HomeCache.key(Api.loggedIn, Api.user?.str("user_id"), Api.language)
+
+    /** A fresh answer home is drawn from, kept for the next launch. Written in order, off the main thread. */
+    private fun keep(part: String, json: Any) {
+        val dir = context?.filesDir?.resolve(KEPT) ?: return
+        val key = keptKey() ?: return
+        Api.scope.launch(keeping) { HomeCache.write(dir, key, part, json.toString()) }
+    }
+
+    /**
+     * Home as the last run left it for this account and language, drawn whole: rows, hero and
+     * billboard, their art from the image cache. False when there is none, or no catalogue in it.
+     */
+    private suspend fun drawKept(): Boolean {
+        val key = keptKey() ?: return false
+        val dir = requireContext().filesDir.resolve(KEPT)
+        // Read and parsed off the main thread: home alone is ~300 KB of JSON. A file cut short or garbled is a miss.
+        val (home, menu, watching, watchlist) = withContext(Dispatchers.IO) {
+            listOf(HomeCache.HOME, HomeCache.MENU, HomeCache.WATCHING, HomeCache.WATCHLIST).map { part ->
+                HomeCache.read(dir, key, part)?.let { runCatching { JSONTokener(it).nextValue() }.getOrNull() }
+            }
+        }
+        showHome(home as? JSONObject ?: return false)
+        (menu as? JSONObject)?.let(::showMenu)
+        if (Api.loggedIn) {
+            (watching as? JSONArray)?.let { showContinueWatching(it) }
+            (watchlist as? JSONObject)?.let { showWatchlist(it) }
+        }
+        showLists()
+        return true
     }
 
     private suspend fun showHome(home: JSONObject) {
@@ -382,35 +499,40 @@ class HomeFragment : BrowseSupportFragment() {
         if (hero?.active == true) setSelectedPosition(0, false)
     }
 
-    /**
-     * The watchlist's latest additions as My List, the official mobile app's row, ending in the
-     * whole list. Guests and an empty list get no row; a failed fetch keeps what is there (null).
-     */
-    private suspend fun watchlistCards(): List<Card>? {
-        if (!Api.loggedIn) return null
+    /** The watchlist's latest additions. Guests get no row; a failed fetch keeps what is there. */
+    /** My List again, if a toggle changed it since it was fetched: on return to home, or under a quick-actions sheet. */
+    fun listsChanged() {
+        if (Api.loggedIn && Library.changes != watchlistAt) lifecycleScope.launch { loadWatchlist() }
+    }
+
+    private suspend fun loadWatchlist() {
+        if (!Api.loggedIn) return
         val at = Library.changes
-        val list = runCatching { Api.userList("watchlist", 1, "add_list") }.getOrNull() ?: return null
-        val context = context ?: return null
+        val list = runCatching { Api.userList("watchlist", 1, "add_list") }.getOrNull() ?: return
         watchlistAt = at
+        keep(HomeCache.WATCHLIST, list)
+        showWatchlist(list)
+    }
+
+    /** [list] as My List, the official mobile app's row, ending in the whole list. An empty list gets no row. */
+    private suspend fun showWatchlist(list: JSONObject) {
+        val context = context ?: return
         val cards = withContext(Dispatchers.Default) {
             list.optJSONArray("posts").objects().map { t -> t.toCard(context) { context.openDetails(t) } }
         }
-        if (cards.isEmpty()) return cards
         val name = getString(R.string.my_watchlist)
-        return cards + seeAll(cards) { startActivity(GridActivity.list(context, "watchlist", name)) }
+        setRow(WATCHLIST, R.string.my_watchlist, if (cards.isEmpty()) cards else cards + seeAll(cards) {
+            startActivity(GridActivity.list(context, "watchlist", name))
+        })
+        keepFirstRow()
     }
 
     /** The card ending a row of [posts] that opens all of it, its art four of their posters (SeeAll.kt). */
     private fun seeAll(posts: List<Card>, onClick: () -> Unit) =
         Card(getString(R.string.see_all), icon = R.drawable.ic_more, mosaic = posts.mapNotNull { it.image }.take(4), onClick = onClick)
 
-    private fun showWatchlist(cards: List<Card>) {
-        setRow(WATCHLIST, R.string.my_watchlist, cards)
-        keepFirstRow()
-    }
-
-    private suspend fun loadWatchlist() {
-        watchlistCards()?.let(::showWatchlist)
+    private suspend fun loadMenu() {
+        runCatching { Api.menu() }.onSuccess { keep(HomeCache.MENU, it); showMenu(it) }
     }
 
     private fun showMenu(menu: JSONObject) {
@@ -431,18 +553,21 @@ class HomeFragment : BrowseSupportFragment() {
         else forgetSession(requireContext())
     }
 
+    /** A failed fetch keeps what is there; one from the last run is replaced as soon as this answers, as progress moves. */
     private suspend fun loadContinueWatching() {
-        continueWatchingCards()?.let { setRow(CONTINUE, R.string.continue_watching, it) }
+        val result = runCatching { Api.continueWatching() }.getOrNull() ?: return
+        val context = context ?: return
+        val posts = (result as? JSONObject)?.optJSONArray("posts") ?: result as? JSONArray ?: JSONArray()
+        keep(HomeCache.WATCHING, posts)
+        // The launcher's Play Next row mirrors this one. Api.scope, so leaving home mid-sync can't cut it short.
+        Api.scope.launch { WatchNext.sync(context.applicationContext, posts.objects()) }
+        showContinueWatching(posts)
     }
 
-    private suspend fun continueWatchingCards(): List<Card>? {
-        val result = runCatching { Api.continueWatching() }.getOrNull() ?: return null
-        val context = context ?: return null
-        val posts = ((result as? JSONObject)?.optJSONArray("posts") ?: result as? org.json.JSONArray).objects()
-        // The launcher's Play Next row mirrors this one. Api.scope, so leaving home mid-sync can't cut it short.
-        Api.scope.launch { WatchNext.sync(context.applicationContext, posts) }
+    private suspend fun showContinueWatching(posts: JSONArray) {
+        val context = context ?: return
         val cards = withContext(Dispatchers.Default) {
-            posts.map { t ->
+            posts.objects().map { t ->
                 // data: {episode_title: "فصل 1 - قسمت 4", display_time: "00:33:00", progress, ...}. The
                 // red bar already says how far in, so the line names only the episode: «فصل ۱، قسمت ۴».
                 val where = t.str("data", "episode_title")?.episodeLabel()
@@ -452,8 +577,7 @@ class HomeFragment : BrowseSupportFragment() {
                 }
             }
         }
-        hero?.resumable = posts.mapTo(HashSet()) { it.titleId }
-        return cards
+        setRow(CONTINUE, R.string.continue_watching, cards)
     }
 
     /** OK held on a continue card: take it off the row, or go to its page instead of Cancel (Back cancels). */
@@ -519,6 +643,13 @@ class HomeFragment : BrowseSupportFragment() {
     companion object {
         /** How old home's rows may get before they are fetched again: the official app's half hour. */
         private const val STALE = 30 * 60_000L
+        /** How long the remote rests on a card before its neighbours' covers are fetched: Billboard's own wait for its art. */
+        private const val REST = 350L
+        /** How often home from the last run asks for a server again while none answers: Api's own wait between host searches. */
+        private const val RETRY = 30_000L
+        /** Home's answers for the next launch: a folder in filesDir (HomeCache), written one at a time so the last fetched lands last. */
+        private const val KEPT = "home"
+        private val keeping = Dispatchers.IO.limitedParallelism(1)
 
         /** Cards are rebuilt on every load; one showing the same title the same way is the same card. */
         private val SAME_CARD = object : DiffCallback<Card>() {
@@ -550,4 +681,6 @@ fun forgetSession(context: android.content.Context) {
     Api.user = null
     Library.clear()
     Api.scope.launch { WatchNext.clear(context.applicationContext) }
+    // The home kept for the next launch (HomeFragment.KEPT) is this account's: it goes with it.
+    context.applicationContext.filesDir.resolve("home").deleteRecursively()
 }

@@ -27,6 +27,7 @@ import android.widget.TextView
 import androidx.annotation.DrawableRes
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
+import androidx.fragment.app.FragmentActivity
 import androidx.leanback.widget.BaseGridView
 import androidx.leanback.widget.FocusHighlight
 import androidx.leanback.widget.ImageCardView
@@ -45,10 +46,12 @@ import org.json.JSONObject
 /**
  * A title as a poster, carrying what the billboard shows when the remote rests on it. A continue
  * card's caption is its time [left] instead of the score and year, or [caption], a shorter way of saying it.
+ * OK held opens the title's quick actions (Sheets.kt), unless [onLongClick] says otherwise, as
+ * Continue Watching's does.
  */
 fun JSONObject.toCard(
     context: Context, lead: String? = null, progress: Float? = null, left: String? = null, caption: String? = left,
-    onLongClick: (() -> Unit)? = null, onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = { (context as? FragmentActivity)?.quickActions(this) }, onClick: () -> Unit,
 ) = Card(englishName, meta(context, lead, left), poster, plot = plot, backdrop = cover, localTitle = localName, source = this,
     facts = caption ?: facts(context), progress = progress, free = isFree, onLongClick = onLongClick, onClick = onClick)
 
@@ -126,6 +129,10 @@ class CardRowPresenter : ListRowPresenter(FocusHighlight.ZOOM_FACTOR_NONE) {
             windowAlignmentOffsetPercent = 0f
             itemAlignmentOffset = 0
             itemAlignmentOffsetPercent = 0f
+            // The cards just past the row's end edge (about two posters) are laid out and attached
+            // as well, so their art is already downloading when a press scrolls them in. Before,
+            // each one asked for its poster only as it came on screen.
+            prefetchAttachedRows()
         }
     }
 
@@ -481,7 +488,10 @@ private class TileView(context: Context) : FrameLayout(context) {
  */
 internal fun blank(context: Context): Drawable = ColorDrawable(ContextCompat.getColor(context, R.color.surface_high))
 
-/** Coil starts image requests when rows attach; binding alone does not prefetch them. */
+/**
+ * Coil starts image requests when rows (or a row's cards) attach; binding alone does not prefetch
+ * them. About a row of a grid, or two posters of a row, past each edge.
+ */
 @SuppressLint("RestrictedApi")
 internal fun BaseGridView.prefetchAttachedRows() {
     setExtraLayoutSpace((240 * resources.displayMetrics.density).toInt())

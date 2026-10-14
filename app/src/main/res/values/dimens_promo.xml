@@ -1,15 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Home's promoted hero (Promo.kt) on the 540dp screen. While it is up the rows sit
      promo_rows_drop lower, their first title at 424dp, so its posters peek in under the hero.
-     Above that, from the foot up: the page dots end 22dp over the row title (402dp), the
-     buttons sit 18dp over the dots (330 to 378dp), and the billboard's words end 20dp over the
-     buttons (310dp) and grow upward: names, meta and three lines of synopsis
-     (50 + 34 + 35 + 100 dp at most) start no higher than 91dp. -->
+     Above that, from the foot up: the button's pill ends 28dp over the row title (352 to 396dp,
+     in its 48dp view, the dots centred beside it), and the billboard's words end 24dp over the pill (328dp)
+     and grow upward: names, meta and three lines of synopsis (50 + 34 + 35 + 100 dp at most)
+     start no higher than 109dp. -->
 <resources>
     <dimen name="promo_rows_drop">172dp</dimen>
-    <dimen name="promo_hero_bottom">138dp</dimen>
-    <dimen name="promo_text_bottom">230dp</dimen>
+    <dimen name="promo_hero_bottom">142dp</dimen>
+    <dimen name="promo_text_bottom">212dp</dimen>
     <dimen name="promo_dot">6dp</dimen>
     <!-- Each dot's slot, as wide as the current page's pill. -->
     <dimen name="promo_dot_slot">18dp</dimen>
+    <!-- A page turning: how far the words travel out and in, and the art behind them, half as
+         far. billboard.xml's art bleeds promo_drift past each side so its drift never bares an edge. -->
+    <dimen name="promo_glide">32dp</dimen>
+    <dimen name="promo_drift">16dp</dimen>
 </resources>
