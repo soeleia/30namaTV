@@ -258,7 +258,9 @@ class HomeFragment : BrowseSupportFragment() {
             })
         }
         for (i in 0 until rowsGrid.childCount) {
-            val row = rowsGrid.getChildAt(i)
+            // Selection can land mid-layout (focus restored while rows attach and detach), when the
+            // grid's child list has a gap; a row skipped here takes its alpha as it attaches.
+            val row = rowsGrid.getChildAt(i) ?: continue
             val past = rowsGrid.getChildAdapterPosition(row) < focusedRow
             val alpha = if (past) 0f else 1f
             row.animate().cancel()
