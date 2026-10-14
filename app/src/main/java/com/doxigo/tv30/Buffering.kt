@@ -91,11 +91,12 @@ object Buffering {
      * ExoPlayer's buffer lives on the Java heap, which a 2 GB TV caps at about 192 MB per app. A
      * third of it (64 MB there) holds a minute and a half of 1080p, and two minutes caps lighter
      * streams (it was 30 s / 48 MB). Loading pauses at the top and resumes at 50 s, which leaves the
-     * read-ahead long turns on the connection.
+     * read-ahead long turns on the connection. Never more than that third: a 32 MB floor took two
+     * thirds of a 48 MB heap, and a paused film plus a subtitle search ran out of memory.
      */
     fun loadControl(): LoadControl = DefaultLoadControl.Builder()
         .setBufferDurationsMs(50_000, 120_000, 2_500, 5_000)
-        .setTargetBufferBytes((Runtime.getRuntime().maxMemory() / 3).coerceIn(32L shl 20, 96L shl 20).toInt())
+        .setTargetBufferBytes((Runtime.getRuntime().maxMemory() / 3).coerceAtMost(96L shl 20).toInt())
         .build()
 
     /**
