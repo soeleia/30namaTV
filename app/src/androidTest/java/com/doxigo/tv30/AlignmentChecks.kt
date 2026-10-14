@@ -3,14 +3,20 @@ package com.doxigo.tv30
 import android.app.Activity
 import android.app.Instrumentation
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Rect
+import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.text.Layout
+import android.text.TextUtils
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import java.nio.ByteBuffer
 import java.util.Locale
 import kotlin.math.abs
 
@@ -28,11 +34,11 @@ object AlignmentChecks {
                     .putExtra("row", 0).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 waitForIdleSync()
                 val host = checkNotNull(activity)
+                if (code == "fa") linesFit(host)
                 runOnMainSync {
                     playerColumns(host)
-                    spacesFit(host)
                     val choices = host.findViewById<LinearLayout>(R.id.settings_choices)
-                    check(choices.childCount == Settings.QUALITIES.size)
+                    check(choices.childCount == Settings.QUALITIES.size) { "Settings opened with ${choices.childCount} choices, focus on ${host.currentFocus}, touch mode ${host.window.decorView.isInTouchMode}" }
                     val values = (0 until choices.childCount).map { choices.getChildAt(it) as TextView }
                     values.forEach(::aligned)
                     check(values.map { it.compoundPaddingStart }.distinct().size == 1) { "The selected value shifted past its check" }
@@ -52,7 +58,7 @@ object AlignmentChecks {
                 }
                 activity = null
             }
-            result.putString("stream", "PASS: English/Persian player columns, headings, check gutters and Settings choices/notes in RTL and LTR, widened Persian lines within their width\n")
+            result.putString("stream", "PASS: English/Persian player columns, headings, check gutters and Settings choices/notes in RTL and LTR, widened Persian lines and their ink within their width, ellipsized synopses cut at whole words\n")
         } catch (error: Throwable) {
             result.putString("stream", error.stackTraceToString())
             resultCode = Activity.RESULT_CANCELED
@@ -98,28 +104,93 @@ object AlignmentChecks {
 
     /**
      * Persian with its widened word spaces (TextSpacing.kt) breaks at the width it is drawn at: no
-     * line runs past its view's end edge. Before, Android 10 and up broke lines for the font's
-     * narrow space and drew the wide one, the last word cut off. (An ellipsized last line is left
-     * out: Android 9, with no widening, already draws one up to a space past at some widths.)
+     * line's words run past its view's end edge. Before, Android 10 and up broke lines for the
+     * font's narrow space and drew the wide one, the last word cut off. Nor is any ink drawn past
+     * that edge, where TextView clips it: from Android 15 a line-final ر's tail (Fit gives the word
+     * to the next line), and on every version the ellipsized synopsis's «…» line, which StaticLayout
+     * cut mid-word, the cut letter then drawn in its wider final form (Fit ends it at a whole word).
+     * At every width a synopsis might have, each laid out and redone on screen as it would be.
      */
-    private fun spacesFit(host: Activity) {
-        val words = "این متن آزمایشی چند خط فارسی است که فاصله‌های میان واژه‌هایش پهن‌تر از فاصلهٔ خود قلم " +
-            "کشیده می‌شوند، تا هیچ واژه‌ای در پایان خط از لبهٔ کادر بیرون نزند؛ خلاصهٔ داستان، راهنمای تنظیمات " +
-            "و برگهٔ کلید همه همین‌گونه چیده می‌شوند."
-        for (width in 560..1040 step 40) {
-            val view = TextView(host).apply {
-                setTextAppearance(R.style.TextAppearance_App_Synopsis)
-                widenSpaces()
-                text = words
-                measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+    private fun Instrumentation.linesFit(host: Activity) {
+        val texts = listOf(
+            "این متن آزمایشی چند خط فارسی است که فاصله‌های میان واژه‌هایش پهن‌تر از فاصلهٔ خود قلم " +
+                "کشیده می‌شوند، تا هیچ واژه‌ای در پایان خط از لبهٔ کادر بیرون نزند؛ خلاصهٔ داستان، راهنمای تنظیمات " +
+                "و برگهٔ کلید همه همین‌گونه چیده می‌شوند.",
+            "در این سفر دور و دراز مردی از شهر نور به کنار دریا می‌رود تا راز پدر را باز کند و هر بار که دیر " +
+                "شود باز هم کار را از سر بگیرد تا روز آخر در کنار یار و دیار خود به خانه برگردد و دیگر هرگز از آن در دور نشود.",
+        )
+        val views = ArrayList<TextView>()
+        lateinit var column: LinearLayout
+        runOnMainSync {
+            column = LinearLayout(host).apply { orientation = LinearLayout.VERTICAL }
+            for (words in texts) for (ellipsized in listOf(false, true)) for (width in 420..1100 step 8) {
+                val view = TextView(host).apply {
+                    setTextAppearance(R.style.TextAppearance_App_Synopsis)
+                    widenSpaces()
+                    if (ellipsized) {
+                        maxLines = 2
+                        ellipsize = TextUtils.TruncateAt.END
+                        ellipsizeAtWords()
+                    }
+                    text = words
+                }
+                column.addView(view, LinearLayout.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT))
+                views += view
             }
-            val layout = checkNotNull(view.layout)
-            for (line in 0 until layout.lineCount) {
-                // Its words' advances as drawn, not getLineMax: from Android 15 that takes glyph
-                // bounds, and a final ر's tail overhangs its advance whatever the spacing.
-                val drawn = Layout.getDesiredWidth(layout.text, layout.getLineStart(line), layout.getLineVisibleEnd(line), view.paint)
-                check(drawn <= layout.width + 0.5f) { "Line $line of ${layout.lineCount} runs ${drawn - layout.width} px past its $width px view" }
+            host.findViewById<ViewGroup>(android.R.id.content).addView(column, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+        // Fit lays a line out again before it is drawn, a frame or two each: until none changes.
+        var layouts = emptyList<Layout?>()
+        var still = 0
+        val deadline = SystemClock.uptimeMillis() + 10_000
+        while (still < 3 && SystemClock.uptimeMillis() < deadline) {
+            waitForIdleSync()
+            SystemClock.sleep(32)
+            var now = emptyList<Layout?>()
+            runOnMainSync { now = views.map { it.layout } }
+            if (now.indices.all { now[it] != null && layouts.getOrNull(it) === now[it] }) still++ else still = 0
+            layouts = now
+        }
+        check(still >= 3) { "The synopses kept being laid out again" }
+        runOnMainSync {
+            try {
+                for (view in views) {
+                    val layout = checkNotNull(view.layout)
+                    val ellipsized = view.maxLines == 2
+                    val last = layout.lineCount - 1
+                    for (line in 0 until layout.lineCount) {
+                        // Its words' advances as drawn, not getLineMax: from Android 15 that takes glyph bounds.
+                        val drawn = Layout.getDesiredWidth(layout.text, layout.getLineStart(line), layout.getLineVisibleEnd(line), view.paint)
+                        check(drawn <= layout.width + 0.5f) { "Line $line of ${layout.lineCount} runs ${drawn - layout.width} px past its ${view.width} px view" }
+                        if (Build.VERSION.SDK_INT < 35 && !(ellipsized && line == last)) continue
+                        val past = inkPastEnd(layout, line)
+                        check(past <= 0) { "Line $line of ${layout.lineCount}${if (ellipsized) ", ellipsized at two," else ""} draws $past px past the end of its ${view.width} px view" }
+                    }
+                }
+            } finally {
+                (column.parent as ViewGroup).removeView(column)
             }
+        }
+    }
+
+    /** How far [line]'s ink reaches past the end edge of [layout] (its left: the text is Persian), in px. */
+    private fun inkPastEnd(layout: Layout, line: Int): Int {
+        val margin = 100
+        val top = layout.getLineTop(line)
+        val bitmap = Bitmap.createBitmap(layout.width + 2 * margin, layout.getLineBottom(line) - top, Bitmap.Config.ALPHA_8)
+        try {
+            val canvas = Canvas(bitmap)
+            canvas.translate(margin.toFloat(), -top.toFloat())
+            canvas.clipRect(-margin, layout.getLineTop(line), layout.width + margin, layout.getLineBottom(line))
+            layout.draw(canvas)
+            val pixels = ByteBuffer.allocate(bitmap.rowBytes * bitmap.height)
+            bitmap.copyPixelsToBuffer(pixels)
+            for (x in 0 until margin) for (y in 0 until bitmap.height) {
+                if (pixels.get(y * bitmap.rowBytes + x).toInt() and 0xFF > 40) return margin - x
+            }
+            return 0
+        } finally {
+            bitmap.recycle()
         }
     }
 

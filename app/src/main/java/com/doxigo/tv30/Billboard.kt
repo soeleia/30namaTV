@@ -64,6 +64,7 @@ class Billboard(private val root: View, private val scope: CoroutineScope) {
     }
 
     init {
+        plot.ellipsizeAtWords()
         val c = root.context
         val solid = c.getColor(R.color.scrim)
         val clear = c.getColor(R.color.scrim_clear)
@@ -109,7 +110,7 @@ class Billboard(private val root: View, private val scope: CoroutineScope) {
      * A page turn of the promoted hero ([turn]) starts at once, with its words: the hero lands a
      * turn only once paging rests (Promo.refresh), and its neighbours' art is in memory. It
      * crossfades too, the art moving with the words: see [turn]. The art is wider than the screen
-     * by that much (billboard.xml), so the drift never bares an edge.
+     * by that much (PromoHero), so the drift never bares an edge.
      */
     private fun stage(url: String?, level: Float, turn: Float? = null) {
         strength = level
