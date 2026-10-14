@@ -154,6 +154,8 @@ class HomeFragment : BrowseSupportFragment() {
     /** 30nama's promoted titles over the rows. It owns the billboard; the rows reach it through [PromoHero.follow]. */
     private var hero: PromoHero? = null
     private var loaded = false
+    /** The TMDB key the trending row was fetched with: one saved in Settings since brings the row in on return. */
+    private var trendingKey: String? = null
     /** The card focus rests on while a held D-pad races past, and its row: the billboard catches up on release. */
     private var waiting: Pair<Card, ArrayObjectAdapter?>? = null
     /** Where in which row the remote last rested, which says the way it is heading (see [follow]). */
@@ -320,6 +322,7 @@ class HomeFragment : BrowseSupportFragment() {
             lifecycleScope.launch { loadContinueWatching() }
             listsChanged()
         }
+        if (!stale && Tmdb.key != trendingKey) lifecycleScope.launch { loadTrending() }
         keepFresh()
     }
 
@@ -355,6 +358,7 @@ class HomeFragment : BrowseSupportFragment() {
         loadedAt = SystemClock.elapsedRealtime()
         val context = context ?: return
         lifecycleScope.launch {
+            trendingKey = Tmdb.key
             val trending = async { Trending.titles(context) }
             coroutineScope {
                 if (Api.loggedIn) {
@@ -415,7 +419,7 @@ class HomeFragment : BrowseSupportFragment() {
             loadedAt = SystemClock.elapsedRealtime()
             keepFresh()
             // Trending's catalogue searches share the API dispatcher; start them after home.
-            showTrending(Trending.titles(requireContext()))
+            loadTrending()
         }
     }
 
@@ -487,6 +491,11 @@ class HomeFragment : BrowseSupportFragment() {
     }
 
     /** TMDB's week as 30nama titles. No TMDB token, no answer or no match: no row. */
+    private suspend fun loadTrending() {
+        trendingKey = Tmdb.key
+        showTrending(Trending.titles(requireContext()))
+    }
+
     private fun showTrending(titles: List<JSONObject>) {
         val context = context ?: return
         if (titles.isEmpty()) return
