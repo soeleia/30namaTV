@@ -15,6 +15,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.TextView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.leanback.widget.HorizontalGridView
 import androidx.leanback.widget.VerticalGridView
 import androidx.leanback.widget.ItemBridgeAdapter
 import androidx.leanback.widget.ArrayObjectAdapter
@@ -47,6 +48,7 @@ object SearchGridChecks {
         val originalClient = Api.http
         val originalLanguage = Api.language
         val originalLocale = Locale.getDefault()
+        val originalRecents = Recents.read(instrumentation.targetContext)
         val clientField = Api::class.java.getDeclaredField("http").apply { isAccessible = true }
         val requests = Collections.synchronizedList(mutableListOf<Pair<String, Int>>())
         val slowStarted = CountDownLatch(1)
@@ -79,6 +81,8 @@ object SearchGridChecks {
                 runOnMainSync {
                     Api.language = language
                     clientField.set(Api, client)
+                    // Opens on suggestions alone; the recent searches have their own pass below.
+                    Recents.clear(targetContext)
                 }
                 activity = startActivitySync(Intent(targetContext, SearchActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 val host = checkNotNull(activity)
@@ -189,10 +193,10 @@ object SearchGridChecks {
                     fragment.onActivityResult(1, Activity.RESULT_OK, Intent().putStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS, arrayListOf("voice")))
                 }
                 await("Voice result did not populate and focus the grid") { first(fragment)?.title == "voice 0" && grid.hasFocus() }
-                runOnMainSync {
-                    check(editor.text.toString() == "voice")
-                    host.finish()
-                }
+                runOnMainSync { check(editor.text.toString() == "voice") }
+
+                recentSearches(host, fragment, grid, editor, language)
+                runOnMainSync { host.finish() }
                 await("Search activity did not close") { host.isDestroyed }
                 activity = null
             }
@@ -206,7 +210,7 @@ object SearchGridChecks {
                     true
                 }
             }
-            result.putString("stream", "PASS: cached pagination after layout, six-column RTL/LTR search, D-pad/editor/rail/clicks, row spacing, pagination, debounce/cancel, empty/error and voice results\n")
+            result.putString("stream", "PASS: cached pagination after layout, six-column RTL/LTR search, D-pad/editor/rail/clicks, row spacing, pagination, debounce/cancel, empty/error and voice results, recent searches\n")
         } catch (error: Throwable) {
             capture("search-failure")
             result.putString("stream", error.stackTraceToString())
@@ -219,6 +223,8 @@ object SearchGridChecks {
                 Api.language = originalLanguage
                 Locale.setDefault(originalLocale)
                 clientField.set(Api, originalClient)
+                Recents.clear(targetContext)
+                originalRecents.asReversed().forEach { Recents.add(targetContext, it) }
             }
             client.dispatcher.cancelAll()
         }
@@ -287,6 +293,70 @@ object SearchGridChecks {
                 host.finish()
             }
             await("Cached pagination fixture did not close") { host.isDestroyed }
+        }
+    }
+
+    /**
+     * The empty box's recent searches, from the voice results the caller left: opening one keeps its
+     * query; clearing the box brings it back over the suggestions; Down goes box, recents, grid and
+     * Up back; OK on a recent runs it again and hands the remote to its results; Clear forgets them.
+     */
+    private fun Instrumentation.recentSearches(host: Activity, fragment: SearchFragment, grid: VerticalGridView, editor: TextView, language: String) {
+        val recents = field(fragment, "recents") as View
+        val strip = field(fragment, "strip") as HorizontalGridView
+        // The title page is held back: only the click's own bookkeeping is under test.
+        val details = addMonitor(DetailsActivity::class.java.name, null, true)
+        try {
+            runOnMainSync { checkNotNull(first(fragment)).onClick() }
+            check(details.hits == 1) { "Opening a result did not open its title" }
+        } finally {
+            removeMonitor(details)
+        }
+        check(Recents.read(targetContext) == listOf("voice")) { "Opening a result did not keep its query: ${Recents.read(targetContext)}" }
+
+        fun downFromBox() {
+            await("Search keyboard did not open with the editor") { keyboardVisible(host) }
+            runOnMainSync { host.getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(editor.windowToken, 0) }
+            await("Search keyboard did not hide") { !keyboardVisible(host) }
+            var there = false
+            runOnMainSync { there = strip.hasFocus() }
+            if (!there) press(KeyEvent.KEYCODE_DPAD_DOWN)
+            await("Down from the box did not reach the recent searches", detail = {
+                "recents=${recents.visibility}, focus=${host.currentFocus?.javaClass?.simpleName}"
+            }) { strip.hasFocus() }
+        }
+
+        text(editor, "")
+        await("Clearing the box did not bring back the recent searches") {
+            recents.visibility == View.VISIBLE && strip.adapter?.itemCount == 2 && grid.isFocusable
+        }
+        downFromBox()
+        await("Recent searches did not open on the newest") { strip.selectedPosition == 0 }
+        SystemClock.sleep(300)
+        capture("search-recents-$language")
+        press(KeyEvent.KEYCODE_DPAD_DOWN)
+        await("Down from the recent searches did not reach the suggestions") { grid.hasFocus() }
+        runOnMainSync { grid.selectedPosition = 0 }
+        await("Suggestions could not select the first poster") { grid.selectedPosition == 0 && grid.hasFocus() && grid.scrollState == 0 }
+        press(KeyEvent.KEYCODE_DPAD_UP)
+        await("Up from the suggestions did not return to the recent searches") { strip.hasFocus() }
+        press(KeyEvent.KEYCODE_DPAD_UP)
+        await("Up from the recent searches did not return to the editor") { editor.hasFocus() }
+        downFromBox()
+
+        press(KeyEvent.KEYCODE_DPAD_CENTER)
+        await("A recent search did not run again into focused results", detail = {
+            "text=${editor.text}, first=${first(fragment)?.title}, grid.hasFocus=${grid.hasFocus()}, recents=${recents.visibility}, focus=${host.currentFocus?.javaClass?.simpleName}"
+        }) { editor.text.toString() == "voice" && first(fragment)?.title == "voice 0" && grid.hasFocus() && recents.visibility == View.GONE }
+
+        text(editor, "")
+        await("Recent searches did not come back") { recents.visibility == View.VISIBLE && grid.isFocusable }
+        downFromBox()
+        press(if (language == "fa") KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT)
+        await("Clear did not follow the last recent search") { strip.selectedPosition == 1 && strip.hasFocus() }
+        press(KeyEvent.KEYCODE_DPAD_CENTER)
+        await("Clear did not forget the recent searches and hand the remote to the suggestions") {
+            Recents.read(targetContext).isEmpty() && recents.visibility == View.GONE && grid.hasFocus()
         }
     }
 

@@ -9,4 +9,12 @@
     <!-- Half the field's height: a pill. -->
     <dimen name="search_field_radius">26dp</dimen>
     <item name="lb_search_orb_focused_zoom" type="fraction">108%</item>
+
+    <!-- Clear, ending the recent searches: a bare pill with the bin, dim until the remote reaches
+         it (the person page's sort pill at rest), beside the queries' glass pills. -->
+    <style name="Widget.App.Button.Clear" parent="Widget.App.Button.Icon">
+        <item name="android:background">@drawable/person_pill</item>
+        <item name="android:textColor">@color/person_pill_ink</item>
+        <item name="android:drawableTint">@color/person_pill_ink</item>
+    </style>
 </resources>

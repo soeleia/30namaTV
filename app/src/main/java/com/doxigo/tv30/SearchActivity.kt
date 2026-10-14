@@ -1,6 +1,7 @@
 package com.doxigo.tv30
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -10,16 +11,22 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.leanback.widget.ArrayObjectAdapter
+import androidx.leanback.widget.BaseGridView
 import androidx.leanback.widget.BrowseFrameLayout
+import androidx.leanback.widget.ClassPresenterSelector
 import androidx.leanback.widget.FocusHighlight
+import androidx.leanback.widget.HorizontalGridView
+import androidx.leanback.widget.ItemBridgeAdapter
 import androidx.leanback.widget.OnItemViewClickedListener
 import androidx.leanback.widget.OnItemViewSelectedListener
+import androidx.leanback.widget.Presenter
 import androidx.leanback.widget.SearchBar
 import androidx.leanback.widget.SearchOrbView
 import androidx.leanback.widget.VerticalGridPresenter
@@ -43,6 +50,12 @@ class SearchActivity : TvActivity() {
 class SearchFragment : Fragment(), SearchBar.SearchBarListener {
     private lateinit var bar: SearchBar
     private lateinit var heading: TextView
+    /** The recent searches: their heading and [strip], shown while the box is empty and there are some. */
+    private lateinit var recents: LinearLayout
+    private lateinit var strip: HorizontalGridView
+    private val recentItems = ArrayObjectAdapter(ClassPresenterSelector()
+        .addClassPresenter(String::class.java, Pill(clear = false))
+        .addClassPresenter(ClearRecents::class.java, Pill(clear = true)))
     private lateinit var grid: VerticalGridView
     private lateinit var gridHolder: VerticalGridPresenter.ViewHolder
     private val presenter = VerticalGridPresenter(FocusHighlight.ZOOM_FACTOR_NONE, false).apply {
@@ -63,6 +76,24 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
         val dock = root.findViewById<FrameLayout>(androidx.leanback.R.id.lb_results_frame)
         dock.layoutParams.width = ViewGroup.LayoutParams.MATCH_PARENT
         val content = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+        recents = inflater.inflate(R.layout.search_recents, content, false) as LinearLayout
+        content.addView(recents)
+        // The recent searches line up as a row of posters does: the focused pill on the content's
+        // start edge, the ones before it sliding under the rail.
+        strip = recents.findViewById<HorizontalGridView>(R.id.search_recent_strip).apply {
+            adapter = ItemBridgeAdapter(recentItems).apply {
+                setAdapterListener(object : ItemBridgeAdapter.AdapterListener() {
+                    override fun onCreate(viewHolder: ItemBridgeAdapter.ViewHolder) {
+                        viewHolder.itemView.setOnClickListener { (viewHolder.item as? String)?.let(::rerun) ?: clearRecents() }
+                    }
+                })
+            }
+            windowAlignment = BaseGridView.WINDOW_ALIGN_BOTH_EDGE
+            windowAlignmentOffset = paddingStart
+            windowAlignmentOffsetPercent = 0f
+            itemAlignmentOffset = 0
+            itemAlignmentOffsetPercent = 0f
+        }
         heading = TextView(context).apply {
             setTextAppearance(R.style.TextAppearance_Leanback_Header)
             textAlignment = View.TEXT_ALIGNMENT_VIEW_START
@@ -85,10 +116,13 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
         dock.addView(content, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.TOP).apply {
             topMargin = (108 * dp).toInt()
         })
-        root.onFocusSearchListener = BrowseFrameLayout.OnFocusSearchListener { focused, direction ->
+        // Box, recent searches, results, top to bottom, whichever of the middle two are there.
+        root.onFocusSearchListener = BrowseFrameLayout.OnFocusSearchListener { _, direction ->
             when {
-                direction == View.FOCUS_UP && grid.hasFocus() && grid.selectedPosition < 6 -> bar.findViewById(androidx.leanback.R.id.lb_search_text_editor)
-                direction == View.FOCUS_DOWN && bar.hasFocus() && grid.isFocusable -> grid
+                direction == View.FOCUS_UP && grid.hasFocus() && grid.selectedPosition < 6 -> if (recentsShown) strip else editor
+                direction == View.FOCUS_UP && strip.hasFocus() -> editor
+                direction == View.FOCUS_DOWN && bar.hasFocus() -> below()
+                direction == View.FOCUS_DOWN && strip.hasFocus() && grid.isFocusable -> grid
                 else -> null
             }
         }
@@ -196,8 +230,51 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
     override fun onKeyboardDismiss(query: String) = focusResults()
 
     private fun focusResults() {
-        moveToResults = !grid.isFocusable
-        if (grid.isFocusable) grid.requestFocus()
+        val next = below()
+        moveToResults = next == null
+        next?.requestFocus()
+    }
+
+    /** Down from the box: the recent searches while they show, else the results once they can take the remote. */
+    private fun below(): View? = when {
+        recentsShown -> strip
+        grid.isFocusable -> grid
+        else -> null
+    }
+
+    private val editor: TextView get() = bar.findViewById(androidx.leanback.R.id.lb_search_text_editor)
+
+    private val recentsShown get() = recents.visibility == View.VISIBLE
+
+    /** A recent search again: into the box, and the remote on to its results as they land (see [showRecents]). */
+    private fun rerun(text: String) {
+        bar.setSearchQuery(text)
+        search(text, debounce = false)
+    }
+
+    private fun clearRecents() {
+        Recents.clear(requireContext())
+        showRecents(false)
+    }
+
+    /**
+     * The recent searches, newest first and ending in Clear, while the box is empty. Going while the
+     * remote is on them, they hand it on first, to the results or else the field: a view that leaves
+     * with the focus sends it back to the field by itself, and Leanback's keyboard comes up with it.
+     */
+    private fun showRecents(show: Boolean) {
+        val queries = if (show) Recents.read(requireContext()) else emptyList()
+        if (queries.isEmpty()) {
+            if (strip.hasFocus()) (if (grid.isFocusable) grid else editor).requestFocus()
+            recents.visibility = View.GONE
+            return
+        }
+        val items = queries + ClearRecents
+        if (recentItems.unmodifiableList<Any>() != items) {
+            recentItems.setItems(items, null)
+            strip.selectedPosition = 0
+        }
+        recents.visibility = View.VISIBLE
     }
 
     private fun title(value: CharSequence) {
@@ -206,10 +283,11 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
     }
 
     /**
-     * Results for [text], or, until there are two letters to go on, 30nama's suggestions, so the
-     * page never opens on an empty screen. Either way the row stands at once, a skeleton until
-     * the first page lands; results head it as «نتایج», then with their count once it is known
-     * (never the query again: it is in the field just above, and Latin set in Peyda loses its spaces).
+     * Results for [text], or, until there are two letters to go on, the recent searches over
+     * 30nama's suggestions, so the page never opens on an empty screen. Either way the row stands at
+     * once, a skeleton until the first page lands; results head it as «نتایج», then with their count
+     * once it is known (never the query again: it is in the field just above, and Latin set in Peyda
+     * loses its spaces). Opening a result keeps its query among the recent searches.
      */
     private fun search(text: String, debounce: Boolean) {
         val q = text.trim().takeIf { it.length >= 2 }.orEmpty()
@@ -225,14 +303,30 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
         waitingForTyping = debounce && q.isNotEmpty()
         moveToResults = false
         grid.isFocusable = false
+        // A recent search being run again keeps the remote until its results can take it.
+        if (!strip.hasFocus()) showRecents(q.isEmpty())
         val context = requireContext()
         val items = ArrayObjectAdapter(PosterPresenter(112, 168))
-        val pager = Pager(viewLifecycleOwner.lifecycleScope, items, { t -> t.toCard(context) { context.openDetails(t) } }, onEmpty = {
-            if (query == q && q.isNotEmpty()) title(getString(R.string.no_results))
+        val pager = Pager(viewLifecycleOwner.lifecycleScope, items, { t ->
+            t.toCard(context) {
+                if (q.isNotEmpty()) Recents.add(context, q)
+                context.openDetails(t)
+            }
+        }, onEmpty = {
+            if (query == q) {
+                if (q.isNotEmpty()) title(getString(R.string.no_results))
+                showRecents(q.isEmpty())
+            }
             moveToResults = false
-        }, onError = { if (query == q) context.toast(it) }, skeleton = Skeleton(12, 112, 168), onFirst = { total ->
+        }, onError = {
+            if (query == q) {
+                context.toast(it)
+                showRecents(q.isEmpty())
+            }
+        }, skeleton = Skeleton(12, 112, 168), onFirst = { total ->
             if (query == q) {
                 grid.isFocusable = true
+                showRecents(q.isEmpty())
                 if (q.isNotEmpty() && total != null) title(resources.getQuantityString(R.plurals.search_count, total, total))
                 if (moveToResults) focusResults()
             }
@@ -252,4 +346,61 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
     private companion object {
         const val VOICE = 1
     }
+}
+
+/** The end of the recent searches: forget them. */
+private object ClearRecents
+
+/**
+ * A recent search as the app's secondary pill (Widget.App.Button), set in its script's face; Clear
+ * ends the strip as a bare pill with the bin (Widget.App.Button.Clear), so it never reads as one
+ * more query.
+ */
+private class Pill(private val clear: Boolean) : Presenter() {
+    override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
+        val context = parent.context
+        val button = if (clear) Button(context, null, 0, R.style.Widget_App_Button_Clear).apply {
+            setText(R.string.search_recent_clear)
+            contentDescription = context.getString(R.string.search_recent_clear_all)
+            setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.settings_ic_clear, 0, 0, 0)
+        } else Button(context).apply { maxWidth = (280 * resources.displayMetrics.density).toInt() }
+        button.widenSpaces()
+        return ViewHolder(button)
+    }
+
+    override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {
+        val query = item as? String ?: return
+        val button = viewHolder.view as Button
+        button.typeface = button.context.font(if (query.isLatin) R.font.inter_medium else R.font.vazirmatn_medium)
+        button.text = latin(button.context, query, R.font.inter_medium)
+    }
+
+    override fun onUnbindViewHolder(viewHolder: ViewHolder) = Unit
+}
+
+/**
+ * The last [CAP] searches that opened a title, newest first. A search counts once one of its
+ * results is opened rather than when it is submitted: with a remote most people type and press
+ * Down, never the keyboard's search key, and a query that led somewhere is worth running again
+ * where a typo or a dead end is not. One list for both languages, as a query runs the same in either.
+ */
+object Recents {
+    const val CAP = 8
+    private const val KEY = "recent"
+    private val SPACES = Regex("\\s+")
+
+    fun read(context: Context): List<String> = prefs(context).getString(KEY, null)?.split('\n')?.filter(String::isNotEmpty).orEmpty()
+
+    fun add(context: Context, query: String) = prefs(context).edit().putString(KEY, push(read(context), query).joinToString("\n")).apply()
+
+    fun clear(context: Context) = prefs(context).edit().remove(KEY).apply()
+
+    /** [query] at the front with its spacing tidied (so never a line break), the same query in any case dropped from further back, the oldest past [CAP] gone. */
+    fun push(recents: List<String>, query: String): List<String> {
+        val q = query.trim().replace(SPACES, " ")
+        if (q.isEmpty()) return recents
+        return (listOf(q) + recents.filterNot { it.equals(q, ignoreCase = true) }).take(CAP)
+    }
+
+    private fun prefs(context: Context) = context.getSharedPreferences("search", Context.MODE_PRIVATE)
 }

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fa">
+    <!-- Search's empty box: the searches that opened a title, newest first, then a way to forget them. -->
+    <string name="search_recent">جست‌وجوهای اخیر</string>
+    <string name="search_recent_clear">پاک کردن</string>
+    <!-- Clear's spoken name: the label alone does not say what it clears. -->
+    <string name="search_recent_clear_all">پاک کردن جست‌وجوهای اخیر</string>
+</resources>
