@@ -5,6 +5,7 @@ import android.app.Instrumentation
 import android.content.Intent
 import android.graphics.Rect
 import android.os.Bundle
+import android.text.Layout
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -29,6 +30,7 @@ object AlignmentChecks {
                 val host = checkNotNull(activity)
                 runOnMainSync {
                     playerColumns(host)
+                    spacesFit(host)
                     val choices = host.findViewById<LinearLayout>(R.id.settings_choices)
                     check(choices.childCount == Settings.QUALITIES.size)
                     val values = (0 until choices.childCount).map { choices.getChildAt(it) as TextView }
@@ -50,7 +52,7 @@ object AlignmentChecks {
                 }
                 activity = null
             }
-            result.putString("stream", "PASS: English/Persian player columns, headings, check gutters and Settings choices/notes in RTL and LTR\n")
+            result.putString("stream", "PASS: English/Persian player columns, headings, check gutters and Settings choices/notes in RTL and LTR, widened Persian lines within their width\n")
         } catch (error: Throwable) {
             result.putString("stream", error.stackTraceToString())
             resultCode = Activity.RESULT_CANCELED
@@ -92,6 +94,33 @@ object AlignmentChecks {
         }
         check(values.single { it.text.toString() == "1080p" }.layout.getParagraphDirection(0) == 1)
         check(values.single { it.text.toString() == "خودکار" }.layout.getParagraphDirection(0) == -1)
+    }
+
+    /**
+     * Persian with its widened word spaces (TextSpacing.kt) breaks at the width it is drawn at: no
+     * line runs past its view's end edge. Before, Android 10 and up broke lines for the font's
+     * narrow space and drew the wide one, the last word cut off. (An ellipsized last line is left
+     * out: Android 9, with no widening, already draws one up to a space past at some widths.)
+     */
+    private fun spacesFit(host: Activity) {
+        val words = "این متن آزمایشی چند خط فارسی است که فاصله‌های میان واژه‌هایش پهن‌تر از فاصلهٔ خود قلم " +
+            "کشیده می‌شوند، تا هیچ واژه‌ای در پایان خط از لبهٔ کادر بیرون نزند؛ خلاصهٔ داستان، راهنمای تنظیمات " +
+            "و برگهٔ کلید همه همین‌گونه چیده می‌شوند."
+        for (width in 560..1040 step 40) {
+            val view = TextView(host).apply {
+                setTextAppearance(R.style.TextAppearance_App_Synopsis)
+                widenSpaces()
+                text = words
+                measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+            }
+            val layout = checkNotNull(view.layout)
+            for (line in 0 until layout.lineCount) {
+                // Its words' advances as drawn, not getLineMax: from Android 15 that takes glyph
+                // bounds, and a final ر's tail overhangs its advance whatever the spacing.
+                val drawn = Layout.getDesiredWidth(layout.text, layout.getLineStart(line), layout.getLineVisibleEnd(line), view.paint)
+                check(drawn <= layout.width + 0.5f) { "Line $line of ${layout.lineCount} runs ${drawn - layout.width} px past its $width px view" }
+            }
+        }
     }
 
     private fun start(root: ViewGroup, text: TextView): Int {
