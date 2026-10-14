@@ -218,9 +218,9 @@ object UpdatesChecks {
 
     private fun Activity.row(label: Int): View {
         val options = findViewById<ViewGroup>(R.id.settings_options)
-        return (0 until options.childCount).map(options::getChildAt).single {
-            it.findViewById<TextView>(R.id.settings_label)?.text?.toString() == getString(label)
-        }
+        val rows = (0 until options.childCount).map(options::getChildAt)
+        return rows.singleOrNull { it.findViewById<TextView>(R.id.settings_label)?.text?.toString() == getString(label) }
+            ?: error("Not one ${getString(label)} row among ${rows.mapNotNull { it.findViewById<TextView>(R.id.settings_label)?.text }}, focus on $currentFocus, touch mode ${window.decorView.isInTouchMode}")
     }
 
     private fun fits(text: TextView) {

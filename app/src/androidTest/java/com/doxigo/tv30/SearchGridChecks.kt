@@ -314,6 +314,20 @@ object SearchGridChecks {
         }
         check(Recents.read(targetContext) == listOf("voice")) { "Opening a result did not keep its query: ${Recents.read(targetContext)}" }
 
+        /**
+         * Back to the box, emptied, once the results have taken the remote and the keyboard has gone
+         * down with it: a person's pace, where the test's was 0.13 s. On Android 16 the phone
+         * keyboard of this landscape emulator goes full screen for the results' non-text focus and
+         * hides itself there (HIDE_SOFT_INPUT_EXTRACT_INPUT_CHANGED); the box's show, asked for
+         * before the keyboard had caught up, was cancelled by that hide and never came. A TV's
+         * keyboard is never full screen, and nobody is back in the box that fast.
+         */
+        fun backToBox() {
+            await("The keyboard did not go down with the remote") { !keyboardVisible(host) }
+            SystemClock.sleep(600)
+            text(editor, "")
+        }
+
         fun downFromBox() {
             await("Search keyboard did not open with the editor") { keyboardVisible(host) }
             runOnMainSync { host.getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(editor.windowToken, 0) }
@@ -326,7 +340,7 @@ object SearchGridChecks {
             }) { strip.hasFocus() }
         }
 
-        text(editor, "")
+        backToBox()
         await("Clearing the box did not bring back the recent searches") {
             recents.visibility == View.VISIBLE && strip.adapter?.itemCount == 2 && grid.isFocusable
         }
@@ -349,7 +363,7 @@ object SearchGridChecks {
             "text=${editor.text}, first=${first(fragment)?.title}, grid.hasFocus=${grid.hasFocus()}, recents=${recents.visibility}, focus=${host.currentFocus?.javaClass?.simpleName}"
         }) { editor.text.toString() == "voice" && first(fragment)?.title == "voice 0" && grid.hasFocus() && recents.visibility == View.GONE }
 
-        text(editor, "")
+        backToBox()
         await("Recent searches did not come back") { recents.visibility == View.VISIBLE && grid.isFocusable }
         downFromBox()
         press(if (language == "fa") KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT)

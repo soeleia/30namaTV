@@ -74,6 +74,7 @@ object TrailerChecks {
             var host = launch("wubu7o2")
             var player = field(host, "player") as ExoPlayer
             var video = field(host, "video") as PlayerView
+            fun playbackState() = "state=${player.playbackState}, playWhenReady=${player.playWhenReady}, isPlaying=${player.isPlaying}, position=${player.currentPosition}, bufferedMs=${player.totalBufferedDuration}, suppression=${player.playbackSuppressionReason}, error=${player.playerError?.errorCodeName}, lifecycle=${host.lifecycle.currentState}, windowFocus=${host.hasWindowFocus()}, focused=${host.currentFocus?.javaClass?.simpleName}"
             await("Animals did not load or report an error", 40_000) {
                 player.playbackState == Player.STATE_READY && player.isPlaying && player.videoSize.width > 0 || (field(host, "error") as View).visibility == View.VISIBLE
             }
@@ -122,32 +123,34 @@ object TrailerChecks {
                     (field(host, "loading") as View).visibility = View.GONE
                 }
             }
-            await("Paused trailer did not prepare") { player.playbackState == Player.STATE_READY && !player.playWhenReady }
+            await("Paused trailer did not prepare", details = ::playbackState) { player.playbackState == Player.STATE_READY && !player.playWhenReady }
             press(KeyEvent.KEYCODE_MEDIA_PLAY)
-            await("Play did not resume the trailer") { player.isPlaying }
+            await("Play did not resume the trailer", details = ::playbackState) { player.isPlaying }
             var beforeSeek = 0L
             runOnMainSync {
                 player.pause()
                 beforeSeek = player.currentPosition
             }
             press(KeyEvent.KEYCODE_MEDIA_FAST_FORWARD)
-            await("Trailer forward seek did not resume") { player.isPlaying && player.currentPosition >= beforeSeek + 9_000 }
+            await("Trailer forward seek did not resume", details = ::playbackState) { player.isPlaying && player.currentPosition >= beforeSeek + 9_000 }
             runOnMainSync {
                 player.pause()
                 beforeSeek = player.currentPosition
             }
             press(KeyEvent.KEYCODE_MEDIA_REWIND)
-            await("Trailer rewind did not seek") { player.currentPosition <= beforeSeek - 9_000 }
+            await("Trailer rewind did not seek", details = ::playbackState) { player.currentPosition <= beforeSeek - 9_000 }
             runOnMainSync {
                 check(!player.playWhenReady) { "Trailer rewind resumed paused playback" }
                 player.seekTo(player.currentPosition + 10_000)
             }
-            await("Native forward seek did not resume") { player.isPlaying }
+            await("Native forward seek did not resume", details = ::playbackState) { player.isPlaying }
             runOnMainSync {
                 check(video.controllerShowTimeoutMs == 5_000 && !video.controllerAutoShow)
                 video.showController()
-                check(video.isControllerFullyVisible)
             }
+            // Fully visible once its show animation ends: the controls the rewind brought up may
+            // have timed out already while the seek buffered from the network.
+            await("Trailer controls did not show") { video.isControllerFullyVisible }
             val shownAt = SystemClock.elapsedRealtime()
             await("Trailer controls did not hide after inactivity") { !video.isControllerFullyVisible }
             check(SystemClock.elapsedRealtime() - shownAt >= 4_000) { "Trailer controls hid before the configured timeout" }
@@ -155,7 +158,6 @@ object TrailerChecks {
             foreground = startActivitySync(Intent(targetContext, SettingsActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as SettingsActivity
             await("Settings did not take foreground focus") { foreground?.hasWindowFocus() == true }
-            fun playbackState() = "state=${player.playbackState}, playWhenReady=${player.playWhenReady}, isPlaying=${player.isPlaying}, position=${player.currentPosition}, bufferedMs=${player.totalBufferedDuration}, suppression=${player.playbackSuppressionReason}, error=${player.playerError?.errorCodeName}, lifecycle=${host.lifecycle.currentState}, windowFocus=${host.hasWindowFocus()}, focused=${host.currentFocus?.javaClass?.simpleName}"
             await("Background trailer kept loading or playing", details = ::playbackState) {
                 !host.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) && player.playbackState == Player.STATE_IDLE && !player.playWhenReady && !player.isPlaying
             }
