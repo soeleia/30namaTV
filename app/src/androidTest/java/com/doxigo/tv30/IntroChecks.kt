@@ -8,6 +8,8 @@ import android.graphics.Rect
 import android.os.Bundle
 import android.os.SystemClock
 import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageView
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -58,9 +60,17 @@ object IntroChecks {
                 check(abs(video.translationY + shift) < 1f) { "Loading logo exceeded its safe upward shift" }
             }
             verifyLoadingPixels(host)
-            onMain { intro?.leave(); intro?.leave() }
+            // The video's surface can't fade: the exit fades a copy of its frame laid over it.
+            lateinit var still: ImageView
+            onMain {
+                val frame = video.findViewById<ViewGroup>(androidx.media3.ui.R.id.exo_content_frame)
+                still = frame.getChildAt(frame.childCount - 2) as ImageView
+                intro?.leave(); intro?.leave()
+            }
+            screenshot("30namatv-exit-test.png")
             SystemClock.sleep(300)
             onMain {
+                check(still.drawable != null) { "Exit did not fade from the frame on screen" }
                 check(host.findViewById<View>(R.id.intro_overlay) == null)
                 check(video.player == null) { "Motion decoder survived exit" }
             }
