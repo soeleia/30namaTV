@@ -45,17 +45,19 @@ import java.util.Locale
 // Call them on the activity (from a fragment, requireActivity()):
 //
 //   Activity.confirm(title, question, action, art: String? = null, secondary: CharSequence? = null,
-//                    onSecondary: (() -> Unit)? = null, onConfirm: () -> Unit)
+//                    onSecondary: (() -> Unit)? = null, actionIcon: Int = 0, secondaryIcon: Int = 0,
+//                    onConfirm: () -> Unit)
 //     requireActivity().confirm(title.englishName, getString(R.string.continue_remove_question),
 //         getString(R.string.continue_remove), art = title.poster,
-//         secondary = getString(R.string.continue_info), onSecondary = { openDetails(title) }) { remove(title) }
+//         secondary = getString(R.string.continue_info), onSecondary = { openDetails(title) },
+//         actionIcon = R.drawable.settings_ic_clear, secondaryIcon = R.drawable.promo_info) { remove(title) }
 //     Asks before a step the viewer can't take back, as the Apple TV app does: the page dims and
 //     a card rises in the middle with the poster ([art], a URL; left out when null), the name
 //     ([title], its face by its script), the [question] and two stacked buttons. [action] names
 //     the step by its verb («حذف از ادامهٔ تماشا», never «تأیید»); under it, Cancel, or the safe
 //     [secondary] step in its place (Back already cancels), holds the remote at first, so a stray
 //     OK changes nothing. Back and Esc cancel. onConfirm runs only for the action, onSecondary
-//     only for [secondary].
+//     only for [secondary]. With icons, the two read as quickActions' buttons: icon then label.
 //
 //   Activity.choose(title, options: List<CharSequence>, current: Int, onChoose: (Int) -> Unit)
 //     requireActivity().choose(getString(R.string.sort_by), SORTS.map { getString(it.second) }, sort) { picked ->
@@ -91,7 +93,8 @@ import java.util.Locale
 
 fun Activity.confirm(
     title: CharSequence, question: CharSequence, action: CharSequence, art: String? = null,
-    secondary: CharSequence? = null, onSecondary: (() -> Unit)? = null, onConfirm: () -> Unit,
+    secondary: CharSequence? = null, onSecondary: (() -> Unit)? = null,
+    @DrawableRes actionIcon: Int = 0, @DrawableRes secondaryIcon: Int = 0, onConfirm: () -> Unit,
 ) {
     val dp = resources.displayMetrics.density
     // The question on its own card, the contract's first surface step: solid, so no poster or
@@ -107,6 +110,7 @@ fun Activity.confirm(
         }
         val pad = px(CARD_PAD)
         setPadding(pad, pad, pad, pad)
+        clipToPadding = false // the focused button's lift reaches into the padding; clipped, its ends went flat
     }
     // The poster the viewer just held OK on, so there is no doubt which title this is.
     if (art != null) column.addView(poster(art), linear(px(96), px(144)).apply { bottomMargin = px(24) })
@@ -123,8 +127,9 @@ fun Activity.confirm(
         textSize = 18f
         maxLines = 3
     }, linear(MATCH, WRAP).apply { topMargin = px(8) })
-    val act = button(action)
-    val safe = button(secondary ?: getString(R.string.sheet_cancel))
+    // With icons, the buttons read as quickActions' do: icon and label from the start edge.
+    val act = if (actionIcon != 0) action(action, actionIcon) else button(action)
+    val safe = (secondary ?: getString(R.string.sheet_cancel)).let { if (secondaryIcon != 0) action(it, secondaryIcon) else button(it) }
     column.addView(act, linear(MATCH, WRAP).apply { topMargin = px(32) })
     // 8dp between the 48dp targets is 12dp between the pills they draw, the buttons' own gap.
     column.addView(safe, linear(MATCH, WRAP).apply { topMargin = px(8) })

@@ -584,7 +584,8 @@ class HomeFragment : BrowseSupportFragment() {
     private fun confirmDismiss(title: JSONObject) {
         val activity = requireActivity()
         activity.confirm(title.englishName, getString(R.string.continue_remove_question), getString(R.string.continue_remove), art = title.poster,
-            secondary = getString(R.string.continue_info), onSecondary = { activity.openDetails(title) }) {
+            secondary = getString(R.string.continue_info), onSecondary = { activity.openDetails(title) },
+            actionIcon = R.drawable.settings_ic_clear, secondaryIcon = R.drawable.promo_info) {
             lifecycleScope.launch {
                 runCatching { Api.dismissContinueWatching(title.titleId) }
                 loadContinueWatching()
