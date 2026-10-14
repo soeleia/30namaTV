@@ -418,8 +418,8 @@ class HomeFragment : BrowseSupportFragment() {
         fun cards(key: String) = menu.optJSONArray(key).objects().map { it.toMenuCard(context) }
         setRow(CATEGORIES, R.string.categories, cards("categories"), tiles)
         val genres = menu.optJSONArray("genres") ?: JSONArray()
-        val preview = cards("genres").take(2)
-        setRow(GENRES, R.string.genres, if (preview.isEmpty()) emptyList() else preview + Card(getString(R.string.see_all), icon = R.drawable.nav_categories) {
+        val all = cards("genres")
+        setRow(GENRES, R.string.genres, if (all.isEmpty()) all else all + seeAll(all) {
             startActivity(GridActivity.genres(context, genres))
         }, tiles)
     }

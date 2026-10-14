@@ -71,8 +71,9 @@ object GenresChecks {
                     if (genreRow < 0 || found?.view?.findViewById<View>(androidx.leanback.R.id.browse_container_dock)?.alpha != 1f) false else {
                         home = checkNotNull(found)
                         val items = (home.adapter[genreRow] as ListRow).adapter
-                        check(items.size() == 3) { "Home still has the long horizontal genre list" }
-                        check((items[2] as Card).icon == R.drawable.nav_categories)
+                        val names = (0 until 20).map { if (language == "fa") "ژانر $it" else "Genre $it" }
+                        check(items.size() == 21 && (0 until 20).map { (items[it] as Card).title } == names) { "Home genre row does not hold every genre" }
+                        check((items[20] as Card).icon == R.drawable.ic_more) { "Home genre row does not end in More" }
                         true
                     }
                 }
@@ -87,8 +88,8 @@ object GenresChecks {
                         true
                     }
                 }
-                runOnMainSync { row.gridView.selectedPosition = 2; row.gridView.requestFocus() }
-                await("Home More entry did not take focus") { row.gridView.hasFocus() && row.gridView.selectedPosition == 2 && row.gridView.scrollState == 0 }
+                runOnMainSync { row.gridView.selectedPosition = 20; row.gridView.requestFocus() }
+                await("Home More entry did not take focus") { row.gridView.findViewHolderForAdapterPosition(20)?.itemView?.hasFocus() == true && row.gridView.selectedPosition == 20 && row.gridView.scrollState == 0 }
                 val openGenres = addMonitor(GridActivity::class.java.name, null, false)
                 press(KeyEvent.KEYCODE_DPAD_CENTER)
                 genresActivity = waitForMonitorWithTimeout(openGenres, 5_000) as? GridActivity
@@ -129,13 +130,13 @@ object GenresChecks {
                 await("Back did not restore the selected genre") { archive.isDestroyed && grid.hasFocus() && grid.selectedPosition == 19 }
                 archiveActivity = null
                 press(KeyEvent.KEYCODE_BACK)
-                await("Back did not restore home's genre entry") { genreHost.isDestroyed && row.gridView.hasFocus() && row.gridView.selectedPosition == 2 }
+                await("Back did not restore home's genre entry") { genreHost.isDestroyed && row.gridView.hasFocus() && row.gridView.selectedPosition == 20 }
                 genresActivity = null
                 runOnMainSync { homeHost.finish() }
                 await("Home did not close") { homeHost.isDestroyed }
                 homeActivity = null
             }
-            result.putString("stream", "PASS: short home genre row, complete cached genre grid, RTL/LTR four-column D-pad/rail, catalogue links and Back focus\n")
+            result.putString("stream", "PASS: every genre on home ending in More, complete cached genre grid, RTL/LTR four-column D-pad/rail, catalogue links and Back focus\n")
         } catch (error: Throwable) {
             capture("genres-failure")
             result.putString("stream", error.stackTraceToString())

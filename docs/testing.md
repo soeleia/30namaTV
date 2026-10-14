@@ -15,7 +15,7 @@ Install the APK on the Android 11 Sony TV and verify:
 1. Cold launch, quick relaunch, home focus movement and opening a title. Home content should appear as soon as its catalogue response is ready; the motion logo must not delay it.
 2. Search `friends`: results scroll vertically; Down enters the grid, Up from its first row returns to search, and the edge arrow reaches the sidebar. Search replacement and voice search should show only the current query.
 3. My Lists: all three actions still open their original lists. Move rapidly between posters and rows, including the end of a paginated list.
-   Genres: open More from the short home preview. The full four-column page should open immediately, every genre should open its catalogue, and Back should restore the focused genre/home tile.
+   Genres: home shows every genre, then More; open More. The full four-column page should open immediately, every genre should open its catalogue, and Back should restore the focused genre/home tile.
 4. Animals teaser: video starts, pause/play work, controls hide after inactivity, backgrounding stops playback, and returning resumes correctly. YouTube trailers still open the installed YouTube/SmartTube app.
 5. Full playback: controls hide about five seconds after the last remote interaction while playing. Paused controls remain visible. Opening audio/quality/subtitle menus should keep them open until dismissed.
 6. Pause and seek forward using remote buttons and the progress bar: playback resumes after the committed seek. Cancelling the seek or seeking backward should preserve the previous paused state.
