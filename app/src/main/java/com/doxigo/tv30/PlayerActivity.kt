@@ -35,6 +35,7 @@ import androidx.leanback.widget.Action
 import androidx.leanback.widget.ArrayObjectAdapter
 import androidx.leanback.widget.PlaybackControlsRow
 import androidx.leanback.widget.PlaybackRowPresenter
+import androidx.leanback.widget.PlaybackSeekDataProvider
 import androidx.leanback.widget.PlaybackSeekUi
 import androidx.leanback.widget.PlaybackTransportRowPresenter
 import androidx.leanback.widget.RowPresenter
@@ -118,6 +119,11 @@ class PlayerFragment : VideoSupportFragment() {
     private var chosenQuality: String? = null
     private var chosenAudio: String? = null
     private var reportedAt = -1L
+    /** The title's Persian name, under the English one on the controls. */
+    private var persianName: String? = null
+    /** Leanback is scrubbing the seek bar; [seekHeld]: how long the left or right key has been held. */
+    private var seeking = false
+    private var seekHeld = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -175,7 +181,7 @@ class PlayerFragment : VideoSupportFragment() {
         // Buffering shows in the top start corner, where nothing else ever sits (the subtitles, the
         // controls' title, the panel and the skip pill all keep below or to the end): Leanback's
         // spinner, mid-screen, crossed the subtitles once they rose over the controls. Small and in
-        // the brand's lilac, as the intro's is; the medium ring at 32dp draws the intro's 2.7dp line.
+        // 30nama's red, as the intro's is; the medium ring at 32dp draws the intro's 2.7dp line.
         val dp = resources.displayMetrics.density
         val spinner = ProgressBar(context).apply {
             indeterminateTintList = ContextCompat.getColorStateList(context, R.color.brand)
@@ -209,10 +215,13 @@ class PlayerFragment : VideoSupportFragment() {
 
     /**
      * The panel stands in for the controls while it shows. Leanback brings them back on its own (a
-     * play state change, a tickle), so that is refused here rather than undone after.
+     * play state change, a tickle), so that is refused here rather than undone after. Each time the
+     * controls come up, the remote starts on play/pause.
      */
     override fun showControlsOverlay(runAnimation: Boolean) {
-        if (!::panel.isInitialized || !panel.isOpen) super.showControlsOverlay(runAnimation)
+        if (::panel.isInitialized && panel.isOpen) return
+        if (!isControlsOverlayVisible) focusControls()
+        super.showControlsOverlay(runAnimation)
     }
 
     override fun setPlaybackSeekUiClient(client: PlaybackSeekUi.Client?) {
@@ -223,6 +232,7 @@ class PlayerFragment : VideoSupportFragment() {
                 override fun isSeekEnabled() = delegate.isSeekEnabled
                 override fun getPlaybackSeekDataProvider() = delegate.playbackSeekDataProvider
                 override fun onSeekStarted() {
+                    seeking = true
                     startedAt = player.currentPosition
                     requestedAt = startedAt
                     delegate.onSeekStarted()
@@ -232,6 +242,7 @@ class PlayerFragment : VideoSupportFragment() {
                     delegate.onSeekPositionChanged(positionMs)
                 }
                 override fun onSeekFinished(cancelled: Boolean) {
+                    seeking = false
                     delegate.onSeekFinished(cancelled)
                     if (!cancelled && requestedAt > startedAt) player.play()
                 }
@@ -276,8 +287,38 @@ class PlayerFragment : VideoSupportFragment() {
             return true
         }
         // After the pill (a seek or a skip stops its countdown); the controls come up to show what the key did.
-        return skipKey(event) || session.onKey(event).also { if (it && event.action == KeyEvent.ACTION_DOWN) tickle() }
+        return skipKey(event) || seekKey(event) || session.onKey(event).also { if (it && event.action == KeyEvent.ACTION_DOWN) tickle() }
     }
+
+    /**
+     * Left and right scrub the seek bar, [seekStep] at a time: from hidden controls they bring it up
+     * already seeking. A second after the last press the seek lands and playback goes on, where
+     * Leanback would wait for OK (OK and Back still land or cancel it at once).
+     */
+    private fun seekKey(event: KeyEvent): Boolean {
+        val code = event.keyCode
+        if (code != KeyEvent.KEYCODE_DPAD_LEFT && code != KeyEvent.KEYCODE_DPAD_RIGHT) return false
+        val bar = view?.findViewById<View>(androidx.leanback.R.id.playback_progress) ?: return false
+        bar.removeCallbacks(landSeek)
+        if (event.action == KeyEvent.ACTION_UP) {
+            if (seeking) bar.postDelayed(landSeek, SEEK_LAND_MS)
+            return false
+        }
+        seekHeld = event.eventTime - event.downTime
+        if (isControlsOverlayVisible || glue == null) return false
+        tickle()
+        bar.requestFocus()
+        return bar.dispatchKeyEvent(event)
+    }
+
+    /** OK on the bar, its only public way out of Leanback's seek. */
+    private val landSeek = Runnable {
+        view?.findViewById<View>(androidx.leanback.R.id.playback_progress)?.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_CENTER))
+    }
+
+    /** 5 s a press; held, the step doubles every 1.5 s up to 80 s, so a held key crosses a film in seconds. */
+    // ponytail: paced for a remote repeating ~20 times a second; a slower one moves proportionally slower.
+    private fun seekStep() = SEEK_STEP_MS shl (seekHeld / 1_500).coerceAtMost(4).toInt()
 
     private suspend fun load() {
         val args = requireActivity().intent
@@ -290,6 +331,14 @@ class PlayerFragment : VideoSupportFragment() {
             return
         }
         this.stream = stream
+        // 30nama's Persian name, else TMDB's (PersianNames), which may come after the controls.
+        stream.optJSONObject("info")?.let { info ->
+            persianName = PersianNames.cached(info)
+            if (PersianNames.pending(info)) lifecycleScope.launch {
+                persianName = PersianNames.lookup(context, info) ?: return@launch
+                glue?.host?.notifyPlaybackRowChanged()
+            }
+        }
         files = stream.optJSONArray("hls").objects()
         val resume = stream.optJSONObject("continue_watching")
         val chosen = args.getStringExtra("file")
@@ -307,6 +356,9 @@ class PlayerFragment : VideoSupportFragment() {
         glue = Glue(context, LeanbackPlayerAdapter(context, player, 500), series = files.size > 1).apply {
             host = VideoSupportFragmentGlueHost(this@PlayerFragment)
             isSeekEnabled = true
+            // No thumbnails: with a provider the bar and clock move while scrubbing and the player
+            // seeks once, where it lands, instead of loading every step on the way.
+            seekProvider = PlaybackSeekDataProvider()
         }
         progressBarManager.hide()
         play(files[index], at * 1000)
@@ -333,7 +385,7 @@ class PlayerFragment : VideoSupportFragment() {
         showEndTime() // after the new item is set: the old one's duration would give a wrong time
     }
 
-    /** The controls' line under the title: the episode (a series), and when it ends ([showEndTime]). */
+    /** The controls' line under the title and its Persian name: the episode (a series), and when it ends ([showEndTime]). */
     private var episodeLine: String? = null
     private var subtitle: String? = "" // "" so the first call sets it, null included
     /** The subtitle changed width since the cues were placed beside it (see [arrange]). */
@@ -636,9 +688,10 @@ class PlayerFragment : VideoSupportFragment() {
         return true
     }
 
-    /** The remote back to the transport row (its play button), before the pill goes or loses the controls around it. */
+    /** The remote to play/pause, the middle of the primary actions (Leanback's own pick is the seek bar). */
     private fun focusControls() {
-        view?.findViewById<View>(androidx.leanback.R.id.transport_row)?.requestFocus()
+        val actions = view?.findViewById<View>(androidx.leanback.R.id.controls_dock)?.findViewById<ViewGroup>(androidx.leanback.R.id.control_bar) ?: return
+        actions.getChildAt(actions.childCount / 2)?.requestFocus()
     }
 
     /**
@@ -812,7 +865,7 @@ class PlayerFragment : VideoSupportFragment() {
     /** The panel closed: the remote goes back to the action that opened it, the controls with it unless an episode just started. */
     private fun uncover(controls: Boolean) {
         if (controls) tickle()
-        if (opener?.requestFocus() != true) view?.findViewById<View>(androidx.leanback.R.id.playback_progress)?.requestFocus()
+        if (opener?.requestFocus() != true) focusControls()
         opener = null
     }
 
@@ -980,6 +1033,9 @@ class PlayerFragment : VideoSupportFragment() {
         /** The next episode's countdown, and auto-skip's sweep before it takes an intro or recap. */
         const val NEXT_MS = 10_000L
         const val AUTO_SKIP_MS = 1_500L
+        /** The seek bar's step for a press, and the pause after the last one before the seek lands. */
+        const val SEEK_STEP_MS = 5_000L
+        const val SEEK_LAND_MS = 1_000L
         /** Keys that leave a countdown running. */
         val PASSIVE_KEYS = intArrayOf(
             KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN, KeyEvent.KEYCODE_VOLUME_MUTE,
@@ -989,8 +1045,8 @@ class PlayerFragment : VideoSupportFragment() {
         const val LIFT_GAP = 20
         /** In step with the player_speeds labels. */
         val SPEEDS = floatArrayOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
-        /** The title and episode line, which lifted subtitles clear vertically. */
-        val TITLE = intArrayOf(androidx.leanback.R.id.lb_details_description_title, androidx.leanback.R.id.lb_details_description_subtitle)
+        /** The title, its Persian name and the episode line, which lifted subtitles clear vertically. */
+        val TITLE = intArrayOf(androidx.leanback.R.id.lb_details_description_title, androidx.leanback.R.id.lb_details_description_subtitle, androidx.leanback.R.id.lb_details_description_body)
     }
 
     private object Retry403 : DefaultLoadErrorHandlingPolicy() {
@@ -1025,7 +1081,12 @@ class PlayerFragment : VideoSupportFragment() {
 
         /** The glue's row and description, including its key listener and title layout. */
         override fun onCreateRowPresenter(): PlaybackRowPresenter = object : PlaybackTransportRowPresenter() {
-            override fun createRowViewHolder(parent: ViewGroup): RowPresenter.ViewHolder = super.createRowViewHolder(parent).also { dress(it.view) }
+            override fun createRowViewHolder(parent: ViewGroup): RowPresenter.ViewHolder = super.createRowViewHolder(parent).also {
+                dress(it.view)
+                it.view.post(::focusControls) // once attached: the first controls start on play/pause too
+            }
+
+            override fun getDefaultSeekIncrement() = player.duration.takeIf { it > 0 }?.let { seekStep().toFloat() / it } ?: super.getDefaultSeekIncrement()
 
             override fun onBindRowViewHolder(vh: RowPresenter.ViewHolder, item: Any) {
                 super.onBindRowViewHolder(vh, item)
@@ -1047,7 +1108,8 @@ class PlayerFragment : VideoSupportFragment() {
                     vh.title.typeface = context.font(if (title?.isLatin != false) R.font.inter_bold else R.font.peyda_bold)
                     vh.title.includeFontPadding = true
                     vh.title.text = title?.let { latin(context, it, R.font.inter_bold) }
-                    vh.subtitle.text = subtitle?.let { latin(context, it, R.font.inter_regular) }
+                    vh.subtitle.text = persianName
+                    vh.body.text = subtitle?.let { latin(context, it, R.font.inter_regular) }
                 }
             })
         }

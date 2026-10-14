@@ -8,6 +8,7 @@ import android.os.SystemClock
 import android.util.TypedValue
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import androidx.leanback.media.PlaybackTransportControlGlue
 import androidx.leanback.widget.Action
 import androidx.media3.exoplayer.ExoPlayer
@@ -65,7 +66,12 @@ object ControlsChecks {
             await("Initial controls stayed visible") { !fragment.isControlsOverlayVisible }
 
             press(KeyEvent.KEYCODE_DPAD_DOWN)
-            runOnMainSync { check(fragment.isControlsOverlayVisible) { "Remote did not reveal controls" } }
+            runOnMainSync {
+                check(fragment.isControlsOverlayVisible) { "Remote did not reveal controls" }
+                val actions = checkNotNull(fragment.view).findViewById<View>(androidx.leanback.R.id.controls_dock)
+                    .findViewById<ViewGroup>(androidx.leanback.R.id.control_bar)
+                check(actions.getChildAt(actions.childCount / 2).hasFocus()) { "Controls did not open on play/pause: ${fragment.view?.findFocus()}" }
+            }
             SystemClock.sleep(3_000)
             press(KeyEvent.KEYCODE_DPAD_UP)
             SystemClock.sleep(3_000)
@@ -127,11 +133,48 @@ object ControlsChecks {
             }
             press(KeyEvent.KEYCODE_DPAD_RIGHT)
             runOnMainSync {
-                check(player.currentPosition > beforeSeek) { "Seek bar did not move forward" }
+                check(scrubbed(glue) - beforeSeek in 4_900L..5_100L) { "Seek bar did not step five seconds: ${scrubbed(glue) - beforeSeek}" }
+                check(player.currentPosition == beforeSeek) { "Scrubbing seeked the player before it landed" }
                 check(!player.playWhenReady) { "Seek bar resumed before confirmation" }
             }
             press(KeyEvent.KEYCODE_DPAD_CENTER)
-            await("Confirmed forward seek did not resume") { player.isPlaying }
+            await("Confirmed forward seek did not land and resume") { player.isPlaying && player.currentPosition >= beforeSeek + 5_000 }
+
+            // Held, the step grows: two seconds in, a repeat steps ten seconds.
+            runOnMainSync {
+                player.pause()
+                player.seekTo(60_000)
+            }
+            await("Playback did not pause before a held seek") { !player.isPlaying && (glue.controlsRow?.currentPosition ?: 0L) == 60_000L }
+            runOnMainSync {
+                fragment.tickle()
+                check(checkNotNull(fragment.view).findViewById<View>(androidx.leanback.R.id.playback_progress).requestFocus())
+            }
+            val down = SystemClock.uptimeMillis() - 2_000
+            sendKeySync(KeyEvent(down, SystemClock.uptimeMillis(), KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT, 20))
+            sendKeySync(KeyEvent(down, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_RIGHT, 0))
+            waitForIdleSync()
+            runOnMainSync { check(scrubbed(glue) - 60_000 in 9_900L..10_100L) { "A held key did not speed up: ${scrubbed(glue) - 60_000}" } }
+            // A second after the last press the seek lands without OK; forward, playback goes on.
+            await("Scrub did not land by itself") { player.isPlaying && player.currentPosition >= 70_000 }
+
+            // From hidden controls, right brings up the bar already seeking.
+            runOnMainSync {
+                player.pause()
+                player.seekTo(60_000)
+            }
+            await("Playback did not pause before a seek from hidden controls") { !player.isPlaying && (glue.controlsRow?.currentPosition ?: 0L) == 60_000L }
+            runOnMainSync {
+                fragment.hideControlsOverlay(false)
+                check(!fragment.isControlsOverlayVisible)
+            }
+            press(KeyEvent.KEYCODE_DPAD_RIGHT)
+            runOnMainSync {
+                check(fragment.isControlsOverlayVisible) { "Right did not reveal controls" }
+                check(checkNotNull(fragment.view).findViewById<View>(androidx.leanback.R.id.playback_progress).isFocused) { "Right from hidden controls did not focus the seek bar" }
+                check(scrubbed(glue) - 60_000 in 4_900L..5_100L) { "Right from hidden controls did not seek: ${scrubbed(glue) - 60_000}" }
+            }
+            await("Seek from hidden controls did not land") { player.isPlaying && player.currentPosition >= 65_000 }
 
             runOnMainSync { player.pause() }
             await("Playback did not pause before seek cancellation") { !player.isPlaying }
@@ -147,10 +190,13 @@ object ControlsChecks {
                 check(player.currentPosition == beforeSeek) { "Cancelled seek did not restore its position" }
             }
             press(KeyEvent.KEYCODE_DPAD_LEFT)
-            runOnMainSync { check(player.currentPosition < beforeSeek) { "Seek bar did not move backward" } }
+            runOnMainSync { check(beforeSeek - scrubbed(glue) in 4_900L..5_100L) { "Seek bar did not step back five seconds" } }
             press(KeyEvent.KEYCODE_DPAD_CENTER)
-            runOnMainSync { check(!player.playWhenReady) { "Backward seek changed paused playback" } }
-            result.putString("stream", "PASS: five-second remote timeout, inactivity reset, panel return, pause/resume, remote/button/bar forward resume, seek cancellation and paused rewind\n")
+            runOnMainSync {
+                check(beforeSeek - player.currentPosition in 4_900L..5_100L) { "Backward seek did not land" }
+                check(!player.playWhenReady) { "Backward seek changed paused playback" }
+            }
+            result.putString("stream", "PASS: five-second remote timeout, inactivity reset, play/pause focus, panel return, pause/resume, remote/button/bar forward resume, 5 s bar steps, held acceleration, self-landing and hidden-controls seeks, seek cancellation and paused rewind\n")
         } catch (error: Throwable) {
             result.putString("stream", error.stackTraceToString())
             resultCode = Activity.RESULT_CANCELED
@@ -165,6 +211,9 @@ object ControlsChecks {
         }
         finish(resultCode, result)
     }
+
+    /** Where the seek bar points mid-scrub: the glue moves the row, the player waits for the landing. */
+    private fun scrubbed(glue: PlaybackTransportControlGlue<*>) = checkNotNull(glue.controlsRow).currentPosition
 
     private fun field(instance: Any, name: String): Any? =
         instance.javaClass.getDeclaredField(name).apply { isAccessible = true }.get(instance)

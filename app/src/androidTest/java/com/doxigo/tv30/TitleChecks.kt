@@ -28,7 +28,7 @@ object TitleChecks {
         val client = OkHttpClient.Builder().addInterceptor { chain ->
             check(chain.request().url.pathSegments.last() == "stream")
             Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200).message("OK")
-                .body("""{"success":true,"result":{"info":{"title":{"english":"Illicit Friends"}},"hls":[{"info":{"file_id":"test"},"file":{}}]}}""".toResponseBody()).build()
+                .body("""{"success":true,"result":{"info":{"title":{"english":"Illicit Friends","local":"دوستان ممنوعه"}},"hls":[{"info":{"file_id":"test"},"file":{}}]}}""".toResponseBody()).build()
         }.build()
         try {
             for (language in listOf("fa", "en")) {
@@ -68,6 +68,11 @@ object TitleChecks {
                     check(title.getGlobalVisibleRect(visible))
                     check(visible.top <= position[1] + inkTop && visible.bottom >= position[1] + inkBottom) { "A parent clips the title glyphs: $visible" }
                     check((title.layoutParams as ViewGroup.MarginLayoutParams).topMargin >= 0) { "Leanback restored a negative title margin" }
+                    val persian = root.findViewById<TextView>(androidx.leanback.R.id.lb_details_description_subtitle)
+                    check(persian.isShown && persian.text.toString() == "دوستان ممنوعه") { "The Persian name is not under the title: ${persian.text}" }
+                    val persianAt = IntArray(2)
+                    persian.getLocationOnScreen(persianAt)
+                    check(persianAt[1] >= position[1] + inkBottom) { "The Persian name is not below the English one" }
                 }
                 SystemClock.sleep(300)
                 capture("title-$language")
@@ -75,7 +80,7 @@ object TitleChecks {
                 await("Player did not close") { host.isDestroyed }
                 activity = null
             }
-            result.putString("stream", "PASS: Inter player titles, complete I/F/d glyph bounds and ancestor clipping in Persian/English layouts\n")
+            result.putString("stream", "PASS: Inter player titles with their Persian names under them, complete I/F/d glyph bounds and ancestor clipping in Persian/English layouts\n")
         } catch (error: Throwable) {
             code = Activity.RESULT_CANCELED
             result.putString("stream", error.stackTraceToString())

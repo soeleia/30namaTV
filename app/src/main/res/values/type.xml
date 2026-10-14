@@ -43,16 +43,18 @@
         <item name="android:textColor">@color/lb_details_description_color</item>
     </style>
 
+    <!-- Only the player's controls use these: the subtitle is the title's Persian name, set as
+         the billboard sets it (TextAppearance.App.Subtitle), and the body the episode and end time. -->
     <style name="TextAppearance.Leanback.DetailsDescriptionSubtitle">
-        <item name="android:fontFamily">@font/vazir</item>
+        <item name="android:fontFamily">@font/peyda_semibold</item>
         <item name="android:textSize">@dimen/lb_details_description_subtitle_text_size</item>
-        <item name="android:textColor">@color/text_dim</item>
+        <item name="android:textColor">@color/text_body</item>
     </style>
 
     <style name="TextAppearance.Leanback.DetailsDescriptionBody">
         <item name="android:fontFamily">@font/vazir</item>
         <item name="android:textSize">@dimen/lb_details_description_body_text_size</item>
-        <item name="android:textColor">@color/lb_details_description_body_color</item>
+        <item name="android:textColor">@color/text_dim</item>
     </style>
 
     <style name="TextAppearance.Leanback.DetailsActionButton">
