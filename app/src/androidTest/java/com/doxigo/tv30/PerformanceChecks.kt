@@ -2,6 +2,7 @@ package com.doxigo.tv30
 
 import android.app.Activity
 import android.app.Instrumentation
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Bundle
@@ -34,6 +35,18 @@ class PerformanceChecks : Instrumentation() {
         super.onCreate(arguments)
         requestedCheck = arguments?.getString("check")
         start()
+    }
+
+    /**
+     * The checks swap the session, language and settings out and back with apply(), and the
+     * process dies as the run ends: an unwritten restore once signed a real emulator out. A
+     * commit on each file waits for every write before it.
+     */
+    override fun finish(resultCode: Int, results: Bundle?) {
+        File(targetContext.applicationInfo.dataDir, "shared_prefs").list().orEmpty().forEach {
+            targetContext.getSharedPreferences(it.removeSuffix(".xml"), Context.MODE_PRIVATE).edit().commit()
+        }
+        super.finish(resultCode, results)
     }
 
     override fun onStart() {
