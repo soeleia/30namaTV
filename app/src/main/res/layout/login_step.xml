@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One sign-in step: its number in ink on a lilac disc, then what to do. -->
+<!-- One sign-in step: its number in white on a red disc, then what to do. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -15,7 +15,7 @@
         android:gravity="center"
         android:includeFontPadding="false"
         android:textAppearance="@style/TextAppearance.App.Button"
-        android:textColor="@color/ink"
+        android:textColor="@color/text"
         android:textSize="13sp" />
 
     <TextView

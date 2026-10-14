@@ -1,15 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- The interface keeps its lilac accent after the requested switch to original 30nama branding.
-         - brand: sign-in steps, status light, done check and player loading indicator.
-           As a fill it carries ink (never white: 2.1:1); as a mark it sits on ink.
+    <!-- 30nama's branding: its red is the one accent, no lilac or purple.
+         - brand: 30nama's red, for sign-in steps, status light, done check and player loading
+           indicator. As a fill it carries white (4.8:1); as a mark it sits on ink.
            Never on large areas, never as body text.
-         - red: not an accent. It is 30nama's, kept for watched progress and 30nama's own marks
-           (its score badge, the "30"). New work does not reach for it.
-         - Focus stays white everywhere; grounds stay ink. The purple ground in
-           original logo and launch motion keep their own source colors.
+         - red: the same red, for watched progress and 30nama's own marks (its score badge, the "30").
+         - Focus stays white everywhere; grounds stay ink. The original logo and launch motion
+           keep their own source colors.
          Other screens take these by name, never by hex. -->
-    <color name="brand">#C5A0FF</color>
+    <color name="brand">@color/red</color>
     <color name="ink">#141414</color>
     <color name="ink_deep">#0B0B0B</color>
     <color name="surface">#1F1F1F</color>

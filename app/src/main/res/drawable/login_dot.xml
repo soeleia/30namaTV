@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The login status light: the brand's lilac, breathing while the TV waits for the phone. -->
+<!-- The login status light: 30nama's red, breathing while the TV waits for the phone. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
     <solid android:color="@color/brand" />
 </shape>

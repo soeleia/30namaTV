@@ -5,7 +5,7 @@
     <style name="Theme.App" parent="@style/Theme.Leanback">
         <item name="android:windowBackground">@color/ink</item>
         <item name="android:colorPrimary">@color/ink</item>
-        <!-- Lilac is the one accent; red is left to watched progress and 30nama's own marks. -->
+        <!-- 30nama's red is the one accent (colors.xml: brand). -->
         <item name="android:colorAccent">@color/brand</item>
         <item name="android:colorControlHighlight">@color/focus_wash</item>
         <item name="android:buttonStyle">@style/Widget.App.Button</item>
