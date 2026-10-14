@@ -8,9 +8,11 @@ import android.os.Bundle
 import android.os.LocaleList
 import android.speech.RecognizerIntent
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsets
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -126,7 +128,24 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
                 else -> null
             }
         }
-        return root
+        // Down from the box, ahead of the keyboard: see [down].
+        return object : FrameLayout(context) {
+            override fun dispatchKeyEventPreIme(event: KeyEvent) = down(event) || super.dispatchKeyEventPreIme(event)
+        }.apply { addView(root) }
+    }
+
+    /**
+     * Down from the box with the keyboard down and the caret at the end goes [below] before the
+     * keyboard is offered it. A keyboard that is down still serves the box and sees every key
+     * first, and what it makes of Down is its own: on Android TV 11 (CI's search check) the remote
+     * stayed in the box over the recent searches. From Android 11, where the window can tell the
+     * keyboard is down; Android 9 and 10 keep the focus search's way, as before.
+     */
+    private fun down(event: KeyEvent): Boolean {
+        if (Build.VERSION.SDK_INT < 30 || event.keyCode != KeyEvent.KEYCODE_DPAD_DOWN || event.action != KeyEvent.ACTION_DOWN) return false
+        val box = editor
+        if (!box.isFocused || box.selectionEnd != box.length() || box.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) != false) return false
+        return below()?.requestFocusFromTouch() == true
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
