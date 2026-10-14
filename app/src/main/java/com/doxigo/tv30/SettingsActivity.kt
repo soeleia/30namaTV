@@ -669,7 +669,7 @@ class SettingsActivity : TvActivity() {
     /** One row per service: OK opens the sheet that takes its key. */
     private fun services(): List<Group> = listOf(Group(0, keyed.map { s ->
         Option(s.name, text(s.help), value = { keyValue(s) }, note = { keyNote(s) }, sub = s.unlocks, warn = { outcome(s) == Check.REJECTED }) {
-            ask(getString(s.name), getString(R.string.settings_key_ask), Settings.savedKey(s.id), s.link) { save(s, it) }
+            ask(getString(s.name), Settings.savedKey(s.id), s.link) { save(s, it) }
         }
     }))
 

@@ -7,10 +7,23 @@
     <string name="continue_remove">حذف از ادامهٔ تماشا</string>
     <!-- In Cancel's place, to the title page: the hero's button (promo_more), without its icon. -->
     <string name="continue_info">اطلاعات بیشتر</string>
-    <!-- ask: a key typed in. The hint names the remote's button and Google's phone app as they are. -->
+    <!-- ask: a key, three ways in. The first line is the phone's (KeyForm), or with no home network
+         the key page's; the hint names the remote's button, Google's phone app and Paste as they are. -->
+    <string name="sheet_key_phone">کد را با گوشی اسکن کنید. در صفحه‌ای که باز می‌شود، کلید رایگان را بردارید و به همین تلویزیون بفرستید.</string>
+    <string name="sheet_key_page">کد را با گوشی اسکن کنید، کلید رایگان را از همان صفحه بردارید و این‌جا وارد کنید.</string>
     <string name="sheet_save">ذخیره</string>
     <string name="sheet_clear">پاک کردن</string>
-    <string name="sheet_keyboard_hint">برای نوشتن، OK را بزنید. از برنامهٔ Google TV روی گوشی هم می‌توانید کلید را بنویسید یا جای‌گذاری کنید.</string>
+    <string name="sheet_paste">جای‌گذاری</string>
+    <string name="sheet_keyboard_hint">یا روی کادر OK را بزنید و بنویسید، با کنترل یا برنامهٔ Google TV؛ یا کلید کپی‌شده را جای‌گذاری کنید.</string>
+    <string name="sheet_paste_empty">چیزی روی این تلویزیون کپی نشده است. کلید را بنویسید یا از گوشی بفرستید.</string>
+    <!-- KeyForm: the page a phone opens from ask's code. %s is the service's name. -->
+    <string name="key_page_title">کلید %s</string>
+    <string name="key_page_get">کلید رایگان را از این صفحه بردارید:</string>
+    <string name="key_page_paste">آن را این‌جا بگذارید و به تلویزیون بفرستید.</string>
+    <string name="key_page_send">ارسال به تلویزیون</string>
+    <string name="key_page_bad">این شبیه کلید نیست. دوباره کپی‌اش کنید و این‌جا بگذارید.</string>
+    <string name="key_page_sent">فرستاده شد</string>
+    <string name="key_page_sent_note">نتیجه را روی تلویزیون ببینید.</string>
     <!-- quickActions: OK held on a poster. Each list's step names the list as the title page and
          My Lists do (strings.xml, list_*). -->
     <string name="quick_favorite_add">افزودن به علاقه‌مندی‌ها</string>

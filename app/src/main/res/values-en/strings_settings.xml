@@ -79,5 +79,4 @@
     <string name="settings_key_rejected_note">Key rejected. Compare it with the key page and enter it again.</string>
     <string name="settings_key_unreachable">Key saved, but %s couldn\'t be reached to check it.</string>
     <string name="settings_key_built">Using the key built into this copy of the app; your own takes its place.</string>
-    <string name="settings_key_ask">Scan the code with your phone, copy your free key from that page and enter it here.</string>
 </resources>

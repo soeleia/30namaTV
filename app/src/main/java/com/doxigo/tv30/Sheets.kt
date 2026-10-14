@@ -2,6 +2,7 @@ package com.doxigo.tv30
 
 import android.animation.LayoutTransition
 import android.app.Activity
+import android.content.ClipboardManager
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.drawable.GradientDrawable
@@ -10,6 +11,7 @@ import android.os.LocaleList
 import android.text.InputType
 import android.text.TextUtils
 import android.view.Gravity
+import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
@@ -29,6 +31,9 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.core.widget.TextViewCompat
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import coil3.load
 import coil3.request.crossfade
@@ -67,15 +72,17 @@ import java.util.Locale
 //     settings come in: the current one checked and under the remote. OK applies and closes;
 //     onChoose gets the index of any pick, the current one too. Back and Esc close without it.
 //
-//   Activity.ask(title, question, value: String, link: String, onSave: (String) -> Unit)
-//     ask("TMDB", getString(R.string.settings_key_ask), Settings.savedKey(Tmdb.NAME),
-//         "https://www.themoviedb.org/settings/api") { key -> Settings.saveKey(Tmdb.NAME, key) }
-//     A line of text the viewer gets elsewhere, an API key: on confirm's card, the field under
-//     the remote with [value] in it, and beside it [link] as a QR code and its address, the page
-//     the text is found on. OK on the field brings up the TV's keyboard, which the Google TV app
-//     on a phone can type or paste into. Save (or the keyboard's Done) closes and hands onSave
-//     the text as it stands; Clear, there only when [value] is not empty, hands it "". Back and
-//     Esc close without either.
+//   Activity.ask(title, value: String, link: String, onSave: (String) -> Unit)
+//     ask("TMDB", Settings.savedKey(Tmdb.NAME), "https://www.themoviedb.org/settings/api") { key ->
+//         Settings.saveKey(Tmdb.NAME, key) }
+//     An API key, the viewer's from [link], three ways in, on confirm's card. A QR code and its
+//     address open a page this TV serves its home network while the sheet is open (KeyForm): it
+//     links to [link] and sends the key back, saved as Save saves it; with no home network, the
+//     code is [link] itself. OK on the field, under the remote with [value] in it, asks for the
+//     TV's keyboard, which the Google TV app on a phone can type or paste into. Paste, beside it,
+//     takes the TV's clipboard. Save (or the keyboard's Done) closes and hands onSave the text as
+//     it stands; Clear, there only when [value] is not empty, hands it "". Back and Esc close
+//     without either.
 //
 //   FragmentActivity.quickActions(title: JSONObject)
 //     (context as? FragmentActivity)?.quickActions(t) // toCard's default hold, Cards.kt
@@ -171,15 +178,22 @@ fun Activity.choose(title: CharSequence, options: List<CharSequence>, current: I
     sheet.open(rows.getOrElse(current) { rows.first() }, title)
 }
 
-fun Activity.ask(title: CharSequence, question: CharSequence, value: String, link: String, onSave: (String) -> Unit) {
+fun Activity.ask(title: CharSequence, value: String, link: String, onSave: (String) -> Unit) {
     val dp = resources.displayMetrics.density
+    // A key from the phone goes in as a typed one would and is saved by Save; set once Save is.
+    var send: (String) -> Unit = {}
+    val phone = KeyForm.open(this, title, link) { send(it) }
     // The form down the start side, as confirm's column but read from its start edge.
-    val form = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+    val form = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        clipChildren = false // a focused button lifts past the form's edges
+    }
     form.addView(text(title, R.style.TextAppearance_App_DialogTitle).apply {
         textSize = 26f
         typeface = font(if (title.isLatin) R.font.inter_bold else R.font.peyda_bold)
         start()
     }, linear(MATCH, WRAP))
+    val question = getString(if (phone != null) R.string.sheet_key_phone else R.string.sheet_key_page)
     form.addView(text(latin(this, question, R.font.inter_regular), R.style.TextAppearance_App_Body).apply {
         maxLines = 3
         start()
@@ -203,18 +217,31 @@ fun Activity.ask(title: CharSequence, question: CharSequence, value: String, lin
         setText(value)
         setSelection(value.length)
     }
-    form.addView(field, linear(MATCH, px(52)).apply { topMargin = px(24) })
-    form.addView(text(latin(this, getString(R.string.sheet_keyboard_hint), R.font.inter_regular), R.style.TextAppearance_App_Caption).apply {
+    // Paste beside the field, both the 44dp pill of the app's controls (the button's 48dp target
+    // holds its pill 2dp in), so they line up.
+    val paste = button(getString(R.string.sheet_paste))
+    val row = LinearLayout(this).apply {
+        gravity = Gravity.CENTER_VERTICAL
+        clipChildren = false
+        addView(field, linear(0, px(44), 1f))
+        addView(paste, linear(WRAP, WRAP).apply { marginStart = px(12) })
+    }
+    form.addView(row, linear(MATCH, WRAP).apply { topMargin = px(24) })
+    val hint = latin(this, getString(R.string.sheet_keyboard_hint), R.font.inter_regular)
+    val note = text(hint, R.style.TextAppearance_App_Caption).apply {
         textSize = 14f
         maxLines = 2
         start()
-    }, linear(MATCH, WRAP).apply { topMargin = px(10) })
+    }
+    form.addView(note, linear(MATCH, WRAP).apply { topMargin = px(10) })
     val save = button(getString(R.string.sheet_save))
     form.addView(save, linear(MATCH, WRAP).apply { topMargin = px(24) })
     val clear = if (value.isEmpty()) null else button(getString(R.string.sheet_clear))
     clear?.let { form.addView(it, linear(MATCH, WRAP).apply { topMargin = px(8) }) }
 
-    // The page on the white plate the sign-in code wears, its address under it.
+    // The phone's page (else the key's own) on the white plate the sign-in code wears, its address
+    // under it for a phone that can't scan.
+    val target = phone?.url ?: link
     val page = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER_HORIZONTAL
@@ -223,10 +250,10 @@ fun Activity.ask(title: CharSequence, question: CharSequence, value: String, lin
         setBackgroundResource(R.drawable.qr_plate)
         val pad = px(12)
         setPadding(pad, pad, pad, pad)
-        setImageBitmap(qr(link, px(QR)))
+        setImageBitmap(qr(target, px(QR)))
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }, linear(px(QR + 24), px(QR + 24)))
-    page.addView(text(link.removePrefix("https://").removePrefix("www."), R.style.TextAppearance_App_Caption).apply {
+    page.addView(text(target.substringAfter("://").removePrefix("www."), R.style.TextAppearance_App_Caption).apply {
         typeface = font(R.font.inter_medium)
         textSize = 13f
         textDirection = View.TEXT_DIRECTION_LTR
@@ -242,25 +269,80 @@ fun Activity.ask(title: CharSequence, question: CharSequence, value: String, lin
         val pad = px(CARD_PAD)
         setPadding(pad, pad, pad, pad)
         clipToPadding = false // a focused button lifts into it, past the form's edge
+        // Getting a key on the phone takes minutes; the screensaver would stop the page and the form with it.
+        keepScreenOn = phone != null
     }
     card.addView(form, linear(px(360), WRAP))
     // Wider than the plate, so "themoviedb.org/settings/api" holds on one line under it.
     card.addView(page, linear(px(QR + 56), WRAP).apply { marginStart = px(32) })
 
     val sheet = Sheet(this, card, FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER), SCRIM_ALERT, dy = 16 * dp)
+    val keys = getSystemService(InputMethodManager::class.java)
     fun done(text: String) {
         // The keyboard would otherwise stay up over the page the sheet hands back.
-        getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(field.windowToken, 0)
+        keys.hideSoftInputFromWindow(field.windowToken, 0)
         sheet.close { onSave(text) }
     }
     save.setOnClickListener { done(field.text.toString()) }
     clear?.setOnClickListener { done("") }
+    send = { key ->
+        field.setText(key)
+        save.performClick()
+    }
+    paste.setOnClickListener {
+        val copied = getSystemService(ClipboardManager::class.java).primaryClip?.takeIf { it.itemCount > 0 }
+            ?.getItemAt(0)?.coerceToText(this)?.toString()?.trim().orEmpty()
+        if (copied.isEmpty()) {
+            note.text = latin(this, getString(R.string.sheet_paste_empty), R.font.inter_regular)
+            return@setOnClickListener
+        }
+        field.setText(copied)
+        field.setSelection(copied.length)
+        note.text = hint
+        save.requestFocus() // one more OK saves it
+    }
+    // OK on the field asks for the keyboard outright. TextView's own answer to OK, a plain request,
+    // brought nothing up on a Sony on Android 9: forced, and if the keyboard wasn't serving the
+    // field yet, its input started and asked again.
+    @Suppress("DEPRECATION") // SHOW_FORCED, deprecated from Android 13; this is for the TVs before it
+    fun keyboard() {
+        field.requestFocus()
+        if (!keys.showSoftInput(field, InputMethodManager.SHOW_FORCED)) {
+            keys.restartInput(field)
+            field.post { keys.showSoftInput(field, InputMethodManager.SHOW_FORCED) }
+        }
+    }
+    field.setOnClickListener { keyboard() }
+    // A remote whose OK sends Enter would reach the Done below and save; a keyboard's Enter still does.
+    field.setOnKeyListener { _, code, event ->
+        val ok = (code == KeyEvent.KEYCODE_ENTER || code == KeyEvent.KEYCODE_NUMPAD_ENTER) &&
+            event.device?.keyboardType != InputDevice.KEYBOARD_TYPE_ALPHABETIC
+        if (ok && event.action == KeyEvent.ACTION_UP) keyboard()
+        ok
+    }
     // Done, or Enter on a keyboard; closing twice is nothing (Sheet.close), so the key's down and up both may.
     field.setOnEditorActionListener { _, action, event ->
         if (action == EditorInfo.IME_ACTION_DONE || event?.keyCode == KeyEvent.KEYCODE_ENTER) save.performClick()
         true
     }
-    sheet.open(field, dotted(title.toString(), question.toString()))
+    // The phone's form lives only while the sheet does: it goes with it, and the sheet goes when the
+    // page stops (Home), the keyboard first, which forced would stay up over whatever comes next.
+    val life = (this as? LifecycleOwner)?.lifecycle
+    val stop = LifecycleEventObserver { _, event ->
+        if (event != Lifecycle.Event.ON_STOP) return@LifecycleEventObserver
+        phone?.close()
+        keys.hideSoftInputFromWindow(field.windowToken, 0)
+        sheet.close()
+    }
+    life?.addObserver(stop)
+    card.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+        override fun onViewAttachedToWindow(view: View) = Unit
+        override fun onViewDetachedFromWindow(view: View) {
+            phone?.close()
+            life?.removeObserver(stop)
+        }
+    })
+    sheet.open(field, dotted(title.toString(), question))
 }
 
 fun FragmentActivity.quickActions(title: JSONObject) {

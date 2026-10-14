@@ -98,5 +98,4 @@
     <string name="settings_key_rejected_note">کلید پذیرفته نشد. آن را با صفحهٔ کلید مقایسه کنید و دوباره وارد کنید.</string>
     <string name="settings_key_unreachable">کلید ذخیره شد، ولی %s در دسترس نبود تا بررسی شود.</string>
     <string name="settings_key_built">کلیدی که در خود این نسخه ساخته شده به کار می‌رود؛ کلید خودتان جای آن را می‌گیرد.</string>
-    <string name="settings_key_ask">کد را با گوشی اسکن کنید، کلید رایگان را از همان صفحه بردارید و این‌جا وارد کنید.</string>
 </resources>
