@@ -63,14 +63,4 @@
         <activity android:name=".PlayerActivity" android:configChanges="keyboard|keyboardHidden|navigation|screenSize|smallestScreenSize|screenLayout|orientation" />
         <activity android:name=".TrailerActivity" android:configChanges="keyboard|keyboardHidden|navigation|screenSize|smallestScreenSize|screenLayout|orientation" />
     </application>
-
-    <!-- The YouTube apps a trailer can be handed to (Trailer.kt): SmartTube's three package names,
-         YouTube for Android TV, and the phone app some boxes carry. Android 11 hides them otherwise. -->
-    <queries>
-        <package android:name="com.teamsmart.videomanager.tv" />
-        <package android:name="com.liskovsoft.smarttubetv.beta" />
-        <package android:name="com.liskovsoft.smarttubetv" />
-        <package android:name="com.google.android.youtube.tv" />
-        <package android:name="com.google.android.youtube" />
-    </queries>
 </manifest>

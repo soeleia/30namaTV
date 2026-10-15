@@ -348,11 +348,13 @@ class DetailsActivity : TvActivity() {
         rows.add(ListRow(HeaderItem(rows.size().toLong(), header), ArrayObjectAdapter(CastPresenter()).apply { setItems(cards, null) }))
     }
 
-    /** «تریلر» once there is somewhere to play one from: YouTube when it answers, else Aparat (Trailer.kt). */
+    /** «تریلر» once there is somewhere to play one from: Aparat in Iran, YouTube elsewhere (Trailer.kt). */
     private suspend fun showTrailer() {
-        val sources = Trailer.find(this, title) ?: return
+        val sources = Trailer.find(title) ?: return
+        trailer.setCompoundDrawablesRelativeWithIntrinsicBounds(sources.icon, 0, 0, 0)
+        if (sources.viaYoutube) trailer.contentDescription = getString(R.string.trailer_on_youtube)
         trailer.setOnClickListener { Trailer.play(this, sources) }
-        // With both sources, a long press asks: «یوتیوب» or «آپارات».
+        // With both sources, a long press asks: «آپارات» or «یوتیوب».
         trailer.setOnLongClickListener { Trailer.choose(this, sources); true }
         trailer.visibility = View.VISIBLE
     }

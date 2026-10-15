@@ -479,7 +479,9 @@ fun FragmentActivity.quickActions(title: JSONObject) {
     }
     signIn?.setOnClickListener { sheet.close { startActivity(Intent(this, LoginActivity::class.java)) } }
     lifecycleScope.launch {
-        val sources = Trailer.find(this@quickActions, title) ?: return@launch
+        val sources = Trailer.find(title) ?: return@launch
+        trailer.icon(sources.icon)
+        if (sources.viaYoutube) trailer.contentDescription = getString(R.string.trailer_on_youtube)
         trailer.setOnClickListener { sheet.close { Trailer.play(this@quickActions, sources) } }
         trailer.visibility = View.VISIBLE // on a closed sheet, a view nobody sees
     }

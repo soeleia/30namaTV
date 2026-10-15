@@ -46,4 +46,14 @@ class TrailerTest {
         val fallback = "https://caspian27.cdn.asset.aparat.com/aparat-video/animals-1080p.apt?signature=value"
         assertEquals(fallback, Trailer.aparatMediaUrl(null, listOf(1080 to "file:///video.mp4"), fallback))
     }
+
+    @Test
+    fun sourceFollowsWhereTheViewerIs() {
+        assertFalse(Trailer.Sources("yt", "ap", iran = true).viaYoutube)
+        assertTrue(Trailer.Sources("yt", null, iran = true).viaYoutube)
+        assertTrue(Trailer.Sources("yt", "ap", iran = false).viaYoutube)
+        assertFalse(Trailer.Sources(null, "ap", iran = false).viaYoutube)
+        assertEquals("SE", Trailer.country("fl=1\nh=30nama.com\nloc=SE\ncolo=ARN\n"))
+        assertNull(Trailer.country("<html>blocked</html>"))
+    }
 }

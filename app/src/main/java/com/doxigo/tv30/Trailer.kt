@@ -1,9 +1,10 @@
 package com.doxigo.tv30
 
 import android.app.Activity
-import android.content.Context
-import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.webkit.WebView
+import androidx.annotation.DrawableRes
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -19,24 +20,25 @@ import kotlin.math.abs
 
 /**
  * A title's trailer. 30nama has none (no field in any answer, nothing in the official app), so it
- * comes from the two places its audience watches trailers:
- * - YouTube: the official trailer TMDB lists for the title, handed to the TV's YouTube app. Blocked
- *   in Iran without a VPN, so offered only while youtube.com answers from here.
+ * comes from the two places its audience watches trailers, both played in the app (TrailerActivity):
  * - Aparat, Iran's own video site, where trailers are re-uploaded, often with Persian subtitles:
- *   its public search and streams, played by the native TV player. Reachable in Iran and out.
- * The button plays YouTube's when it can (TMDB matches by IMDb id, Aparat only by name); a long
+ *   its public search and streams. Reachable in Iran and out, without a VPN.
+ * - YouTube: the official trailer TMDB lists for the title. Blocked in Iran without a VPN, so
+ *   offered only while youtube.com answers from here.
+ * The button plays Aparat's in Iran, unfiltered and on domestic traffic, and YouTube's, the studio's
+ * own, elsewhere; either falls back to the other. It says YouTube when it would play that; a long
  * press offers both.
  */
 object Trailer {
-    /** A YouTube video key and an Aparat video hash; either may be missing, never both. */
-    class Sources(val youtube: String?, val aparat: String?)
+    /** A YouTube video key and an Aparat video hash, either may be missing, never both; and whether the viewer is in Iran. */
+    class Sources(val youtube: String?, val aparat: String?, val iran: Boolean) {
+        /** What a press plays: in Iran Aparat's, else YouTube's, each when there is one. */
+        val viaYoutube get() = if (iran) aparat == null else youtube != null
 
-    // SmartTube first: a TV it is sideloaded on is one whose owner watches YouTube there. Package
-    // visibility needs each of these in the manifest's <queries>.
-    private val YOUTUBE_APPS = listOf(
-        "com.teamsmart.videomanager.tv", "com.liskovsoft.smarttubetv.beta", "com.liskovsoft.smarttubetv",
-        "com.google.android.youtube.tv", "com.google.android.youtube",
-    )
+        /** The button's icon: YouTube's mark when a press plays YouTube, else the clapperboard. */
+        @get:DrawableRes val icon get() = if (viaYoutube) R.drawable.act_youtube else R.drawable.act_trailer
+    }
+
     private const val AWHILE = 5 * 60_000L
 
     private val client by lazy { Api.http.newBuilder().connectTimeout(4, TimeUnit.SECONDS).callTimeout(6, TimeUnit.SECONDS).build() }
@@ -45,43 +47,42 @@ object Trailer {
     private val aparatIds = ConcurrentHashMap<Int, String>()
     @Volatile private var checked = 0L
     @Volatile private var reachable = false
+    @Volatile private var located = 0L
+    @Volatile private var iran = true
 
-    /** Where [title]'s trailer can play from here, both looked up at once; null when nowhere. */
-    suspend fun find(context: Context, title: JSONObject): Sources? = coroutineScope {
-        val youtube = async { if (app(context, "") != null && youtubeReachable()) youtubeKey(title) else null }
+    /** Where [title]'s trailer can play from here, all looked up at once; null when nowhere. */
+    suspend fun find(title: JSONObject): Sources? = coroutineScope {
+        val youtube = async { if (youtubeEmbeds() && youtubeReachable()) youtubeKey(title) else null }
         val aparat = async { aparatId(title) }
-        Sources(youtube.await(), aparat.await()).takeIf { it.youtube != null || it.aparat != null }
+        val iran = async { inIran() }
+        Sources(youtube.await(), aparat.await(), iran.await()).takeIf { it.youtube != null || it.aparat != null }
     }
 
-    /** The best source: YouTube's when there is one, else Aparat's. */
+    /** The best source for where the viewer is ([Sources.viaYoutube]). */
     fun play(activity: Activity, sources: Sources) {
-        if (sources.youtube != null && youtube(activity, sources.youtube)) return
-        sources.aparat?.let { activity.startActivity(TrailerActivity.intent(activity, it)) }
+        val intent = if (sources.viaYoutube) TrailerActivity.intent(activity, sources.youtube!!, youtube = true)
+            else TrailerActivity.intent(activity, sources.aparat!!)
+        activity.startActivity(intent)
     }
 
-    /** «یوتیوب» or «آپارات», for a long press; with only one of them, just [play]. */
+    /** «آپارات» or «یوتیوب», for a long press; with only one of them, just [play]. */
     fun choose(activity: Activity, sources: Sources) {
-        val youtube = sources.youtube ?: return play(activity, sources)
         val aparat = sources.aparat ?: return play(activity, sources)
-        val options = listOf<CharSequence>(activity.getString(R.string.trailer_youtube), activity.getString(R.string.trailer_aparat))
-        // YouTube is what a plain press plays, so it is the current choice.
-        activity.choose(activity.getString(R.string.watch_trailer), options, 0) { which ->
-            if (which != 0 || !youtube(activity, youtube)) activity.startActivity(TrailerActivity.intent(activity, aparat))
+        val youtube = sources.youtube ?: return play(activity, sources)
+        val options = listOf<CharSequence>(activity.getString(R.string.trailer_aparat), activity.getString(R.string.trailer_youtube))
+        // What a plain press plays is the current choice.
+        activity.choose(activity.getString(R.string.watch_trailer), options, if (sources.viaYoutube) 1 else 0) { which ->
+            activity.startActivity(if (which == 0) TrailerActivity.intent(activity, aparat) else TrailerActivity.intent(activity, youtube, youtube = true))
         }
     }
 
-    /** Hands [key] to the first YouTube app that takes it; false when none does. */
-    private fun youtube(context: Context, key: String): Boolean {
-        val intent = app(context, key) ?: return false
-        return runCatching { context.startActivity(intent) }.isSuccess
-    }
-
-    /** The watch intent the first installed YouTube app answers: its web link, else the old vnd.youtube one. */
-    private fun app(context: Context, key: String): Intent? = YOUTUBE_APPS.firstNotNullOfOrNull { app ->
-        listOf("https://www.youtube.com/watch?v=$key", "vnd.youtube:$key")
-            .map { Intent(Intent.ACTION_VIEW, Uri.parse(it)).setPackage(app) }
-            .firstOrNull { it.resolveActivity(context.packageManager) != null }
-    }
+    /**
+     * Whether the TV's WebView can run YouTube's embed: Chrome 71 (2018) on, as its script calls
+     * queueMicrotask; older ones play it black. Before Android 8 the version can't be asked without
+     * loading WebView, so the page checks for itself (TrailerActivity's YoutubePlayer).
+     */
+    private fun youtubeEmbeds() = Build.VERSION.SDK_INT < 26 ||
+        (WebView.getCurrentWebViewPackage()?.versionName?.substringBefore('.')?.toIntOrNull() ?: 0) >= 71
 
     /** Whether YouTube answers from here, asked every five minutes at most: VPNs come and go. */
     private suspend fun youtubeReachable(): Boolean {
@@ -95,6 +96,28 @@ object Trailer {
         checked = System.currentTimeMillis()
         return reachable
     }
+
+    /**
+     * Whether the viewer is in Iran: the country Cloudflare sees this connection from, at 30nama's own
+     * site (no third party learns of it), so a VPN counts where it comes out. Not knowing counts as
+     * Iran, where Aparat is the safe choice. Asked every five minutes at most: VPNs come and go.
+     */
+    private suspend fun inIran(): Boolean {
+        if (System.currentTimeMillis() - located < AWHILE) return iran
+        val request = Request.Builder().url("https://30nama.com/cdn-cgi/trace").build()
+        iran = try {
+            Api.run { client.newCall(request).await() }.use { response ->
+                country(withContext(Dispatchers.IO) { response.body!!.string() }) in setOf(null, "IR")
+            }
+        } catch (e: IOException) {
+            true
+        }
+        located = System.currentTimeMillis()
+        return iran
+    }
+
+    /** The `loc=` line of a Cloudflare trace ("SE"), or null without one. */
+    internal fun country(trace: String) = trace.lineSequence().firstOrNull { it.startsWith("loc=") }?.removePrefix("loc=")?.trim()
 
     /** TMDB's trailer on YouTube: Persian before English, a trailer before a teaser, the studio's own first. */
     private suspend fun youtubeKey(title: JSONObject): String? {
