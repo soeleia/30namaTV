@@ -37,6 +37,21 @@
     <string name="subtitle_error_down">%s isn\'t answering right now. Try again in a moment.</string>
     <string name="subtitle_error_quota">Today\'s %s allowance is used up. Try another subtitle.</string>
     <string name="subtitle_error_file">This subtitle wouldn\'t open. Try another one.</string>
+    <string name="subtitle_translate">Make Persian subtitles</string>
+    <string name="subtitle_translate_by">Translated by %s</string>
+    <string name="subtitle_translate_finding">Finding English subtitles…</string>
+    <string name="subtitle_translating">Translating… %s%%</string>
+    <string name="subtitle_translate_watch">Keep watching</string>
+    <string name="subtitle_translate_wait">Takes a few minutes; they come on by themselves once ready.</string>
+    <string name="subtitle_translated">Persian subtitles are ready.</string>
+    <string name="subtitle_translate_again">Try again</string>
+    <string name="subtitle_translate_none">No English subtitles to translate from.</string>
+    <string name="subtitle_translate_key">%s didn\'t accept its key. Check it in Settings, under Services.</string>
+    <string name="subtitle_translate_quota">Your %s allowance or credit has run out.</string>
+    <string name="subtitle_translate_region">%s isn\'t available in this region. Try again over a VPN.</string>
+    <string name="subtitle_translate_blocked">%s declined to translate this subtitle. Try another service\'s key.</string>
+    <string name="subtitle_translate_down">%s isn\'t answering right now. Try again in a moment.</string>
+    <string name="subtitle_translate_network">Couldn\'t reach %s. Check the internet connection.</string>
 
     <string name="subtitle_timing">Subtitle timing</string>
     <string name="subtitle_timing_none">No shift</string>

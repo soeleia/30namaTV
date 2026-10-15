@@ -69,11 +69,12 @@ gh secret set RELEASE_STORE_PASSWORD --repo soeleia/30namaTV
 
 ## Service keys
 
-TMDB, SubDL and OpenSubtitles each need a free API key, and each viewer enters their own under **Settings > Services** (see the [README](../README.md#service-keys)). The app keeps it in its private preferences on that TV and tries it once on saving: TMDB's `/3/configuration`, a one-result SubDL search, and OpenSubtitles' `utilities/guessit` (its `/infos` lists answer any key). Actions passes no keys, so public APKs carry none and nobody spends anyone else's allowance.
+TMDB, SubDL, OpenSubtitles and the translating models each need an API key, and each viewer enters their own under **Settings > Services** (see the [README](../README.md#service-keys)). The app keeps it in its private preferences on that TV and tries it once on saving: TMDB's `/3/configuration`, a one-result SubDL search, and OpenSubtitles' `utilities/guessit` (its `/infos` lists answer any key). Actions passes no keys, so public APKs carry none and nobody spends anyone else's allowance.
 
 - TMDB: `https://www.themoviedb.org/settings/api`. A v3 API key (32 hex digits) is sent as `api_key`, a v4 read access token (`eyJ…`) as a Bearer header.
 - SubDL: `https://subdl.com/panel/api`.
 - OpenSubtitles: create an API consumer at `https://www.opensubtitles.com/consumers`; its API key is the one needed. Without a signed-in user a free key downloads five subtitles a day per IP, and the app never signs in: it carries keys only, never a username or password.
+- Claude, OpenAI and Gemini write Persian subtitles from an English one (`Translator.kt`). Keys come from `https://platform.claude.com/settings/keys`, `https://platform.openai.com/api-keys` and `https://aistudio.google.com/apikey`, each checked with that provider's free model list. **Settings > Services > Translation model** picks one of five models (`Translator.MODELS`), and with it the service; until then the player uses the best model of the first service with a key, in this order: Claude Opus 5.5 (about $0.92 a two-hour film), Claude Sonnet 5.5 (about $0.46), GPT-6.1 Sol (about $0.46), GPT-6 Astra (about $2.30), Gemini 3.8 Flash (free within Gemini's free tier, though it adds the odd clause and its free tier often answers 503 at busy times). Smaller models (Haiku, Flash-Lite, GPT-6 Luna) are left out: on the sample scene they ran cues into one long line or got idioms wrong. These providers refuse requests from Iran, so a viewer there needs a VPN, and the player says so when it happens.
 
 For your own builds, ignored `local.properties` can hold fallbacks, used only while no key is saved in Settings:
 
@@ -81,6 +82,15 @@ For your own builds, ignored `local.properties` can hold fallbacks, used only wh
 tmdb.token=YOUR_TMDB_KEY_OR_READ_TOKEN
 subdl.key=YOUR_SUBDL_API_KEY
 opensubtitles.key=YOUR_OPENSUBTITLES_API_KEY
+gemini.key=YOUR_GEMINI_API_KEY
+anthropic.key=YOUR_ANTHROPIC_API_KEY
+openai.key=YOUR_OPENAI_API_KEY
+```
+
+To read what a provider actually writes, put its key in the environment and run the live translation check. It translates the sample scene in `app/src/test/resources/translator/sample.srt` and writes `app/build/translator-live/<model>.srt` for every model of each keyed provider; without a key it is skipped, so ordinary test runs spend nothing:
+
+```sh
+GEMINI_KEY=… ./gradlew :app:testDebugUnitTest --tests 'com.doxigo.tv30.TranslatorTest.live'
 ```
 
 ## Publish an update

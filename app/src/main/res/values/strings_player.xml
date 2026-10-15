@@ -53,6 +53,27 @@
     <string name="subtitle_error_quota">سهمیهٔ امروز %s تمام شده است. زیرنویس دیگری را امتحان کنید.</string>
     <string name="subtitle_error_file">این زیرنویس باز نشد. یکی دیگر را امتحان کنید.</string>
 
+    <!-- Make Persian subtitles (Translator.kt): the Subtitles column's entry, which has a model
+         translate an English subtitle, and the page that shows how far it has got. %s is the
+         model's name (Gemini, Claude, OpenAI), Latin, so it never opens a line. -->
+    <string name="subtitle_translate">ساخت زیرنویس فارسی</string>
+    <string name="subtitle_translate_by">ترجمه با %s</string>
+    <string name="subtitle_translate_finding">در حال یافتن زیرنویس انگلیسی…</string>
+    <!-- %s is the share done, already in Persian digits. -->
+    <string name="subtitle_translating">در حال ترجمه… %s٪</string>
+    <!-- Under the page's note, the row that closes the panel, and its quiet line. -->
+    <string name="subtitle_translate_watch">ادامهٔ تماشا</string>
+    <string name="subtitle_translate_wait">چند دقیقه طول می‌کشد؛ آماده که شد، خودش نمایش داده می‌شود.</string>
+    <string name="subtitle_translated">زیرنویس فارسی آماده شد.</string>
+    <string name="subtitle_translate_again">تلاش دوباره</string>
+    <string name="subtitle_translate_none">زیرنویس انگلیسی‌ای برای ترجمه پیدا نشد.</string>
+    <string name="subtitle_translate_key">کلید %s پذیرفته نشد. آن را در تنظیمات، بخش سرویس‌ها بررسی کنید.</string>
+    <string name="subtitle_translate_quota">سهمیه یا اعتبار حساب %s تمام شده است.</string>
+    <string name="subtitle_translate_region">سرویس %s از این منطقه در دسترس نیست. با VPN دوباره امتحان کنید.</string>
+    <string name="subtitle_translate_blocked">سرویس %s ترجمهٔ این زیرنویس را نپذیرفت. با کلید سرویس دیگری امتحان کنید.</string>
+    <string name="subtitle_translate_down">سرویس %s فعلاً پاسخ نمی‌دهد. کمی بعد دوباره امتحان کنید.</string>
+    <string name="subtitle_translate_network">ارتباط با %s برقرار نشد. اتصال اینترنت را بررسی کنید.</string>
+
     <!-- Subtitle timing: the Subtitles column's entry, under it what it is set to, and the page it
          opens, whose rows move the shown subtitle a quarter second a press. %s is the seconds,
          already in Persian digits («۰٫۲۵»). -->

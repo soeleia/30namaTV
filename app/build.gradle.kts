@@ -28,14 +28,18 @@ android {
         versionCode = 7
         versionName = "1.1.1"
         testInstrumentationRunner = "com.doxigo.tv30.PerformanceChecks"
-        // TMDB (Tmdb.kt) and the subtitle sites (Subtitles.kt) take each viewer's own key, entered in
-        // Settings. These are the developer's fallback for their own builds, from the gitignored
-        // local.properties (`tmdb.token`, `subdl.key`, `opensubtitles.key`); Actions passes none, so a
-        // public APK carries no key and nobody spends anyone else's.
+        // TMDB (Tmdb.kt), the subtitle sites (Subtitles.kt) and the translating models (Translator.kt)
+        // take each viewer's own key, entered in Settings. These are the developer's fallback for their
+        // own builds, from the gitignored local.properties (`tmdb.token`, `subdl.key`, `opensubtitles.key`,
+        // `gemini.key`, `anthropic.key`, `openai.key`); Actions passes none, so a public APK carries no
+        // key and nobody spends anyone else's.
         val local = Properties().apply {
             providers.fileContents(rootProject.layout.projectDirectory.file("local.properties")).asText.orNull?.let { load(it.reader()) }
         }
-        for ((field, property) in listOf("TMDB_TOKEN" to "tmdb.token", "SUBDL_KEY" to "subdl.key", "OPENSUBTITLES_KEY" to "opensubtitles.key")) {
+        for ((field, property) in listOf(
+            "TMDB_TOKEN" to "tmdb.token", "SUBDL_KEY" to "subdl.key", "OPENSUBTITLES_KEY" to "opensubtitles.key",
+            "GEMINI_KEY" to "gemini.key", "ANTHROPIC_KEY" to "anthropic.key", "OPENAI_KEY" to "openai.key",
+        )) {
             buildConfigField("String", field, "\"${local.getProperty(property).orEmpty().trim()}\"")
         }
     }
@@ -95,4 +99,6 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.3")
     implementation("com.google.zxing:core:3.5.4")
     testImplementation("junit:junit:4.13.2")
+    // The real org.json, in place of android.jar's stubs: Translator's live check talks JSON on the JVM.
+    testImplementation("org.json:json:20250517")
 }

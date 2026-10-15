@@ -14,7 +14,7 @@ Search uses a six-column vertical grid. Home shows every genre in its row, endin
 - **Posters.** Hold OK on any poster for quick actions: More info, add or remove it from your three lists, and the trailer when one exists. On Continue Watching, holding OK offers to remove the title or open its page.
 - **Search.** Recent searches return when the box is empty, above 30nama's suggestions.
 - **Player.** The controls open on play/pause. Left and right scrub in five-second steps that speed up while held, and the seek lands a second after the last press. The light part of the seek bar shows what is ready, including the disk read-ahead (Settings > Playback > Preload), and the next episode's opening is fetched during the credits. The title's Persian name sits under the English one.
-- **Subtitles.** **Find subtitles** searches SubDL and OpenSubtitles for the film or exact episode, Persian first, and loads the chosen file without stopping playback, converting old Windows-1256 Persian files. **Subtitle timing** shifts any subtitle earlier or later in quarter-second steps.
+- **Subtitles.** **Find subtitles** searches SubDL and OpenSubtitles for the film or exact episode, Persian first, and loads the chosen file without stopping playback, converting old Windows-1256 Persian files. **Make Persian subtitles** has Claude, OpenAI or Gemini translate the English subtitle (30nama's, or one from the subtitle sites) into natural, spoken Persian in a few minutes while the film plays, then switches it on. **Subtitle timing** shifts any subtitle earlier or later in quarter-second steps.
 - **Episodes.** Watched episodes carry a check, partly watched ones a progress bar and the minutes left, and Play resumes where you are. The history is kept on the TV (30nama keeps one position per title) and cleared on sign-out.
 
 ## Install
@@ -38,10 +38,11 @@ Before installation, the app verifies the package name, newer version code and s
 
 ## Service keys
 
-TMDB and the player's subtitle search use free API keys that each viewer supplies. Open **Settings > Services** and select TMDB, SubDL or OpenSubtitles. Scan the QR code with a phone on the same Wi-Fi: it opens a page served by the TV that links to where the key is made and sends the pasted key straight to the TV. You can also type the key with the TV's keyboard or the Google TV app, or use **Paste**. The sheet checks the key, says whether it works, and keeps it in the app's private storage on that TV. Without a key that feature stays off; browsing and 30nama playback need none.
+TMDB, the player's subtitle search and its Persian subtitle maker use API keys that each viewer supplies. Open **Settings > Services** and select a service. Scan the QR code with a phone on the same Wi-Fi: it opens a page served by the TV that links to where the key is made and sends the pasted key straight to the TV. You can also type the key with the TV's keyboard or the Google TV app, or use **Paste**. The sheet checks the key, says whether it works, and keeps it in the app's private storage on that TV. Without a key that feature stays off; browsing and 30nama playback need none.
 
 - **TMDB** adds the trending row, Persian names 30nama lacks, More Like This, trailers and episode stills. Its API page offers an API key and an API read access token; either works.
 - **SubDL** and **OpenSubtitles** power **Find subtitles** in the player (Audio & Subtitles → Subtitles), which appears once either has a key. A free OpenSubtitles key downloads five subtitles a day.
+- **Claude**, **OpenAI** and **Gemini** power **Make Persian subtitles** in the same column. **Translation model**, above their keys, picks the model and with it the service: Claude Opus 5.5 (the most faithful Persian, about $0.92 a two-hour film), Claude Sonnet 5.5 or GPT-6.1 Sol (about $0.46), GPT-6 Astra (about $2.30), or Gemini 3.8 Flash (free within Gemini's free tier, but it slips more often). Until you pick one, the best model of the first service with a key, in that order, translates; the paid ones charge your own account. The result is kept on the TV, so watching again costs nothing. These providers refuse connections from Iran without a VPN.
 
 ## Build locally
 
@@ -59,7 +60,7 @@ The APK is `app/build/outputs/apk/release/app-release.apk`. Android Studio's bun
 
 The public checkout includes OFL-licensed Inter and Vazirmatn, so it builds without private font files. Maintainer APKs retain the requested Peyda headings and Yekan Bakh body text; see [fonts and build inputs](docs/setup.md#fonts). English text uses Inter throughout.
 
-Public APKs carry no API keys (see [service keys](#service-keys)). For your own builds, ignored `local.properties` can hold fallbacks used while no key is saved in Settings: `tmdb.token=`, `subdl.key=` and `opensubtitles.key=` ([details](docs/setup.md#service-keys)). Keys compiled into an APK can be extracted, so don't share an APK built with yours, and never put an account password there.
+Public APKs carry no API keys (see [service keys](#service-keys)). For your own builds, ignored `local.properties` can hold fallbacks used while no key is saved in Settings: `tmdb.token=`, `subdl.key=`, `opensubtitles.key=`, `gemini.key=`, `anthropic.key=` and `openai.key=` ([details](docs/setup.md#service-keys)). Keys compiled into an APK can be extracted, so don't share an APK built with yours, and never put an account password there.
 
 ## Checks and screenshots
 
@@ -68,7 +69,7 @@ Public APKs carry no API keys (see [service keys](#service-keys)). For your own 
 python3 scripts/tv-checks.py --serial emulator-5554
 ```
 
-Use a disposable emulator. Fixture checks replace local preferences and use mocked account data; the runner rejects physical devices. They cover startup/cancellation, logo playback and cleanup, five-second control hiding, play/pause focus, accelerating and self-landing seeks, cancelled/backward seeks, column alignment, Persian lines fitting their width, subtitle direction and centering, title clipping, intro/recap countdown, watched episodes, My Lists, vertical search and recent searches, the complete genre page, update validation/status and trailer playback/lifecycle.
+Use a disposable emulator. Fixture checks replace local preferences and use mocked account data; the runner rejects physical devices. They cover startup/cancellation, logo playback and cleanup, five-second control hiding, play/pause focus, accelerating and self-landing seeks, cancelled/backward seeks, column alignment, Persian lines fitting their width, subtitle direction and centering, making Persian subtitles (part by part, with a refused key), title clipping, intro/recap countdown, watched episodes, My Lists, vertical search and recent searches, the complete genre page, update validation/status and trailer playback/lifecycle.
 
 The trailer check attempts the public Animals trailer. If its CDN is unreachable, logs state `PUBLIC_UNAVAILABLE` and use a silence fixture for interaction/lifecycle checks. That result does not certify live CDN playback.
 

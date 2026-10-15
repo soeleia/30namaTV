@@ -65,7 +65,18 @@
     <string name="settings_sign_in_help">Sign in with your phone to watch.</string>
 
     <string name="settings_services">Services</string>
-    <string name="settings_services_about">Free keys of your own for what 30nama doesn\'t carry: TMDB for Persian names, trending and trailers; SubDL and OpenSubtitles for finding subtitles in the player. Keys stay on this TV only.</string>
+    <string name="settings_services_about">Keys of your own for what 30nama doesn\'t carry: TMDB for Persian names, trending and trailers; SubDL and OpenSubtitles for finding subtitles; Claude, OpenAI or Gemini for making Persian subtitles in the player. Keys stay on this TV only.</string>
+    <string name="settings_translators">Make Persian subtitles</string>
+    <string name="settings_translator_unlocks">Translate subtitles in one click</string>
+    <string name="settings_translator_model">Translation model</string>
+    <string name="settings_translator_model_help">The model Make Persian subtitles translates with; picking one picks its service. Bigger models are more faithful and cost more.</string>
+    <string name="settings_model_cost">About $%s for a two-hour film, from your own account credit.</string>
+    <string name="settings_model_cost_free">Free within Gemini\'s free tier; beyond it, about $%s for a two-hour film.</string>
+    <string name="settings_model_missing_key">Enter a %1$s key below; until then %2$s translates.</string>
+    <string name="settings_model_no_key">Enter a key for one of the services below to translate.</string>
+    <string name="settings_gemini_help">Make Persian subtitles, in the player, translates a film\'s English subtitles into natural, spoken Persian. Create a key on the API Keys page of Google AI Studio; within its free tier, translating costs nothing.</string>
+    <string name="settings_claude_help">Make Persian subtitles, in the player, translates a film\'s English subtitles into natural, spoken Persian. Create a key on the API Keys page of the Anthropic Console. Your account is charged. Of the three, Claude writes the most faithful Persian.</string>
+    <string name="settings_openai_help">Make Persian subtitles, in the player, translates a film\'s English subtitles into natural, spoken Persian. Create a key on the API keys page of your OpenAI account. Your account is charged.</string>
     <string name="settings_tmdb_unlocks">Trending and Persian names</string>
     <string name="settings_subdl_unlocks">Find subtitles in the player</string>
     <string name="settings_opensubtitles_unlocks">More subtitles in the player</string>

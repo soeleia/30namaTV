@@ -199,7 +199,7 @@ object Subtitles {
         check(openSubtitlesCall("https://api.opensubtitles.com/api/v1/utilities/guessit?filename=test.mkv", key).build(), 401, 403)
 
     /** Off the main thread, closing included: an unread HTTP/2 body is cancelled with a write to the socket. */
-    private suspend fun check(request: Request, vararg refused: Int): Boolean = withContext(Dispatchers.IO) {
+    internal suspend fun check(request: Request, vararg refused: Int): Boolean = withContext(Dispatchers.IO) {
         Api.run { client.newCall(request.newBuilder().header("User-Agent", AGENT).build()).await() }.use { response ->
             when {
                 response.isSuccessful -> true

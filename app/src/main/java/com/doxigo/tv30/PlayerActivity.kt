@@ -970,6 +970,12 @@ class PlayerFragment : VideoSupportFragment() {
                 finds.added.values.map { Choice(it.label.orEmpty(), it.id == current) { pickFound(it.id) } }),
             Group(null, listOfNotNull(
                 Choice(getString(R.string.subtitle_find), null) { findSubtitles() }.takeIf { Subtitles.enabled && wanted() != null },
+                Translator.model?.takeIf { canTranslate() }?.let { model ->
+                    Choice(getString(R.string.subtitle_translate), null, translateDetail(model)) {
+                        translate()
+                        panel.push(translatePage)
+                    }
+                },
                 Choice(getString(R.string.subtitle_timing), null, timingText(offset())) { panel.push(::subtitleTiming) }.takeIf { current != "off" },
                 Choice(getString(R.string.subtitle_style), null) { panel.push(::appearance) },
             )),
@@ -1087,10 +1093,15 @@ class PlayerFragment : VideoSupportFragment() {
         val added = LinkedHashMap<Subtitles.Found, MediaItem.SubtitleConfiguration>()
         /** The added subtitle showing now, by its configuration's id; null leaves it to the saved language. */
         var picked: String? = null
+        /** Persian being made ([translate]): the job, what it is doing while it runs, and why it stopped. */
+        var translation: Job? = null
+        var translating: String? = null
+        var untranslated: Throwable? = null
 
         fun cancel() {
             search?.cancel()
             download?.cancel()
+            translation?.cancel()
         }
     }
 
@@ -1098,6 +1109,8 @@ class PlayerFragment : VideoSupportFragment() {
 
     /** The search page as one value, so the panel can tell whether it still shows it ([PlayerPanel.shows]). */
     private val findPage: () -> Page = { foundSubtitles() }
+    private val subtitlesPage: () -> Page = { audioAndSubtitles() }
+    private val translatePage: () -> Page = { translation() }
 
     /**
      * What plays, as the subtitle sites know it: by the IMDb id 30nama links (a series' own, with
@@ -1205,9 +1218,10 @@ class PlayerFragment : VideoSupportFragment() {
 
     /**
      * [file] beside 30nama's subtitles, labelled with its language and site («فارسی از SubDL», a
-     * number after a second one), the item re-set where it plays (setSource), and showing.
+     * number after a second one), the item re-set where it plays (setSource), and showing, moved by
+     * [offset] as the subtitle it was made from was.
      */
-    private fun add(found: Subtitles.Found, file: File) {
+    private fun add(found: Subtitles.Found, file: File, offset: Long = 0L) {
         val name = getString(R.string.subtitle_found, languageName(found.language), found.source)
         val same = finds.added.values.count { it.label?.startsWith(name) == true }
         val config = MediaItem.SubtitleConfiguration.Builder(Uri.fromFile(file))
@@ -1218,6 +1232,7 @@ class PlayerFragment : VideoSupportFragment() {
             .build()
         finds.added[found] = config
         finds.picked = config.id
+        if (offset != 0L) offsets[timingKey(config)] = offset
         setSource(player.currentPosition)
         applySubtitleStyle() // its language's direction
     }
@@ -1228,6 +1243,131 @@ class PlayerFragment : VideoSupportFragment() {
         applyTrackPreferences()
         applySubtitleStyle()
         retime()
+    }
+
+    // ---- Make Persian subtitles: an English one, 30nama's or the subtitle sites', translated by the
+    // ---- model the viewer keyed (Translator.kt). Kept on disk, so making it again costs nothing. ----
+
+    /** While a model has a key, there is English to start from, and this file has no Persian made yet. */
+    private fun canTranslate() = finds.added.keys.none { it.ref == TRANSLATED } && (englishSource() != null || Subtitles.enabled && wanted() != null)
+
+    /** The row's quiet line: which model translates, how far it has got, or why it stopped. */
+    private fun translateDetail(model: Translator.Model) =
+        finds.untranslated?.let { translateError(it, model) } ?: finds.translating ?: getString(R.string.subtitle_translate_by, model.name)
+
+    /**
+     * Where the making stands, beside a spinner, over Keep watching (under the remote, saying it comes
+     * on by itself); a failure says why and offers to try again.
+     */
+    private fun translation(): Page {
+        val title = getString(R.string.subtitle_translate)
+        val model = Translator.model ?: return Page(title, emptyList())
+        finds.untranslated?.let { error ->
+            val again = Choice(getString(R.string.subtitle_translate_again), false) {
+                translate()
+                panel.refresh()
+            }
+            return Page(title, listOf(listOf(Group(null, listOf(again)))), note = translateError(error, model))
+        }
+        val watch = Choice(getString(R.string.subtitle_translate_watch), false, getString(R.string.subtitle_translate_wait)) { panel.close(controls = false) }
+        return Page(title, listOf(listOf(Group(null, listOf(watch)))), note = finds.translating, busy = true)
+    }
+
+    /**
+     * Makes this file's Persian, unless it is on its way: the English found, parsed and sent in parts
+     * ([Translator]), the Persian written beside the other found files and played from where the video
+     * is, as a found one is. The page steps back to Audio & Subtitles, where it shows checked; a viewer
+     * who went back to the film is told in a notice either way.
+     */
+    private fun translate() {
+        val model = Translator.model ?: return
+        val finds = finds
+        if (finds.translation?.isActive == true) return
+        finds.untranslated = null
+        finds.translating = getString(R.string.subtitle_translate_finding)
+        finds.translation = lifecycleScope.launch {
+            val made = runCatching {
+                val source = englishSource() ?: englishFromSites()
+                val lines = Translator.lines(cuesOf(source))
+                if (lines.isEmpty()) throw Subtitles.Unreadable()
+                val dir = File(requireContext().cacheDir, "subtitles").apply { mkdirs() }
+                // The same English by the same model is the same Persian: a second viewing, or a retry, is free.
+                val made = File(dir, "${model.provider.id}-${(model.id + Translator.srt(lines, lines.map { it.text })).hashCode().toUInt()}.srt")
+                if (!made.exists()) {
+                    showTranslating(finds, 0f)
+                    // ponytail: a failure loses the parts already done, and a retry pays for them again; keep them per file if failures prove common.
+                    val persian = Translator.translate(model, lines, about()) { showTranslating(finds, it) }
+                    // Whole or not at all: a film cut off mid-write must not pass for made next time.
+                    withContext(Dispatchers.IO) { File(dir, "${made.name}.part").apply { writeText(Translator.srt(lines, persian)) }.renameTo(made) }
+                }
+                source to made
+            }.onFailure { if (it is CancellationException) throw it }
+            finds.translating = null
+            made.onSuccess { (source, file) -> add(Subtitles.Found(model.provider.id, "fa", "", 0, false, TRANSLATED), file, offsets[timingKey(source)] ?: 0L) }
+                .onFailure { finds.untranslated = it }
+            when {
+                panel.shows(translatePage) -> if (made.isSuccess) panel.back() else panel.refresh()
+                else -> {
+                    if (panel.shows(subtitlesPage)) panel.refresh()
+                    requireContext().toast(made.fold({ getString(R.string.subtitle_translated) }, { translateError(it, model) }))
+                }
+            }
+        }
+    }
+
+    private fun showTranslating(finds: Finds, done: Float) {
+        finds.translating = getString(R.string.subtitle_translating, (done * 100).toInt().toString().localDigits())
+        if (panel.shows(translatePage) || panel.shows(subtitlesPage)) panel.refresh()
+    }
+
+    /** The English to translate: the one showing, else 30nama's, else one found for this file; null with none. */
+    private fun englishSource(): MediaItem.SubtitleConfiguration? {
+        val all = file?.let(::ownSubtitles).orEmpty() + finds.added.values
+        return shownSubtitle()?.takeIf { it.language == "en" } ?: all.firstOrNull { it.language == "en" }
+    }
+
+    /**
+     * English from the subtitle sites, from this file's search if it has one: SubDL's first, one not
+     * for the hearing impaired ahead (their sound labels are lines to read), the next if one won't come.
+     */
+    private suspend fun englishFromSites(): MediaItem.SubtitleConfiguration {
+        val wanted = wanted() ?: throw Translator.NoSource()
+        val english = (finds.results?.getOrNull() ?: Subtitles.search(wanted)).filter { it.language == "en" }.sortedBy { it.hearingImpaired }
+        var failure: Throwable = Translator.NoSource()
+        for (found in english.take(3)) {
+            val file = runCatching { Subtitles.download(found, wanted.episode, File(requireContext().cacheDir, "subtitles")) }
+                .onFailure { if (it is CancellationException) throw it else failure = it }
+                .getOrNull() ?: continue
+            return MediaItem.SubtitleConfiguration.Builder(Uri.fromFile(file)).setMimeType(Subtitles.mimeType(file)).setLanguage("en").build()
+        }
+        throw failure
+    }
+
+    /** What plays, for the model: the English name and year, the Persian one, the episode, the story. */
+    private fun about(): Translator.About {
+        val title = stream?.optJSONObject("info")
+        val wanted = wanted()
+        return Translator.About(
+            wanted?.name ?: title?.englishName.orEmpty(),
+            persianName,
+            wanted?.year,
+            wanted?.takeIf { it.isEpisode }?.let { "season ${it.season}, episode ${it.episode}" },
+            title?.let { it.str("plot", "english") ?: it.str("plot", "local") }?.unescaped(),
+        )
+    }
+
+    private fun translateError(error: Throwable, model: Translator.Model): String = when (error) {
+        is Translator.Refused -> getString(when (error.why) {
+            Translator.Why.KEY -> R.string.subtitle_translate_key
+            Translator.Why.QUOTA -> R.string.subtitle_translate_quota
+            Translator.Why.REGION -> R.string.subtitle_translate_region
+            Translator.Why.BLOCKED -> R.string.subtitle_translate_blocked
+            Translator.Why.DOWN -> R.string.subtitle_translate_down
+        }, error.provider)
+        is Translator.NoSource -> getString(R.string.subtitle_translate_none)
+        is Subtitles.Refused, is Subtitles.Unreadable -> findError(error)
+        is IOException -> getString(R.string.subtitle_translate_network, model.provider.id)
+        else -> getString(R.string.subtitle_error_file)
     }
 
     // ---- Subtitle timing: the shown subtitle moved earlier or later, for a file timed to another
@@ -1401,6 +1541,8 @@ class PlayerFragment : VideoSupportFragment() {
     }
 
     private companion object {
+        /** A made Persian subtitle's [Subtitles.Found.ref]: one per file. */
+        const val TRANSLATED = "translated"
         const val REST = 0
         const val LIFTED = 1
         const val BESIDE = 2
@@ -1553,7 +1695,7 @@ class PlayerFragment : VideoSupportFragment() {
                 }
                 previous -> previousEpisode()
                 next -> nextEpisode()
-                captions -> openPanel(::audioAndSubtitles)
+                captions -> openPanel(subtitlesPage)
                 hq -> openPanel { qualityAndSpeed(onSpeed = false) }
                 speed -> openPanel { qualityAndSpeed(onSpeed = true) }
                 episodes -> openEpisodes()

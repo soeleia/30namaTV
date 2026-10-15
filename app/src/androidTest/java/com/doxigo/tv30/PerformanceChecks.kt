@@ -57,6 +57,7 @@ class PerformanceChecks : Instrumentation() {
             "alignment" -> return AlignmentChecks.run(this)
             "trailer" -> return TrailerChecks.run(this)
             "subtitles" -> return SubtitleChecks.run(this)
+            "translate" -> return TranslateChecks.run(this)
             "skip" -> return SkipChecks.run(this)
             "title" -> return TitleChecks.run(this)
             "lists" -> return ListsChecks.run(this)

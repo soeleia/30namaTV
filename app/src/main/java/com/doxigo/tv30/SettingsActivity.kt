@@ -663,15 +663,43 @@ class SettingsActivity : TvActivity() {
             R.string.settings_opensubtitles_help, "https://www.opensubtitles.com/consumers", { Subtitles.openSubtitlesKey }, Subtitles::checkOpenSubtitles),
     )
 
+    /** The models that write Persian subtitles in the player (Translator.kt), under their own title, the one it uses first on top. */
+    private val translators = listOf(
+        Service(Translator.CLAUDE.id, R.string.service_claude, R.string.settings_translator_unlocks, R.string.settings_claude_help,
+            Translator.CLAUDE.link, { Translator.CLAUDE.key }, Translator::checkClaude),
+        Service(Translator.OPENAI.id, R.string.service_openai, R.string.settings_translator_unlocks, R.string.settings_openai_help,
+            Translator.OPENAI.link, { Translator.OPENAI.key }, Translator::checkOpenAi),
+        Service(Translator.GEMINI.id, R.string.service_gemini, R.string.settings_translator_unlocks, R.string.settings_gemini_help,
+            Translator.GEMINI.link, { Translator.GEMINI.key }, Translator::checkGemini),
+    )
+
     /** What checking a key on saving found, by service, with the key it tried. ponytail: for this page's life; persist it if a rejected key should still say so next time. */
     private val checks = HashMap<String, Pair<String, Check>>()
 
     /** One row per service: OK opens the sheet that takes its key. */
-    private fun services(): List<Group> = listOf(Group(0, keyed.map { s ->
+    private fun services(): List<Group> =
+        listOf(Group(0, keyed.map(::keyRow)), Group(R.string.settings_translators, listOf(modelRow()) + translators.map(::keyRow)))
+
+    /**
+     * Which model makes Persian subtitles, every provider's in one list, so picking a model picks its
+     * provider. Before any pick it shows the one in use; the note says what a film costs on it, or,
+     * for a model whose key isn't in yet, which model translates meanwhile.
+     */
+    private fun modelRow() = cycle(R.string.settings_translator_model, text(R.string.settings_translator_model_help), Translator.MODELS,
+        { Translator.picked ?: Translator.model ?: Translator.MODELS.first() }, { Settings.translatorModel = it.id }, note = ::modelNote) { it.name }
+
+    private fun modelNote(): CharSequence {
+        val model = Translator.model ?: return getString(R.string.settings_model_no_key)
+        Translator.picked?.takeIf { it !== model }?.let { return getString(R.string.settings_model_missing_key, it.provider.id, model.name) }
+        // Dollars as the app writes numbers: «۰٫۹۲» in Persian, 0.92 in English.
+        val dollars = String.format(Locale.US, "%.2f", model.cents / 100.0).let { if (Api.language == "fa") it.replace('.', '٫').persianDigits() else it }
+        return getString(if (model.free) R.string.settings_model_cost_free else R.string.settings_model_cost, dollars)
+    }
+
+    private fun keyRow(s: Service) =
         Option(s.name, text(s.help), value = { keyValue(s) }, note = { keyNote(s) }, sub = s.unlocks, warn = { outcome(s) == Check.REJECTED }) {
             ask(getString(s.name), Settings.savedKey(s.id), s.link) { key, answer -> save(s, key, answer) }
         }
-    }))
 
     private fun outcome(s: Service) = checks[s.id]?.takeIf { it.first == Settings.savedKey(s.id) }?.second
 

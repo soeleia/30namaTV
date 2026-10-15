@@ -87,6 +87,11 @@ object Settings {
         get() = prefs.getInt("sub_bg", 1).coerceIn(0, 2)
         set(v) = prefs.edit().putInt("sub_bg", v).apply()
 
+    /** The model Make Persian subtitles translates with (a Translator.Model id); "" leaves it to Translator. */
+    var translatorModel: String
+        get() = prefs.getString("translator_model", null).orEmpty()
+        set(v) = prefs.edit().putString("translator_model", v).apply()
+
     /**
      * The viewer's own API key for a service (Tmdb.NAME, Subtitles.SUBDL, Subtitles.OPENSUBTITLES),
      * entered on Settings' Services page; "" when none. Each service reads it through [pickKey].

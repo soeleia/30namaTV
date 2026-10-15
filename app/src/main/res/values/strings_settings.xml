@@ -76,16 +76,34 @@
     <!-- Services: each viewer's own API keys (Tmdb.kt, Subtitles.kt). A service's name is its own,
          in Latin; a line that names one opens on a Persian word so it keeps its direction. -->
     <string name="settings_services">سرویس‌ها</string>
-    <string name="settings_services_about">کلیدهای رایگان خودتان برای آنچه ۳۰نما ندارد: TMDB برای نام فارسی، پرطرفدارها و تریلرها، و SubDL و OpenSubtitles برای یافتن زیرنویس در پخش. کلیدها فقط روی همین تلویزیون می‌مانند.</string>
+    <string name="settings_services_about">کلیدهای خودتان برای آنچه ۳۰نما ندارد: TMDB برای نام فارسی، پرطرفدارها و تریلرها، SubDL و OpenSubtitles برای یافتن زیرنویس، و یکی از Claude یا OpenAI یا Gemini برای ساخت زیرنویس فارسی در پخش. کلیدها فقط روی همین تلویزیون می‌مانند.</string>
     <string name="service_tmdb" translatable="false">TMDB</string>
     <string name="service_subdl" translatable="false">SubDL</string>
     <string name="service_opensubtitles" translatable="false">OpenSubtitles</string>
+    <string name="service_claude" translatable="false">Claude</string>
+    <string name="service_openai" translatable="false">OpenAI</string>
+    <string name="service_gemini" translatable="false">Gemini</string>
+    <!-- The models' rows sit under their own title. -->
+    <string name="settings_translators">ساخت زیرنویس فارسی</string>
     <!-- Under each service's name: what its key unlocks, in one short line. -->
     <string name="settings_tmdb_unlocks">نام فارسی، پرطرفدارها و تریلر</string>
     <string name="settings_subdl_unlocks">یافتن زیرنویس در پخش</string>
     <string name="settings_opensubtitles_unlocks">زیرنویس‌های بیشتر در پخش</string>
+    <string name="settings_translator_unlocks">ترجمهٔ زیرنویس با یک کلیک</string>
+    <!-- The group's first row: the model that translates, every provider's in one list (Latin names). -->
+    <string name="settings_translator_model">مدل ترجمه</string>
+    <string name="settings_translator_model_help">مدلی که «ساخت زیرنویس فارسی» با آن ترجمه می‌کند؛ سرویسش هم با آن انتخاب می‌شود. مدل بزرگ‌تر دقیق‌تر و گران‌تر است.</string>
+    <!-- Under the help: what a film costs on the model in use, %s the dollars in Persian digits («۰٫۹۲»). -->
+    <string name="settings_model_cost">حدود %s دلار برای هر فیلم دوساعته، از اعتبار حساب خودتان.</string>
+    <string name="settings_model_cost_free">در سهمیهٔ رایگانِ Gemini رایگان است؛ بیرون از آن، حدود %s دلار برای هر فیلم دوساعته.</string>
+    <!-- A model picked before its key is in: %1$s its service, %2$s the model that translates meanwhile. -->
+    <string name="settings_model_missing_key">کلید %1$s را پایین‌تر وارد کنید؛ تا آن موقع ترجمه با %2$s است.</string>
+    <string name="settings_model_no_key">برای ترجمه، کلید یکی از سرویس‌های پایین را وارد کنید.</string>
     <string name="settings_tmdb_help">پایگاه فیلم TMDB ردیف پرطرفدارها، تریلرها، پیشنهادهای مشابه، تصویر قسمت‌ها و نام فارسی عنوان‌هایی را که ۳۰نما ندارد می‌آورد. کلید رایگان را از صفحهٔ API حساب TMDB بردارید؛ API Key و API Read Access Token هر دو کار می‌کنند.</string>
     <string name="settings_subdl_help">نتیجه‌های SubDL، که آرشیو زیرنویس فارسی Subscene را دارد، در «یافتن زیرنویس» پخش اول می‌آیند. پس از ثبت‌نام، کلید رایگان را از صفحهٔ API پنل حسابتان بردارید.</string>
+    <string name="settings_gemini_help">با «ساخت زیرنویس فارسی» در پخش، زیرنویس انگلیسی فیلم را به فارسیِ روان و محاوره‌ای ترجمه می‌کند. کلید را از صفحهٔ API Keys در Google AI Studio بسازید؛ با سهمیهٔ رایگانِ آن، ترجمه هزینه‌ای ندارد.</string>
+    <string name="settings_claude_help">با «ساخت زیرنویس فارسی» در پخش، زیرنویس انگلیسی فیلم را به فارسیِ روان و محاوره‌ای ترجمه می‌کند. کلید را از صفحهٔ API Keys کنسول Anthropic بسازید. هزینه از اعتبار حسابتان کم می‌شود. از میان سه سرویس، فارسیِ Claude از همه دقیق‌تر است.</string>
+    <string name="settings_openai_help">با «ساخت زیرنویس فارسی» در پخش، زیرنویس انگلیسی فیلم را به فارسیِ روان و محاوره‌ای ترجمه می‌کند. کلید را از صفحهٔ API keys حساب OpenAI بسازید. هزینه از اعتبار حسابتان کم می‌شود.</string>
     <string name="settings_opensubtitles_help">در «یافتن زیرنویس» پخش، نتیجه‌های OpenSubtitles بعد از SubDL می‌آیند. پس از ثبت‌نام، در صفحهٔ API consumers یک consumer بسازید و کلید API آن را بردارید. هر کلید رایگان روزی ۵ زیرنویس دانلود می‌کند.</string>
     <!-- A key's state, as the row's value; a set key shows its last four characters only. -->
     <string name="settings_key_none">تنظیم نشده</string>
