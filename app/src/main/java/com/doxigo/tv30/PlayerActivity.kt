@@ -84,6 +84,9 @@ class PlayerActivity : TvActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) // no screensaver mid-film
+        // Leanback fits the video surface to the film's shape; the letterbox bars around it are
+        // the window, which must be true black there, not the app's ink.
+        window.setBackgroundDrawableResource(android.R.color.black)
         if (savedInstanceState == null) {
             supportFragmentManager.beginTransaction().replace(android.R.id.content, PlayerFragment()).commit()
         }
