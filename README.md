@@ -12,6 +12,7 @@ Search uses a six-column vertical grid. Home shows every genre in its row, endin
 
 - **Home.** 30nama's promoted titles page left and right on a hero with one **More info** button; the remote's play key starts the title. Home draws at once from the last saved copy, then refreshes in place. The artwork of the titles next to the one in focus is fetched ahead, so moving along a row rarely waits.
 - **Posters.** Hold OK on any poster for quick actions: More info, add or remove it from your three lists, and the trailer when one exists. On Continue Watching, holding OK offers to remove the title or open its page.
+- **Trailers.** The title page's **Trailer** plays in the app's own player: Aparat's upload in Iran, with no VPN and often with Persian subtitles, and the studio's YouTube trailer elsewhere, each falling back to the other. YouTube's mark on the button says when it plays from YouTube; hold OK on it to choose. YouTube needs youtube.com within reach and a WebView from 2019 on.
 - **Search.** Recent searches return when the box is empty, above 30nama's suggestions.
 - **Player.** The controls open on play/pause. Left and right scrub in five-second steps that speed up while held, and the seek lands a second after the last press. The light part of the seek bar shows what is ready, including the disk read-ahead (Settings > Playback > Preload), and the next episode's opening is fetched during the credits. The title's Persian name sits under the English one.
 - **Subtitles.** **Find subtitles** searches SubDL and OpenSubtitles for the film or exact episode, Persian first, and loads the chosen file without stopping playback, converting old Windows-1256 Persian files. **Make Persian subtitles** has Claude, OpenAI or Gemini translate the English subtitle (30nama's, or one from the subtitle sites) into natural, spoken Persian in a few minutes while the film plays, then switches it on. **Subtitle timing** shifts any subtitle earlier or later in quarter-second steps.
@@ -77,10 +78,11 @@ GitHub Actions runs the instrumented debug APK on an Android 11 TV emulator with
 
 ## Interface
 
-![Home with loaded artwork](docs/screenshots/home-fa.png)
+| | |
+|:-:|:-:|
+| ![Home: the billboard of 30nama's promoted titles](docs/screenshots/home-fa.png)<br>Home | ![Home rows: each poster with its title, year and IMDb score](docs/screenshots/home-rows-fa.png)<br>Home rows |
+| ![MobLand's title page with Play and Trailer](docs/screenshots/title-fa.png)<br>Title page | ![MobLand's trailer from Aparat, paused in the app's trailer player](docs/screenshots/trailer-fa.png)<br>Trailer, played in the app |
+| ![Search results for batman](docs/screenshots/search-batman-fa.png)<br>Search | ![Movies catalogue with loaded posters](docs/screenshots/catalogue-movies-fa.png)<br>Movies |
+| ![Categories and genres](docs/screenshots/genres-fa.png)<br>Categories and genres | ![Settings, Services: TMDB, the subtitle sites and the models that make Persian subtitles](docs/screenshots/settings-services-fa.png)<br>Settings: services |
 
-![Real Friends search results](docs/screenshots/search-friends-fa.png)
-
-![Movies catalogue with loaded posters](docs/screenshots/catalogue-movies-fa.png)
-
-Screenshots show the optimized release browsing the live catalogue as a guest on a disposable emulator, after artwork loaded. They contain no mocked results or private account data. The emulator's status bar is visible; these are unmodified captures, not photos of a physical TV. The original logo and loading animation are documented in [branding provenance](docs/branding.md). 30nama branding and third-party font licenses retain their respective owners' rights; publishing this client does not imply affiliation or a license to reuse those assets separately.
+Screenshots show the optimized release browsing the live catalogue as a guest on a disposable Android 9 emulator, after artwork loaded. The trailer is Aparat's re-upload, with its uploader's watermark. They contain no mocked results or private account data. The emulator's status bar is visible; these are unmodified captures, not photos of a physical TV. The original logo and loading animation are documented in [branding provenance](docs/branding.md). 30nama branding and third-party font licenses retain their respective owners' rights; publishing this client does not imply affiliation or a license to reuse those assets separately.
