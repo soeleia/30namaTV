@@ -154,6 +154,8 @@ class HomeFragment : BrowseSupportFragment() {
     /** 30nama's promoted titles over the rows. It owns the billboard; the rows reach it through [PromoHero.follow]. */
     private var hero: PromoHero? = null
     private var loaded = false
+    /** The rows came in while the rail had another section up, home's view gone: they rise when it is back. */
+    private var riseOnView = false
     /** The TMDB key the trending row was fetched with: one saved in Settings since brings the row in on return. */
     private var trendingKey: String? = null
     /** The card focus rests on while a held D-pad races past, and its row: the billboard catches up on release. */
@@ -307,6 +309,11 @@ class HomeFragment : BrowseSupportFragment() {
         return root
     }
 
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        if (riseOnView) view.post { rise() }
+    }
+
     override fun onDestroyView() {
         hero = null
         super.onDestroyView()
@@ -431,8 +438,15 @@ class HomeFragment : BrowseSupportFragment() {
      * intro (if any) starts to dissolve, so it all reads as one move.
      */
     private fun arrive() {
-        setSelectedPosition(0, false)
         (activity as? MainActivity)?.homeReady(rows = true)
+        rise()
+    }
+
+    /** The rows and the hero's button rising in, and the remote on the hero; put off while home's view is gone. */
+    private fun rise() {
+        riseOnView = view == null
+        if (riseOnView) return
+        setSelectedPosition(0, false)
         view?.post { if (hero?.focus() != true) mainFragment?.view?.requestFocus() }
         view?.findViewById<View>(androidx.leanback.R.id.browse_container_dock)?.animate()
             ?.alpha(1f)?.translationY(0f)?.setStartDelay(0)?.setInterpolator(Motion.emph)?.setDuration(Motion.PAGE)?.start()
