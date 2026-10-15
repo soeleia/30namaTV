@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- media3's own sizes, overridden by name: its control view slides its time bar by these while
+     it fades the rest, and pins the bar's bottom margin to the last. The trailer's bar sits inside
+     the one block that fades (trailer_controls), so it keeps its place. Nothing else uses media3's
+     control view (the full player is Leanback's). -->
+<resources>
+    <dimen name="exo_styled_bottom_bar_height">0dp</dimen>
+    <dimen name="exo_styled_progress_bar_height">0dp</dimen>
+    <dimen name="exo_styled_progress_margin_bottom">0dp</dimen>
+</resources>

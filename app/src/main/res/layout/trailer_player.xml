@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A trailer's video and controls: media3's PlayerView, which drives whichever Player it is given
+     (Aparat's stream in ExoPlayer, or YouTube's page), in the app's own control layer
+     (trailer_controls) and glyphs rather than media3's. Inflated, since only the XML can name them. -->
+<androidx.media3.ui.PlayerView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    app:controller_layout_id="@layout/trailer_controls"
+    app:play_icon="@drawable/act_play"
+    app:pause_icon="@drawable/trailer_pause"
+    app:rewind_icon="@drawable/trailer_rewind"
+    app:fastforward_icon="@drawable/trailer_forward" />

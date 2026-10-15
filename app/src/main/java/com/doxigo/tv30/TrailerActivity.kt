@@ -53,7 +53,7 @@ class TrailerActivity : TvActivity() {
             .setSeekBackIncrementMs(10_000)
             .setSeekForwardIncrementMs(10_000)
             .build()
-        video = PlayerView(this).apply {
+        video = (layoutInflater.inflate(R.layout.trailer_player, null) as PlayerView).apply {
             player = this@TrailerActivity.player
             controllerShowTimeoutMs = 5_000
             controllerAutoShow = false

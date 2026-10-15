@@ -113,6 +113,18 @@
         <item name="android:drawablePadding">0dp</item>
     </style>
 
+    <!-- A trailer's transport (trailer_controls): a 24dp glyph in the 48dp target, bare at rest and
+         ink on the white disc under the remote (trailer_button), lifted as every button is. -->
+    <style name="Widget.App.Transport" parent="@android:style/Widget.Material.ImageButton">
+        <item name="android:layout_width">@dimen/button_target</item>
+        <item name="android:layout_height">@dimen/button_target</item>
+        <item name="android:background">@drawable/trailer_button</item>
+        <item name="android:padding">12dp</item>
+        <item name="android:scaleType">fitCenter</item>
+        <item name="android:tint">@color/on_button</item>
+        <item name="android:stateListAnimator">@animator/button_lift</item>
+    </style>
+
     <!-- No automatic hyphenation: Android 9 broke English help text as "play-/back". Android 10
          already defaults to none; this holds it below that, for every TextView not styled otherwise. -->
     <style name="Widget.App.TextView" parent="@android:style/Widget.Material.TextView">
