@@ -2,6 +2,7 @@ package com.doxigo.tv30
 
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
 import android.os.Bundle
@@ -13,6 +14,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
@@ -79,7 +81,7 @@ class SettingsActivity : TvActivity() {
     )
     private lateinit var page: ViewGroup
     private lateinit var categories: LinearLayout
-    private lateinit var panel: View
+    private lateinit var scroll: ScrollView
     private lateinit var surface: View
     private lateinit var options: LinearLayout
     private lateinit var detail: View
@@ -115,7 +117,8 @@ class SettingsActivity : TvActivity() {
         val content = layoutInflater.inflate(R.layout.settings_page, findViewById(R.id.browse_host), true)
         page = content.findViewById(R.id.settings_page)
         categories = content.findViewById(R.id.settings_categories)
-        panel = content.findViewById(R.id.settings_panel)
+        scroll = content.findViewById(R.id.settings_scroll)
+        scroll.isSmoothScrollingEnabled = !Motion.reduced
         surface = content.findViewById(R.id.settings_surface)
         options = content.findViewById(R.id.settings_options)
         detail = content.findViewById(R.id.settings_detail)
@@ -137,7 +140,7 @@ class SettingsActivity : TvActivity() {
         show(start)
         Rail(this, Rail.Section.SETTINGS) { categories.getChildAt(section) }.ready()
         (rows.getOrNull(intent.getIntExtra(EXTRA_ROW, -1)) ?: categories.getChildAt(start)).takeFocus()
-        rise(listOf(content.findViewById(R.id.settings_title), categories, panel, detail))
+        rise(listOf(content.findViewById(R.id.settings_title), categories, scroll, detail))
         measure()
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -187,7 +190,9 @@ class SettingsActivity : TvActivity() {
         section = index
         val slide = from >= 0 && !Motion.fast
         val dir = if (index > from) 1 else -1
-        if (slide) leave(-dir) else options.removeAllViews()
+        if (slide) leave(-dir)
+        options.removeAllViews()
+        scroll.scrollTo(0, 0)
         rows.clear()
         if (index == ACCOUNT) {
             options.addView(accountCard())
@@ -208,12 +213,25 @@ class SettingsActivity : TvActivity() {
         options.animate().alpha(1f).translationY(0f).setInterpolator(Motion.easeOut).setDuration(Motion.ENTER).start()
     }
 
-    /** The rows on show slide [dir] and fade in the page's overlay, out of the way of the next ones. */
+    /**
+     * The rows on show slide [dir] and fade in the page's overlay, out of the way of the next ones,
+     * each cut to what showed of it short of the scroll's fading edges: a row scrolled away, or
+     * faded, does not come back on its way out.
+     */
     private fun leave(dir: Int) {
         val overlay = page.overlay
         overlay.clear()
         val travel = Motion.travel(12 * dp * dir)
+        val fade = scroll.verticalFadingEdgeLength
+        val y = scroll.scrollY
+        val below = scroll.getChildAt(0).height - scroll.height - y
+        val top = y + minOf(y, fade)
+        val bottom = y + scroll.height - below.coerceIn(0, fade)
         for (view in (0 until options.childCount).map(options::getChildAt)) {
+            val at = options.top + view.top
+            val shown = Rect(0, top - at, view.width, bottom - at)
+            if (!shown.intersect(0, 0, view.width, view.height)) continue // out of sight: it simply goes
+            view.clipBounds = shown
             overlay.add(view) // off the panel, where it was on the screen
             view.animate().alpha(0f).translationY(travel).setInterpolator(Motion.easeOut).setDuration(Motion.EXIT)
                 .withEndAction { overlay.remove(view) }.start()
