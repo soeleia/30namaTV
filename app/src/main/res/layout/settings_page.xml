@@ -5,9 +5,9 @@
      the ink again, the section's icon beside what is focused, what it does, every value it takes,
      and a live preview where there is one. The subtitle sample sits where the player draws
      subtitles, at their real size, so it can be judged from the sofa.
-     Nothing here clips: a focused row lifts past its own bounds, the panel's surface stretches
-     from the last section's height to the next one's, and outgoing rows slide out in the page's
-     overlay. -->
+     Only the panel's scroll clips, to the room under the title. Inside it a focused row lifts past
+     its own bounds and the surface stretches from the last section's height to the next one's;
+     outgoing rows slide out in the page's overlay. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/settings_page"
     android:layout_width="match_parent"
@@ -19,6 +19,7 @@
         android:layout_marginStart="@dimen/content_start"
         android:layout_marginTop="32dp"
         android:layout_marginEnd="48dp"
+        android:layout_marginBottom="32dp"
         android:clipChildren="false"
         android:orientation="vertical">
 
@@ -33,10 +34,10 @@
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="0dp"
             android:layout_marginTop="20dp"
+            android:layout_weight="1"
             android:baselineAligned="false"
-            android:clipChildren="false"
             android:orientation="horizontal">
 
             <LinearLayout
@@ -45,30 +46,42 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
 
-            <FrameLayout
-                android:id="@+id/settings_panel"
+            <!-- A section taller than the screen (Services) scrolls with the remote, its panel
+                 fading out at an edge with more past it. -->
+            <ScrollView
+                android:id="@+id/settings_scroll"
                 android:layout_width="@dimen/settings_panel_width"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_marginStart="24dp"
-                android:clipChildren="false">
+                android:clipChildren="false"
+                android:fadingEdgeLength="48dp"
+                android:overScrollMode="never"
+                android:requiresFadingEdge="vertical"
+                android:scrollbars="none">
 
-                <!-- The surface on its own view, so it can stretch between sections' heights
-                     with a transform rather than a layout per frame; sized to the rows in code. -->
-                <View
-                    android:id="@+id/settings_surface"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:background="@drawable/settings_panel" />
-
-                <LinearLayout
-                    android:id="@+id/settings_options"
+                <FrameLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:clipChildren="false"
-                    android:clipToPadding="false"
-                    android:orientation="vertical"
-                    android:padding="@dimen/settings_panel_pad" />
-            </FrameLayout>
+                    android:clipChildren="false">
+
+                    <!-- The surface on its own view, so it can stretch between sections' heights
+                         with a transform rather than a layout per frame; sized to the rows in code. -->
+                    <View
+                        android:id="@+id/settings_surface"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:background="@drawable/settings_panel" />
+
+                    <LinearLayout
+                        android:id="@+id/settings_options"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:clipChildren="false"
+                        android:clipToPadding="false"
+                        android:orientation="vertical"
+                        android:padding="@dimen/settings_panel_pad" />
+                </FrameLayout>
+            </ScrollView>
 
             <LinearLayout
                 android:id="@+id/settings_detail"
