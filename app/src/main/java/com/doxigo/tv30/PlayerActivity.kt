@@ -106,7 +106,7 @@ class PlayerActivity : TvActivity() {
 /**
  * Plays one title's `stream` answer: an `hls` list with one entry per file (a film has one,
  * a series one per episode). Each entry carries its qualities, subtitles and the intro/recap
- * marks; the server tracks progress through `observer` every 15 s, as the official player does.
+ * marks; the server tracks progress through `observer` at every 15 s mark, as the official player does.
  */
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
 class PlayerFragment : VideoSupportFragment() {
@@ -487,14 +487,14 @@ class PlayerFragment : VideoSupportFragment() {
         showEndTime()
         // The bar's loaded band (Glue): a pause to let the read-ahead load is when it grows most.
         if (!player.isPlaying) glue?.controlsRow?.bufferedPosition = Buffering.bufferedPosition(player)
-        if (player.isPlaying && abs(seconds - reportedAt) >= 15) report()
+        if (player.isPlaying && Api.progressMark(seconds) != Api.progressMark(reportedAt)) report()
     }
 
     /**
      * What the server keeps as "continue watching"; the official player sends the same six fields.
-     * This TV's history of episodes seen (Watched) hears it first, a guest's free episodes too. Every
-     * 15 s, at a pause, leaving and before the next file plays, so a viewing past the credits, or to
-     * the end where autoplay moves on, is marked seen.
+     * This TV's history of episodes seen (Watched) hears it first, a guest's free episodes too. At
+     * every 15 s mark, a pause, leaving and before the next file plays, so a viewing past the
+     * credits, or to the end where autoplay moves on, is marked seen. The server hears the mark.
      */
     private fun report() {
         val f = file ?: return
@@ -503,10 +503,11 @@ class PlayerFragment : VideoSupportFragment() {
         if (seconds <= 0) return
         reportedAt = seconds
         context?.let { Watched.record(it, f, seconds, duration) }
-        if (Api.user?.optBoolean("user_allowed_to_stream") != true) return
+        val mark = Api.progressMark(seconds)
+        if (mark <= 0 || Api.user?.optBoolean("user_allowed_to_stream") != true) return
         Api.scope.launch {
             runCatching {
-                Api.observer(postId, f.obj("info")?.opt("file_id"), Api.user?.opt("user_id"), seconds, duration, f.obj("options")?.opt("token"))
+                Api.observer(postId, f.obj("info")?.opt("file_id"), Api.user?.opt("user_id"), mark, duration, f.obj("options")?.opt("token"))
             }
         }
     }

@@ -267,6 +267,12 @@ object Api {
     suspend fun dismissContinueWatching(id: Int) = call("continue_watching_dismiss", "id" to id)
     suspend fun stream(id: Int, free: Boolean) =
         result("stream", "post_id" to id, "free_stream" to free) as JSONObject
+    /**
+     * Where [seconds] of playback is reported: its 15 s mark. The official player reports only on
+     * the marks (floor(time) % 15 == 0), and 30nama keeps nothing sent between them: reports at
+     * 14, 29, 44 s… never put a title started from the beginning in Continue Watching.
+     */
+    fun progressMark(seconds: Long) = seconds / 15 * 15
     suspend fun observer(postId: Int, fileId: Any?, userId: Any?, time: Long, duration: Long, token: Any?) =
         call("observer", "post_id" to postId, "file_id" to fileId, "user_id" to userId, "time" to time, "duration" to duration, "token" to token)
     suspend fun myLists() = result("user_mylist") as JSONObject

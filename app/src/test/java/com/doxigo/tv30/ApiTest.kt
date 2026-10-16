@@ -40,4 +40,13 @@ class ApiTest {
         assertFalse(write("home_stream"))
         assertFalse(write("qrlogin_code"))
     }
+
+    @Test
+    fun progressGoesOutOnTheMarks() {
+        assertEquals(0L, Api.progressMark(-1)) // nothing reported yet
+        assertEquals(0L, Api.progressMark(14)) // not sent: the old first report, which never landed
+        assertEquals(15L, Api.progressMark(15))
+        assertEquals(15L, Api.progressMark(29))
+        assertEquals(2010L, Api.progressMark(2024)) // a pause between marks
+    }
 }
