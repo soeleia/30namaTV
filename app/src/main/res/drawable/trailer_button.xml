@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A trailer's transport button: the bare glyph over the scrim at rest, as the full player's are,
-     and under the remote the round button's white 44dp disc (button.xml) with the glyph in ink, a
-     shade down while OK is held. -->
+<!-- A transport button, the trailer's and the full player's (lb_control_button_*): the bare glyph
+     over the scrim at rest, and under the remote the round button's white 44dp disc (button.xml)
+     with the glyph in ink, a shade down while OK is held. -->
 <inset xmlns:android="http://schemas.android.com/apk/res/android" android:inset="@dimen/button_inset">
     <selector android:enterFadeDuration="150" android:exitFadeDuration="100">
         <item android:state_pressed="true">

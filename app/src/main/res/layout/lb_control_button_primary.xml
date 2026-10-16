@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The player's play cluster, under Leanback's name, as the trailer's transport
+     (Widget.App.Transport): the bare glyph at rest, and under the remote the white disc with the
+     glyph in ink, lifted 5%. Leanback's own was a grey ripple under a white glyph. The frame is
+     the focusable "button" Leanback looks for, so the glyph takes its focus state. Leanback's
+     glyphs are drawn for 32dp and show at their own size. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/button"
+    style="?attr/playbackControlsButtonStyle"
+    android:layout_width="@dimen/button_target"
+    android:layout_height="@dimen/button_target"
+    android:background="@drawable/trailer_button"
+    android:stateListAnimator="@animator/button_lift">
+
+    <ImageView
+        android:id="@+id/icon"
+        android:layout_width="@dimen/lb_control_icon_width"
+        android:layout_height="@dimen/lb_control_icon_height"
+        android:layout_gravity="center"
+        android:duplicateParentState="true"
+        android:tint="@color/on_button" />
+
+    <TextView
+        android:id="@+id/label"
+        style="?attr/playbackControlButtonLabelStyle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:duplicateParentState="true"
+        android:textColor="@color/on_button" />
+</FrameLayout>

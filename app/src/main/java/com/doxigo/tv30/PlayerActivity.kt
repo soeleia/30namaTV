@@ -24,6 +24,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.core.content.ContextCompat
@@ -418,7 +419,7 @@ class PlayerFragment : VideoSupportFragment() {
         showEndTime() // after the new item is set: the old one's duration would give a wrong time
     }
 
-    /** The controls' line under the title and its Persian name: the episode (a series), and when it ends ([showEndTime]). */
+    /** The controls' line under the title and its Persian name: the year, the episode (a series), and when it ends ([showEndTime]). */
     private var episodeLine: String? = null
     private var subtitle: String? = "" // "" so the first call sets it, null included
     /** The subtitle changed width since the cues were placed beside it (see [arrange]). */
@@ -432,7 +433,7 @@ class PlayerFragment : VideoSupportFragment() {
     private fun showEndTime() {
         val left = player.duration.takeIf { it > 0 }?.let { (it - player.currentPosition).coerceAtLeast(0) }
         val endsAt = left?.let { getString(R.string.player_ends_at, clock(System.currentTimeMillis() + (it / player.playbackParameters.speed).toLong())) }
-        val line = dotted(episodeLine, endsAt).ifEmpty { null }
+        val line = dotted(year()?.localDigits(), episodeLine, endsAt).ifEmpty { null }
         if (line == subtitle) return
         subtitle = line
         glue?.setSubtitle(line)
@@ -1121,10 +1122,16 @@ class PlayerFragment : VideoSupportFragment() {
     private fun wanted(): Subtitles.Wanted? {
         val title = stream?.optJSONObject("info") ?: return null
         val name = title.englishName.ifEmpty { return null }
-        val year = title.str("info", "year") ?: title.str("year") ?: title.str("title", "english")?.let { Regex("\\d{4}$").find(it)?.value }
         val info = file?.optJSONObject("info")
         val season = if (title.isMovie) 0 else info?.optInt("season") ?: 0
-        return Subtitles.Wanted(title.imdbId, name, year?.toIntOrNull(), season, file?.episodeNumber ?: 0)
+        return Subtitles.Wanted(title.imdbId, name, year()?.toIntOrNull(), season, file?.episodeNumber ?: 0)
+    }
+
+    /** The title's year, wherever the stream's answer keeps it, else the one its English name ends in ("Dune 2021"). */
+    private fun year(): String? {
+        val title = stream?.optJSONObject("info") ?: return null
+        return listOf(title.str("info", "year"), title.str("year"), title.str("title", "english")?.let { Regex("\\d{4}$").find(it)?.value })
+            .firstOrNull { (it?.toIntOrNull() ?: 0) > 0 }
     }
 
     /** The search page, searching unless this file's answer is in hand or on its way (a failed one searches again). */
@@ -1638,24 +1645,18 @@ class PlayerFragment : VideoSupportFragment() {
         }
 
         /**
-         * Leanback sets the transport left to right in either language, which in Persian left it
-         * apart from the title at the right. The play cluster is centred, belonging to neither side
-         * (its order stays left to right, as the bar fills); in Persian the row under the bar mirrors,
-         * its buttons at the right under the title, the times at the left in Persian digits.
+         * The row is laid out in lb_playback_transport_controls_row: the clock under the bar's ends,
+         * left to right as the bar fills, and the buttons under the title. Here the play cluster,
+         * which Leanback adds in code, is centred, belonging to neither side (its order stays left to
+         * right), and in Persian the clock takes Persian digits.
          */
         private fun dress(row: View) {
             val dock = row.findViewById<ViewGroup>(androidx.leanback.R.id.controls_dock)
-            // Its -12dp lined the first glyph up with the bar's start; centred, it would only skew it.
-            (dock.layoutParams as ViewGroup.MarginLayoutParams).leftMargin = 0
             (dock.getChildAt(0).layoutParams as FrameLayout.LayoutParams).gravity = Gravity.CENTER_HORIZONTAL
-            if (row.resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL) {
-                val under = row.findViewById<View>(androidx.leanback.R.id.secondary_controls_dock).parent as ViewGroup
-                under.layoutDirection = View.LAYOUT_DIRECTION_RTL
-                (under.layoutParams as ViewGroup.MarginLayoutParams).run {
-                    rightMargin = leftMargin
-                    leftMargin = 0
-                }
-            }
+            // Leanback's bar widens itself for its gaps only after measuring, so packed from the right
+            // (the start in Persian) its first button ran past the edge. Packed from the left it fills
+            // that width exactly, still in the language's order.
+            (row.findViewById<ViewGroup>(androidx.leanback.R.id.secondary_controls_dock).getChildAt(0) as LinearLayout).gravity = Gravity.LEFT
             if (Api.language == "fa") {
                 for (id in intArrayOf(androidx.leanback.R.id.current_time, androidx.leanback.R.id.total_time))
                     row.findViewById<TextView>(id).transformationMethod = PersianDigits
