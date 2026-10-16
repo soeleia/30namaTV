@@ -12,7 +12,7 @@
     android:background="@drawable/trailer_button"
     android:stateListAnimator="@animator/button_lift">
 
-    <ImageView
+    <android.widget.ImageView
         android:id="@+id/icon"
         android:layout_width="@dimen/lb_control_icon_width"
         android:layout_height="@dimen/lb_control_icon_height"
