@@ -102,7 +102,7 @@ class PlayerActivity : TvActivity() {
     }
 
     companion object {
-        /** [title]: what the controls show beside its name (poster, score, year, age); the `stream` answer carries none of it. */
+        /** [title]: what the controls show beside its name (poster, score, year); the `stream` answer carries none of it. */
         fun intent(context: Context, id: Int, free: Boolean, fileId: String? = null, title: JSONObject? = null): Intent =
             Intent(context, PlayerActivity::class.java).putExtra("id", id).putExtra("free", free).putExtra("file", fileId)
                 .putExtra("title", title?.playerFacts?.toString())
@@ -131,7 +131,7 @@ class PlayerFragment : VideoSupportFragment() {
     private val prefs by lazy { requireContext().getSharedPreferences("player", Context.MODE_PRIVATE) }
 
     private var postId = 0
-    /** The title as the screen that opened this one had it (Titles.playerFacts): its poster, score, year and age. */
+    /** The title as the screen that opened this one had it (Titles.playerFacts): its poster, score and year. */
     private var facts = JSONObject()
     private var stream: JSONObject? = null
     private var files: List<JSONObject> = emptyList()
@@ -433,7 +433,7 @@ class PlayerFragment : VideoSupportFragment() {
         val index = files.indexOf(next)
         session.nowPlaying(titleInfo?.englishName, episodeLine, stream?.cover, hasPrevious = index > 0, hasNext = index < files.lastIndex)
         setSource(positionMs)
-        // The line under the names: what plays, the score, the year, the age (Meta.playerMeta).
+        // The line under the names: what plays, the score, the year (Meta.playerMeta).
         glue?.subtitle = facts.playerMeta(requireContext(), episodeLine, episodeName, year()?.localDigits())
         retitled = true
         showEndTime() // after the new item is set: the old one's duration would give a wrong time
@@ -590,7 +590,7 @@ class PlayerFragment : VideoSupportFragment() {
             maxLines = 1
             // TalkBack reads each new offer as it comes, the controls hidden or not.
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
-            // Up from the controls reaches it and Down goes back; nothing else leads off it.
+            // Up from the bar reaches it and Down goes back; nothing else leads off it.
             nextFocusUpId = id
             nextFocusLeftId = id
             nextFocusRightId = id
@@ -1682,17 +1682,18 @@ class PlayerFragment : VideoSupportFragment() {
 
         /**
          * The row is laid out in lb_playback_transport_controls_row: the clock under the bar's ends,
-         * left to right as the bar fills, and the buttons under the title. Here the play cluster,
-         * which Leanback adds in code, is centred, belonging to neither side (its order stays left to
-         * right), and in Persian the clock takes Persian digits.
+         * left to right as the bar fills, and every button in one row under it, YouTube's. In Persian
+         * the clock takes Persian digits.
          */
         private fun dress(row: View) {
-            val dock = row.findViewById<ViewGroup>(androidx.leanback.R.id.controls_dock)
-            (dock.getChildAt(0).layoutParams as FrameLayout.LayoutParams).gravity = Gravity.CENTER_HORIZONTAL
-            // Leanback's bar widens itself for its gaps only after measuring, so packed from the right
-            // (the start in Persian) its first button ran past the edge. Packed from the left it fills
-            // that width exactly, still in the language's order.
-            (row.findViewById<ViewGroup>(androidx.leanback.R.id.secondary_controls_dock).getChildAt(0) as LinearLayout).gravity = Gravity.LEFT
+            // Leanback's bars widen themselves for their gaps only after measuring, so packed from the
+            // right one ran past its edge. Packed from the left each fills its width exactly, the
+            // panels' still in the language's order.
+            for (id in intArrayOf(androidx.leanback.R.id.controls_dock, androidx.leanback.R.id.secondary_controls_dock)) {
+                val bar = row.findViewById<ViewGroup>(id).getChildAt(0)
+                (bar.layoutParams as FrameLayout.LayoutParams).gravity = Gravity.LEFT
+                (bar as? LinearLayout)?.gravity = Gravity.LEFT
+            }
             if (Api.language == "fa") {
                 for (id in intArrayOf(androidx.leanback.R.id.current_time, androidx.leanback.R.id.total_time))
                     row.findViewById<TextView>(id).transformationMethod = PersianDigits

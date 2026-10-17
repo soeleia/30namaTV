@@ -86,10 +86,13 @@ object ResumeChecks {
         }
 
         try {
+            // As a TV with only a remote is: the controls then open on play/pause, as on the TV.
+            setInTouchMode(false)
             runOnMainSync {
                 Buffering.cdn // built from the real client first: the stream itself comes from the CDN
                 clientField.set(Api, client)
                 Api.user = JSONObject("""{"user_id":1,"user_allowed_to_stream":true}""")
+                Api.language = "fa" // Persian first, whatever a run before left
             }
             // ---- From Continue Watching: five minutes in, the start on offer, the poster up. ----
             var opened = open()
@@ -102,7 +105,7 @@ object ResumeChecks {
             // The seek bar with the remote: its dot.
             runOnMainSync { opened.fragment.tickle() }
             SystemClock.sleep(600) // Leanback's fade-in hands the remote to play/pause first
-            sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN) // play/pause down to the bar
+            sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP) // play/pause, under the bar, up to it
             await("The seek bar did not take the remote") { opened.activity.findViewById<View>(androidx.leanback.R.id.playback_progress).isFocused }
             SystemClock.sleep(300)
             capture("resume-seek-dot")
@@ -131,6 +134,13 @@ object ResumeChecks {
             await("The poster did not show in English") { opened.activity.findViewById<View>(androidx.leanback.R.id.image)?.let { it.isShown && it.width > 0 } == true }
             SystemClock.sleep(1_500)
             capture("resume-start-over-en")
+            // One row: Right from play/pause runs past next into the panels' buttons.
+            repeat(3) { sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_RIGHT) }
+            runOnMainSync {
+                val panels = opened.activity.findViewById<View>(androidx.leanback.R.id.secondary_controls_dock)
+                val focused = opened.activity.currentFocus
+                check(focused != null && generateSequence(focused) { it.parent as? View }.any { it === panels }) { "Right did not cross into the panels' buttons: $focused" }
+            }
             opened.close()
             result.putString("stream", "PASS: starts at the saved point offering the start, poster shown; again where this TV left it past a lagging server; the pill restarts\n")
         } catch (error: Throwable) {

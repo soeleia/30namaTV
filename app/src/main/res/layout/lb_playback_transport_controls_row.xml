@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Leanback's player row under its own name (PlaybackTransportRowPresenter finds each part by its
-     id), set as the trailer's (trailer_controls): the play cluster over the bar (Glue.dress centres
-     it), the clock beneath the bar's two ends, elapsed at the left and the length at the right in
-     either language as the bar fills, when it ends beside the length, and under them the player's
-     own buttons at the start edge, below the title (the right in Persian). Leanback's "/" between
-     the times is gone with them apart. Above, the title's poster beside its names and facts, their
-     foot level with the poster's; the thumbnails are Leanback's as they were. -->
+     id). Above the bar only the title: its poster beside its names and facts, their foot level with
+     the poster's. Under the bar, the clock beneath its two ends, elapsed at the left and the length
+     at the right in either language as the bar fills, when it ends beside the length, and under the
+     clock every button in one row, YouTube's: the play cluster from the bar's left end, where
+     playback starts, the panels' buttons to its right end. Leanback's "/" between the times is gone
+     with them apart; the thumbnails are Leanback's as they were. -->
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -70,13 +70,6 @@
         android:clipChildren="false"
         android:clipToPadding="false">
 
-        <FrameLayout
-            android:id="@+id/controls_dock"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:clipChildren="false"
-            android:layoutDirection="ltr" />
-
         <androidx.leanback.widget.SeekBar
             android:id="@+id/playback_progress"
             android:layout_width="match_parent"
@@ -117,14 +110,35 @@
             </LinearLayout>
         </FrameLayout>
 
-        <!-- A glyph sits 12dp inside its 48dp button, so -12dp lines the first one up with the
-             bar's start, as the title is. -->
+        <!-- One child of the row, so Left and Right cross from the play cluster to the panels'
+             buttons (PlaybackTransportRowView keeps them inside the focused child) and Up from
+             either reaches the bar. Left to right in either language, as the bar and the clock
+             are. A glyph's ink sits 16dp inside a play button (Leanback's 32dp box in a 48dp target,
+             its ink a quarter in) and 12dp inside a panel's, so the margins line both up with the
+             bar's ends. -->
         <FrameLayout
-            android:id="@+id/secondary_controls_dock"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="-12dp"
             android:layout_marginTop="12dp"
-            android:clipChildren="false" />
+            android:clipChildren="false"
+            android:layoutDirection="ltr">
+
+            <FrameLayout
+                android:id="@+id/controls_dock"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="left"
+                android:layout_marginLeft="-16dp"
+                android:clipChildren="false" />
+
+            <FrameLayout
+                android:id="@+id/secondary_controls_dock"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="right"
+                android:layout_marginRight="-12dp"
+                android:clipChildren="false"
+                android:layoutDirection="locale" />
+        </FrameLayout>
     </androidx.leanback.widget.PlaybackTransportRowView>
 </LinearLayout>
