@@ -4,7 +4,7 @@
 
 `scripts/tv-checks.py` runs each native instrumentation suite independently and fails unless its final instrumentation result explicitly reports success. It saves raw output, logcat, emulator properties and PNG screenshots in `app/build/reports/tv-checks/`.
 
-Use `--check search`, for example, for a targeted rerun. The `performance` check holds ancillary requests to prove that home content can appear without waiting for menu/account extras; it also checks request cancellation and stable late-row order. This is a responsiveness regression test, not a network speed benchmark.
+Use `--check search`, for example, for a targeted rerun. The `performance` check holds ancillary requests to prove that home content can appear without waiting for menu/account extras; it also checks request cancellation and stable late-row order, the ranked rows included. This is a responsiveness regression test, not a network speed benchmark. The `ranks` check covers home's ranked most-popular rows in both languages: their place under Suggested, ten numbered posters with captions, D-pad movement and More opening the catalogue in that order.
 
 The CI device is Android 11 TV (API 30), 1080p, two cores, 1536 MB RAM, 128 MB heap. It exercises the platform's real RTL layout and D-pad focus behavior. Software-rendered emulator results cannot represent Sony's decoder/GPU speed or the user's network.
 
@@ -15,6 +15,7 @@ Install the APK on the Android 11 Sony TV and verify:
 1. Cold launch, quick relaunch, home focus movement and opening a title. Home content should appear as soon as its catalogue response is ready; the motion logo must not delay it. A relaunch draws the last home from disk at once (the logo still plays its first 1.5 s), then the fresh rows land in place without moving focus. Offline with a saved home, home still shows with a quiet notice.
 2. Search `friends`: results scroll vertically; Down enters the grid, Up from its first row returns to search, and the edge arrow reaches the sidebar. Search replacement and voice search should show only the current query.
 3. My Lists: all three actions still open their original lists. Move rapidly between posters and rows, including the end of a paginated list.
+   Most popular movies/series: ten posters numbered beside them («۱» … «۱۰», 1 … 10 in English), each with its title, IMDb score and year; More opens the catalogue sorted by «محبوب‌ترین».
    Genres: home shows every genre, then More; open More. The full four-column page should open immediately, every genre should open its catalogue, and Back should restore the focused genre/home tile.
    Filters: on Movies, Up from the first column reaches «ژانر»; set IMDb ۷+ and «دههٔ ۲۰۱۰», then sort by IMDb. Every poster should score 7 or more and date from 2010–2019, scrolling should keep finding them, and × should bring the whole catalogue back in the same order.
 4. Animals teaser: video starts, pause/play work, controls hide after inactivity, backgrounding stops playback, and returning resumes correctly. Outside Iran, or through a VPN, with a TMDB key: a title whose Trailer shows YouTube's mark plays it in the app with the same controls, and Back returns to the title page.

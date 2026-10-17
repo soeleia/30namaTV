@@ -3,16 +3,19 @@ package com.doxigo.tv30
 import java.io.File
 
 /**
- * What home was last drawn from (home_stream, the menu, Continue Watching and My List), kept in
- * filesDir so the next launch draws home at once while the fresh answers are on their way
- * (HomeFragment.load). Each answer is a file whose first line says whose home it is and in which
- * language; anything else there, or no file at all, is a miss.
+ * What home was last drawn from (home_stream, the menu, Continue Watching, My List and the ranked
+ * most-favourited rows), kept in filesDir so the next launch draws home at once while the fresh
+ * answers are on their way (HomeFragment.load). Each answer is a file whose first line says whose
+ * home it is and in which language; anything else there, or no file at all, is a miss.
  */
 object HomeCache {
     const val HOME = "home"
     const val MENU = "menu"
     const val WATCHING = "continue"
     const val WATCHLIST = "watchlist"
+
+    /** A ranked row's archive page: one per catalogue slug. */
+    fun loved(slug: String) = "loved-$slug"
 
     /** Raised when what a file holds changes shape, so an older build's files read as misses. */
     private const val FORMAT = 1

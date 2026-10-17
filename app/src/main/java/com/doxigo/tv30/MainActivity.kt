@@ -145,11 +145,15 @@ class HomeFragment : BrowseSupportFragment() {
     private val posters = PosterPresenter(108, 162)
     private val tiles = SinglePresenterSelector(TilePresenter(208, 117))
     private val lists = SinglePresenterSelector(ListsPresenter())
+    private val seeAllCard = SeeAllPresenter(108, 162)
     /** A title row: posters, ended by a poster-sized "see all" card where the row has a catalogue. */
-    private val titles = object : PresenterSelector() {
-        private val seeAll = SeeAllPresenter(108, 162)
-        override fun getPresenter(item: Any?): Presenter = if ((item as Card).icon != null) seeAll else posters
-        override fun getPresenters(): Array<Presenter> = arrayOf(posters, seeAll)
+    private val titles = titleRow(posters)
+    /** The most-favourited rows: each poster beside its place, Netflix's Top 10 (see [showLoved]). */
+    private val ranked = titleRow(PosterPresenter(108, 162, ranked = true))
+
+    private fun titleRow(posters: Presenter) = object : PresenterSelector() {
+        override fun getPresenter(item: Any?): Presenter = if ((item as Card).icon != null) seeAllCard else posters
+        override fun getPresenters(): Array<Presenter> = arrayOf(posters, seeAllCard)
     }
     /** 30nama's promoted titles over the rows. It owns the billboard; the rows reach it through [PromoHero.follow]. */
     private var hero: PromoHero? = null
@@ -378,6 +382,7 @@ class HomeFragment : BrowseSupportFragment() {
                 }
                 launch { runCatching { Api.home() }.onSuccess { keep(HomeCache.HOME, it); showHome(it) } }
                 launch { loadMenu() }
+                for (slug in LOVED) launch { loadLoved(slug) }
             }
             showLists()
             showTrending(trending.await())
@@ -427,7 +432,8 @@ class HomeFragment : BrowseSupportFragment() {
             if (arrival == null) arrive()
             loadedAt = SystemClock.elapsedRealtime()
             keepFresh()
-            // Trending's catalogue searches share the API dispatcher; start them after home.
+            // The ranked rows and Trending's catalogue searches share the API dispatcher; start them after home.
+            for (slug in LOVED) launch { loadLoved(slug) }
             loadTrending()
         }
     }
@@ -473,16 +479,16 @@ class HomeFragment : BrowseSupportFragment() {
         val key = keptKey() ?: return false
         val dir = requireContext().filesDir.resolve(KEPT)
         // Read and parsed off the main thread: home alone is ~300 KB of JSON. A file cut short or garbled is a miss.
-        val (home, menu, watching, watchlist) = withContext(Dispatchers.IO) {
-            listOf(HomeCache.HOME, HomeCache.MENU, HomeCache.WATCHING, HomeCache.WATCHLIST).map { part ->
-                HomeCache.read(dir, key, part)?.let { runCatching { JSONTokener(it).nextValue() }.getOrNull() }
-            }
+        val parts = listOf(HomeCache.HOME, HomeCache.MENU, HomeCache.WATCHING, HomeCache.WATCHLIST) + LOVED.map(HomeCache::loved)
+        val kept = withContext(Dispatchers.IO) {
+            parts.associateWith { part -> HomeCache.read(dir, key, part)?.let { runCatching { JSONTokener(it).nextValue() }.getOrNull() } }
         }
-        showHome(home as? JSONObject ?: return false)
-        (menu as? JSONObject)?.let(::showMenu)
+        showHome(kept[HomeCache.HOME] as? JSONObject ?: return false)
+        (kept[HomeCache.MENU] as? JSONObject)?.let(::showMenu)
+        for (slug in LOVED) (kept[HomeCache.loved(slug)] as? JSONObject)?.let { showLoved(slug, it) }
         if (Api.loggedIn) {
-            (watching as? JSONArray)?.let { showContinueWatching(it) }
-            (watchlist as? JSONObject)?.let { showWatchlist(it) }
+            (kept[HomeCache.WATCHING] as? JSONArray)?.let { showContinueWatching(it) }
+            (kept[HomeCache.WATCHLIST] as? JSONObject)?.let { showWatchlist(it) }
         }
         showLists()
         return true
@@ -516,6 +522,30 @@ class HomeFragment : BrowseSupportFragment() {
         val context = context ?: return
         if (titles.isEmpty()) return
         setRow(TRENDING, R.string.trending_week, titles.map { t -> t.toCard(context) { context.openDetails(t) } })
+        keepFirstRow()
+    }
+
+    /**
+     * 30nama's ten most-favourited films or series ([slug]), ranked. home_stream named a top ten
+     * once (its top_10) and no longer does; this is the archive's «محبوب‌ترین» order, the
+     * catalogue's own sort (30nama-apps ranks the same). A failed fetch keeps what is there.
+     */
+    private suspend fun loadLoved(slug: String) {
+        val list = runCatching { Api.archive(slug, 1, LOVED_ORDER) }.getOrNull() ?: return
+        keep(HomeCache.loved(slug), list)
+        showLoved(slug, list)
+    }
+
+    /** [list] as a ranked row, «۱» to «۱۰» beside the posters, ending in the whole catalogue in that order. */
+    private fun showLoved(slug: String, list: JSONObject) {
+        val context = context ?: return
+        val (key, name) = if (slug == "movies") LOVED_MOVIES to R.string.loved_movies else LOVED_SERIES to R.string.loved_series
+        val cards = list.optJSONArray("posts").objects().take(10).mapIndexed { i, t ->
+            t.toCard(context, rank = (i + 1).toString().localDigits()) { context.openDetails(t) }
+        }
+        setRow(key, name, if (cards.isEmpty()) cards else cards + seeAll(cards) {
+            startActivity(GridActivity.archive(context, slug, getString(name), sort = LOVED_ORDER))
+        }, ranked)
         keepFirstRow()
     }
 
@@ -684,20 +714,27 @@ class HomeFragment : BrowseSupportFragment() {
             override fun areContentsTheSame(old: Card, new: Card) =
                 old.subtitle.toString() == new.subtitle.toString() && old.facts.toString() == new.facts.toString() &&
                     old.progress == new.progress && old.free == new.free && old.plot == new.plot && old.backdrop == new.backdrop &&
-                    old.mosaic == new.mosaic
+                    old.mosaic == new.mosaic && old.numeral == new.numeral // a ranked title that moved takes its new place
         }
+
+        /** The catalogues ranked on home, and the order that ranks them: the archive's «محبوب‌ترین». */
+        private val LOVED = listOf("movies", "series")
+        private const val LOVED_ORDER = "favorite"
 
         const val TOP = -1
         const val CONTINUE = 0
         const val WATCHLIST = 1
         const val TRENDING = 2
         const val SUGGESTED = 3
-        const val MOVIES = 4
-        const val SERIES = 5
-        const val ANIME = 6
-        const val LISTS = 7
-        const val CATEGORIES = 8
-        const val GENRES = 9
+        // The ranked rows sit under the first shelf, before the long catalogues begin.
+        const val LOVED_MOVIES = 4
+        const val LOVED_SERIES = 5
+        const val MOVIES = 6
+        const val SERIES = 7
+        const val ANIME = 8
+        const val LISTS = 9
+        const val CATEGORIES = 10
+        const val GENRES = 11
     }
 }
 
