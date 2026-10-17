@@ -63,7 +63,6 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.common.text.Cue
 import androidx.media3.extractor.text.CuesWithTiming
-import androidx.media3.extractor.text.DefaultSubtitleParserFactory
 import androidx.media3.extractor.text.SubtitleParser
 import androidx.media3.ui.leanback.LeanbackPlayerAdapter
 import coil3.asDrawable
@@ -160,7 +159,9 @@ class PlayerFragment : VideoSupportFragment() {
             .setAudioAttributes(AudioAttributes.Builder().setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).setUsage(C.USAGE_MEDIA).build(), true)
             // DefaultDataSource reads the subtitles found on the subtitle sites from disk (Subtitles.kt)
             // and hands everything over http to Buffering's.
-            .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(context, Buffering.dataSource(context))).setLoadErrorHandlingPolicy(Retry403))
+            .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(context, Buffering.dataSource(context))).setLoadErrorHandlingPolicy(Retry403)
+                // Each subtitle's Persian put right as it is parsed (see Subtitles.cleaned).
+                .setSubtitleParserFactory(Subtitles.Parsers()))
             .build()
         player.setPlaybackSpeed(Settings.speed) // the panel's speed then holds for this viewing
         applyTrackPreferences()
@@ -1486,9 +1487,9 @@ class PlayerFragment : VideoSupportFragment() {
     }
 
     /**
-     * [subtitle]'s cues on its own clock, parsed by Media3's own parsers: a found one from disk,
-     * 30nama's from its URL as ExoPlayer fetched it. Both through Subtitles' decode, so a Persian
-     * file in Windows-1256 reads right here too.
+     * [subtitle]'s cues on its own clock, parsed as ExoPlayer parses them (Subtitles.Parsers): a
+     * found one from disk, 30nama's from its URL as ExoPlayer fetched it. Both through Subtitles'
+     * decode, so a Persian file in Windows-1256 reads right here too.
      */
     private suspend fun cuesOf(subtitle: MediaItem.SubtitleConfiguration): List<CuesWithTiming> {
         val uri = subtitle.uri
@@ -1499,7 +1500,7 @@ class PlayerFragment : VideoSupportFragment() {
         }
         return withContext(Dispatchers.Default) {
             val text = Subtitles.decode(bytes, subtitle.language.orEmpty())
-            val parser = DefaultSubtitleParserFactory().create(Format.Builder().setSampleMimeType(subtitle.mimeType).build())
+            val parser = Subtitles.Parsers().create(Format.Builder().setSampleMimeType(subtitle.mimeType).build())
             buildList { parser.parse(text.toByteArray(), SubtitleParser.OutputOptions.allCues()) { add(it) } }
         }
     }

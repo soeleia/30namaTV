@@ -25,6 +25,74 @@ class SubtitlesTest {
     }
 
     @Test
+    fun persianLetters() {
+        // Persian (پ, گ): every Arabic ي, ى and ك goes, in cues with no Persian-only letter too,
+        // and a yeh before a ZWNJ.
+        assertEquals(
+            listOf("پیشنهاد کردی؟", "نمی\u200Cدونی کی میاد", "یک موسی"),
+            Subtitles.cleaned(listOf("پيشنهاد كردي؟", "نمي\u200Cدوني كي مياد", "يك موسى")),
+        )
+        // Arabic, Persian-only letters nowhere: left as it is.
+        assertEquals(listOf("كيف حالك؟", "إلى اللقاء"), Subtitles.cleaned(listOf("كيف حالك؟", "إلى اللقاء")))
+        assertEquals("كيف حالك", Subtitles.decode("كيف حالك".toByteArray(), "fa"))
+        assertEquals("گفتی که", Subtitles.persianised("گفتي كه"))
+    }
+
+    @Test
+    fun leftToRightAuthored() {
+        // Typed for a player that lays every line out left to right: the closing marks lead.
+        val file = listOf(".سلام، حالت چطوره", "!یه لحظه صبر کن\n...پس کجا رفتی", "OK", "?NASA کجاست")
+        assertEquals(
+            listOf("\u2066.سلام، حالت چطوره\u2069", "\u2066!یه لحظه صبر کن\u2069\n\u2066...پس کجا رفتی\u2069", "\u2066OK\u2069", "\u2066?NASA کجاست\u2069"),
+            Subtitles.cleaned(file),
+        )
+    }
+
+    @Test
+    fun rightToLeftAuthored() {
+        // Written right: closing marks close, a continuation's leading «...» included, so nothing changes.
+        val file = listOf("سلام، حالت چطوره.", "یه لحظه صبر کن!\nپس کجا رفتی...", "...که گفتم نه.", "\u202Bنسخه 1080p آماده است؟\u202C")
+        assertEquals(file, Subtitles.cleaned(file))
+    }
+
+    @Test
+    fun mixedFile() {
+        // Mostly written right, one line typed left to right: that line alone is held. An ellipsis
+        // either side, or a stop at both ends, says nothing of its own and goes with the file.
+        assertEquals(
+            listOf("سلام.", "صبر کن!", "کجا؟ نمی\u200Cدونم.", "\u2066.باشه\u2069", "...که گفتم", "!نه!"),
+            Subtitles.cleaned(listOf("سلام.", "صبر کن!", "کجا؟ نمی\u200Cدونم.", ".باشه", "...که گفتم", "!نه!")),
+        )
+        // Mostly typed left to right, one line written right: that line is left as it is.
+        assertEquals(
+            listOf("\u2066.سلام\u2069", "\u2066!صبر کن\u2069", "باشه.", "\u2066...که گفتم\u2069"),
+            Subtitles.cleaned(listOf(".سلام", "!صبر کن", "باشه.", "...که گفتم")),
+        )
+    }
+
+    @Test
+    fun latinLines() {
+        // In a Persian file a Latin-only line is held left to right, its full stop after it; a line
+        // of digits and marks alone takes its side from the line, and is left as it is.
+        assertEquals(
+            listOf("سلام!", "\u2066Hello, world.\u2069", "یه آهنگ:\n\u2066Yesterday (1965)\u2069", "\u2066OK.\u2069", "2026...", "- ۱۰۸۰"),
+            Subtitles.cleaned(listOf("سلام!", "Hello, world.", "یه آهنگ:\nYesterday (1965)", "OK.", "2026...", "- ۱۰۸۰")),
+        )
+        // An English file: unchanged.
+        val english = listOf("Hello, world.", "OK.\n- Fine!", "2026...")
+        assertEquals(english, Subtitles.cleaned(english))
+    }
+
+    @Test
+    fun arabicDigits() {
+        // An Arabic keyboard's ٠–٩ (٤ ٥ ٦ drawn otherwise) as Persian ۰–۹, where the file is Persian.
+        assertEquals(listOf("ساعت ۴:۵۶ گفت", "۰۱۲۳۴۵۶۷۸۹"), Subtitles.cleaned(listOf("ساعت ٤:٥٦ گفت", "٠١٢٣٤٥٦٧٨٩")))
+        assertEquals("گفت ۱۴۰۵", Subtitles.persianised("گفت ١٤٠٥"))
+        // Arabic, Persian-only letters nowhere: its digits stay.
+        assertEquals(listOf("الساعة ٤:٥٦"), Subtitles.cleaned(listOf("الساعة ٤:٥٦")))
+    }
+
+    @Test
     fun seasonZip() {
         val zip = ByteArrayOutputStream().also { out ->
             ZipOutputStream(out).use { z ->

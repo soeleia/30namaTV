@@ -1,7 +1,13 @@
 package com.doxigo.tv30
 
 import android.os.Build
+import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.util.Consumer
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.extractor.text.CuesWithTiming
+import androidx.media3.extractor.text.DefaultSubtitleParserFactory
+import androidx.media3.extractor.text.SubtitleParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -264,7 +270,7 @@ object Subtitles {
      * Subtitle bytes as text. A byte-order mark says UTF-8 or UTF-16; without one, text that reads
      * as UTF-8 is UTF-8, and the rest is the Windows code page of its language: Persian subtitles
      * very often come in Windows-1256. That page has no Persian ی, so its Persian is spelt with the
-     * Arabic ي (and Arabic-keyboard typing adds ك): both read wrong, and are put right.
+     * Arabic ي (and Arabic-keyboard typing adds ك): both read wrong, and are put right ([persianised]).
      */
     internal fun decode(bytes: ByteArray, language: String): String {
         fun starts(vararg prefix: Int) = bytes.size >= prefix.size && prefix.indices.all { bytes[it] == prefix[it].toByte() }
@@ -276,7 +282,117 @@ object Subtitles {
             else -> runCatching { Charsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(bytes)).toString() }
                 .getOrElse { String(bytes, Charset.forName(if (language == "fa") "windows-1256" else "windows-1252")) }
         }
-        return if (language == "fa") text.replace('ي', 'ی').replace('ى', 'ی').replace('ك', 'ک') else text
+        return persianised(text)
+    }
+
+    /** Letters Persian has and Arabic lacks: a subtitle with any of them is Persian, not Arabic. */
+    private const val PERSIAN = "پچژگ"
+    /**
+     * Marks that take their side from the line's direction. Not the Arabic ؟: it belongs to the
+     * script and stays with its sentence either way.
+     */
+    private const val CLOSERS = ".!?…:"
+
+    private fun letters(text: String) = String(CharArray(text.length) { i ->
+        when (val c = text[i]) {
+            'ي', 'ى' -> 'ی'
+            'ك' -> 'ک'
+            in '٠'..'٩' -> c + ('۰' - '٠')
+            else -> c
+        }
+    })
+
+    /**
+     * [text], a whole subtitle, with the Arabic ي and ى as the Persian ی, the Arabic ك as ک and
+     * the Arabic-Indic digits of an Arabic keyboard as Persian ones (its ٤ ٥ ٦ are drawn otherwise),
+     * where it is Persian ([PERSIAN]). Character by character, so a yeh before a ZWNJ («مي‌دوني»)
+     * goes too.
+     */
+    internal fun persianised(text: String) = if (text.any { it in PERSIAN }) letters(text) else text
+
+    /** Whether [line] has a right-to-left letter: Hebrew, Arabic, or their presentation forms. */
+    private fun rightToLeft(line: String) = line.any { it in '\u0590'..'\u08FF' || it in '\uFB1D'..'\uFDFF' || it in '\uFE70'..'\uFEFC' }
+
+    /** Whether [line] has a left-to-right letter (Latin, mostly): not a digit or a mark, which take a side. */
+    private fun latin(line: String) = line.any { Character.getDirectionality(it) == Character.DIRECTIONALITY_LEFT_TO_RIGHT }
+
+    /** [line]'s runs of [CLOSERS] at its start and its end, spaces and bidi controls (an RLM, a file's own isolates) aside. */
+    private fun marks(line: String): Pair<String, String> {
+        val bare = line.trim { it.isWhitespace() || Character.getType(it) == Character.FORMAT.toInt() }
+        return bare.takeWhile { it in CLOSERS } to bare.takeLastWhile { it in CLOSERS }
+    }
+
+    /** Whether [run] ends a sentence: not an ellipsis, which opens a continuation as well. */
+    private fun stop(run: String) = run.isNotEmpty() && '…' !in run && ".." !in run
+
+    /**
+     * A whole subtitle's cue texts with its Persian put right: its letters as [persianised], and
+     * its lines' direction. Many Persian files were written for players that lay every line out left
+     * to right, so the full stop is typed first (".سلام") to land at the left end, where a Persian
+     * sentence finishes; drawn right to left, as the player draws Persian, it jumps to the start.
+     * More of a file's lines opening on such a mark than closing on one says it is one of those, and
+     * each of its right-to-left lines is then held left to right in an isolate, as it was written.
+     * A file written right is left as it is. A line whose own stop says otherwise goes its own way,
+     * as in a file typed by two hands: opening on a stop and not closing on one, it was typed left
+     * to right; the other way round, right to left. Either way a line with no right-to-left letter but a
+     * Latin one ("OK.", a song's name) is held left to right as well: the player lays a Persian
+     * track's lines out right to left, which would put its full stop before it. A file with no
+     * right-to-left line, an English one, is left alone. After persianised() and directed() in the
+     * Mac client's Core/Subtitles.swift (github.com/thesaikodelik/30nama-apps, MIT).
+     */
+    internal fun cleaned(texts: List<String>): List<String> {
+        val persian = texts.any { text -> text.any { it in PERSIAN } }
+        val lines = texts.flatMap { it.split('\n') }.filter(::rightToLeft)
+        if (lines.isEmpty()) return texts
+        var opening = 0
+        var closing = 0
+        for (line in lines) {
+            val (open, close) = marks(line)
+            if (open.isNotEmpty()) opening++
+            if (close.isNotEmpty()) closing++
+        }
+        val leftToRight = opening > closing
+        return texts.map { text ->
+            val lettered = if (persian) letters(text) else text
+            lettered.split('\n').joinToString("\n") { line ->
+                val (open, close) = marks(line)
+                val held = when {
+                    !rightToLeft(line) -> latin(line)
+                    stop(open) != stop(close) -> stop(open)
+                    else -> leftToRight
+                }
+                if (held) "\u2066$line\u2069" else line
+            }
+        }
+    }
+
+    /**
+     * Media3's subtitle parsers, each file's cues [cleaned] together: ExoPlayer hands a side-loaded
+     * subtitle to its parser whole (its SubtitleExtractor reads to the end first), so a file's habits
+     * are judged on all of it. An unchanged cue keeps its styling; a changed one is plain text, as
+     * the player draws every cue anyway.
+     */
+    @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
+    class Parsers(private val parsers: SubtitleParser.Factory = DefaultSubtitleParserFactory()) : SubtitleParser.Factory by parsers {
+        override fun create(format: Format): SubtitleParser {
+            val parser = parsers.create(format)
+            return object : SubtitleParser {
+                override fun parse(data: ByteArray, offset: Int, length: Int, outputOptions: SubtitleParser.OutputOptions, output: Consumer<CuesWithTiming>) {
+                    val timed = ArrayList<CuesWithTiming>()
+                    parser.parse(data, offset, length, outputOptions) { timed.add(it) }
+                    val texts = cleaned(timed.flatMap { t -> t.cues.mapNotNull { it.text?.toString() } }).iterator()
+                    for (t in timed) output.accept(CuesWithTiming(t.cues.map { cue ->
+                        val text = cue.text?.toString() ?: return@map cue
+                        val clean = texts.next()
+                        if (clean == text) cue else cue.buildUpon().setText(clean).build()
+                    }, t.startTimeUs, t.durationUs))
+                }
+
+                override fun getCueReplacementBehavior() = parser.cueReplacementBehavior
+
+                override fun reset() = parser.reset()
+            }
+        }
     }
 
     private suspend fun json(source: String, request: Request): JSONObject {

@@ -12,7 +12,11 @@ import android.graphics.Typeface
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import androidx.media3.common.Format
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.text.Cue
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.extractor.text.SubtitleParser
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Response
@@ -74,6 +78,18 @@ object SubtitleChecks {
                     val exclamation = text.indexOf('!')
                     check(cues.layout.getPrimaryHorizontal(exclamation) < cues.layout.getPrimaryHorizontal(0)) { "Trailing Persian punctuation moved to the sentence's start" }
                     check((cues.layoutParams as FrameLayout.LayoutParams).bottomMargin > 0)
+                }
+                // Both kinds of Persian file in circulation, through the parsers ExoPlayer is given.
+                for ((kind, file, shown) in listOf(Triple("ltr", LTR_TYPED, LTR_SHOWN), Triple("rtl", RTL_TYPED, RTL_SHOWN))) {
+                    val parsed = parse(file)
+                    check(parsed.map { it.joinToString("\n") { cue -> cue.text.toString() } } == shown) { "A $kind-typed file came out as $parsed" }
+                    runOnMainSync { show(fragment, parsed.last().mapNotNull { it.text }) }
+                    SystemClock.sleep(300) // on screen, for the screenshot: both kinds must look alike
+                    runOnMainSync { check(closesAtEnd(cues)) { "A $kind-typed file's closing marks left the end of their lines" } }
+                    capture("subtitles-$kind-typed-$language")
+                }
+                runOnMainSync {
+                    show(fragment, listOf(styled))
                     fragment.showControlsOverlay(false)
                 }
                 await("Controls pushed subtitles sideways") {
@@ -96,7 +112,7 @@ object SubtitleChecks {
                 await("Player did not close") { host.isDestroyed }
                 activity = null
             }
-            result.putString("stream", "PASS: centered resting/visible-controls subtitles, RTL/LTR punctuation, Latin names, numbers, bidi controls and stacked cues\n")
+            result.putString("stream", "PASS: centered resting/visible-controls subtitles, RTL/LTR punctuation, Latin names, numbers, bidi controls, stacked cues, and LTR- and RTL-typed Persian files' letters and closing marks, Latin lines' included\n")
         } catch (error: Throwable) {
             result.putString("stream", error.stackTraceToString())
             resultCode = Activity.RESULT_CANCELED
@@ -113,6 +129,44 @@ object SubtitleChecks {
             client.dispatcher.cancelAll()
         }
         finish(resultCode, result)
+    }
+
+    /**
+     * Typed for players that lay every line out left to right, closing marks first, on an Arabic
+     * keyboard (ي, ك). Both files end on a line typed the other way, as a second hand leaves one,
+     * and a Latin-only line, as a song's name or a sign is given.
+     */
+    private const val LTR_TYPED = "1\n00:00:01,000 --> 00:00:03,000\n.سلام، حالت چطوره\n\n2\n00:00:03,000 --> 00:00:05,000\n!يه لحظه صبر كن\n...پس كجا رفتي\nباشه.\nHello, world.\n"
+    private val LTR_SHOWN = listOf("\u2066.سلام، حالت چطوره\u2069", "\u2066!یه لحظه صبر کن\u2069\n\u2066...پس کجا رفتی\u2069\nباشه.\n\u2066Hello, world.\u2069")
+    /** Written right: each closing mark closes its sentence. */
+    private const val RTL_TYPED = "1\n00:00:01,000 --> 00:00:03,000\nسلام، حالت چطوره.\n\n2\n00:00:03,000 --> 00:00:05,000\nیه لحظه صبر کن!\nپس کجا رفتی...\n.باشه\nHello, world.\n"
+    private val RTL_SHOWN = listOf("سلام، حالت چطوره.", "یه لحظه صبر کن!\nپس کجا رفتی...\n\u2066.باشه\u2069\n\u2066Hello, world.\u2069")
+
+    /** [srt]'s cues as the player gets them, a list per cue. */
+    @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
+    private fun parse(srt: String): List<List<Cue>> = buildList {
+        Subtitles.Parsers().create(Format.Builder().setSampleMimeType(MimeTypes.APPLICATION_SUBRIP).build())
+            .parse(srt.toByteArray(), SubtitleParser.OutputOptions.allCues()) { add(it.cues) }
+    }
+
+    /**
+     * Whether each line's first closing mark is drawn where its sentence ends: in its left half for
+     * a Persian line, its right half for a Latin one. For a Persian line the secondary caret: in an
+     * isolate it is the mark's own edge, where the primary one is the isolate's opening mark at the
+     * line's far end. For a Latin line both carets: a mark cut off from its text, on its own run,
+     * has one of them at that text's end.
+     */
+    private fun closesAtEnd(cues: CueView): Boolean {
+        val layout = cues.layout ?: return false
+        var start = 0
+        return cues.text.toString().split('\n').all { line ->
+            val mark = start + line.indexOfFirst { it in ".!" }
+            start += line.length + 1
+            val row = layout.getLineForOffset(mark)
+            val middle = (layout.getLineLeft(row) + layout.getLineRight(row)) / 2
+            if (line.any { it in '\u0600'..'\u06FF' }) layout.getSecondaryHorizontal(mark) < middle
+            else minOf(layout.getPrimaryHorizontal(mark), layout.getSecondaryHorizontal(mark)) > middle
+        }
     }
 
     private fun show(fragment: PlayerFragment, text: List<CharSequence>) {
