@@ -1,12 +1,16 @@
 package com.doxigo.tv30
 
+import android.animation.AnimatorInflater
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.LocaleList
 import android.speech.RecognizerIntent
+import android.util.TypedValue
+import android.view.FocusFinder
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.LayoutInflater
@@ -14,8 +18,11 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
 import android.widget.Button
+import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.RelativeLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -61,9 +68,18 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
     private lateinit var grid: VerticalGridView
     private lateinit var gridHolder: VerticalGridPresenter.ViewHolder
     private val presenter = VerticalGridPresenter(FocusHighlight.ZOOM_FACTOR_NONE, false).apply {
-        numberOfColumns = 6
+        numberOfColumns = COLUMNS
         shadowEnabled = false
     }
+    /** Recent searches, heading and results, which step aside for [keys]. */
+    private lateinit var content: LinearLayout
+    /** The box's own Persian keyboard ([keyboard]), out while [open], and the button beside the field that brings it out. */
+    private lateinit var keys: LinearLayout
+    private lateinit var toggle: Button
+    private var open = false
+    /** Where the remote comes back into the keys: the key it was last on, the first letter until then. */
+    private lateinit var firstKey: View
+    private var lastKey: View? = null
     /** What the results show: a query of two letters or more, or "" for the suggestions. */
     private var query: String? = null
     private var pager: Pager? = null
@@ -77,7 +93,7 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
         bar = root.findViewById(androidx.leanback.R.id.lb_search_bar)
         val dock = root.findViewById<FrameLayout>(androidx.leanback.R.id.lb_results_frame)
         dock.layoutParams.width = ViewGroup.LayoutParams.MATCH_PARENT
-        val content = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+        content = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
         recents = inflater.inflate(R.layout.search_recents, content, false) as LinearLayout
         content.addView(recents)
         // The recent searches line up as a row of posters does: the focused pill on the content's
@@ -111,6 +127,10 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
             isFocusable = false
             setPaddingRelative(paddingStart, (12 * dp).toInt(), paddingEnd, (32 * dp).toInt())
             verticalSpacing = (POSTER_GRID_ROW_SPACING_DP * dp).toInt()
+            // The posters' own width, fixed: measuring columns that wrap their posters, Leanback reads
+            // the rows it laid out last, and three of them fall short of six as the keys hand the
+            // results their width back (GridLayoutManager.processRowSizeSecondary).
+            setColumnWidth((112 * dp).toInt())
             prefetchAttachedRows()
         }
         bar.nextFocusDownId = grid.id
@@ -118,24 +138,174 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
         dock.addView(content, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.TOP).apply {
             topMargin = (108 * dp).toInt()
         })
-        // Box, recent searches, results, top to bottom, whichever of the middle two are there.
-        root.onFocusSearchListener = BrowseFrameLayout.OnFocusSearchListener { _, direction ->
+        // Over the content, so a recent search scrolled past the results' start slides under it.
+        keys = keyboard(context)
+        dock.addView(keys, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.START).apply {
+            topMargin = (108 * dp).toInt()
+            marginStart = resources.getDimensionPixelSize(R.dimen.content_start)
+        })
+        // The keyboard's button ends the bar, past the field: a secondary pill with its glyph.
+        toggle = Button(context, null, 0, R.style.Widget_App_Button_Icon).apply {
+            setText(R.string.search_keyboard)
+            setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.search_keyboard, 0, 0, 0)
+            setOnClickListener { showKeys(!open) }
+            widenSpaces()
+        }
+        bar.addView(toggle, RelativeLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            addRule(RelativeLayout.END_OF, androidx.leanback.R.id.lb_search_bar_items)
+            addRule(RelativeLayout.CENTER_VERTICAL)
+            marginStart = resources.getDimensionPixelSize(R.dimen.button_gap)
+        })
+        // Box, recent searches, results, top to bottom, whichever of the middle two are there;
+        // the keys at the start beside them (see [offKeys]).
+        root.onFocusSearchListener = BrowseFrameLayout.OnFocusSearchListener { focused, direction ->
             when {
-                direction == View.FOCUS_UP && grid.hasFocus() && grid.selectedPosition < 6 -> if (recentsShown) strip else editor
-                direction == View.FOCUS_UP && strip.hasFocus() -> editor
-                direction == View.FOCUS_DOWN && bar.hasFocus() -> below()
+                keys.hasFocus() -> offKeys(focused, direction)
+                direction == View.FOCUS_UP && grid.hasFocus() && grid.selectedPosition < columns -> if (recentsShown) strip else box(focused)
+                direction == View.FOCUS_UP && strip.hasFocus() -> box(focused)
+                direction == View.FOCUS_DOWN && bar.hasFocus() -> under()
                 direction == View.FOCUS_DOWN && strip.hasFocus() && grid.isFocusable -> grid
                 else -> null
             }
         }
-        // Down from the box, ahead of the keyboard: see [down].
+        // Down from the box, ahead of the keyboard: see [down]. Back puts the keys away: see [back].
         return object : FrameLayout(context) {
             override fun dispatchKeyEventPreIme(event: KeyEvent) = down(event) || super.dispatchKeyEventPreIme(event)
+            override fun dispatchKeyEvent(event: KeyEvent) = back(event) || super.dispatchKeyEvent(event)
         }.apply { addView(root) }
     }
 
     /**
-     * Down from the box with the keyboard down and the caret at the end goes [below] before the
+     * The box's own Persian keyboard, for a TV whose keyboard has no Persian: Netflix's grid in the
+     * alphabet's order, seven keys to a row and right to left in either language, as Persian reads,
+     * under a row of space, half space and delete. The digits run on after ؤ and Close fills the last
+     * row. A letter or digit is its glyph alone, on the white disc under the remote as a transport
+     * button is (trailer_button); the rest are the secondary pill. Built shut: see [showKeys].
+     */
+    private fun keyboard(context: Context) = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+        visibility = View.GONE
+        descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        val cell = resources.getDimensionPixelSize(R.dimen.button_target)
+        val feather = resources.getDimensionPixelSize(R.dimen.search_keys_feather)
+        setPaddingRelative(0, 0, feather, 0)
+        background = GradientDrawable(if (rtl) GradientDrawable.Orientation.RIGHT_LEFT else GradientDrawable.Orientation.LEFT_RIGHT,
+            Rail.band(context.getColor(R.color.ink), KEY_COLUMNS * cell / (KEY_COLUMNS * cell + feather).toFloat()))
+        fun row() = LinearLayout(context).also {
+            it.layoutDirection = View.LAYOUT_DIRECTION_RTL
+            addView(it)
+        }
+        fun add(row: LinearLayout, key: View, span: Int, pill: Boolean, action: () -> Unit) = key.run {
+            isFocusable = true
+            setOnClickListener { action() }
+            setOnFocusChangeListener { v, focused -> if (focused) lastKey = v }
+            background = ContextCompat.getDrawable(context, if (pill) R.drawable.button else R.drawable.trailer_button)
+            stateListAnimator = AnimatorInflater.loadStateListAnimator(context, R.animator.button_lift)
+            val margin = if (pill) resources.getDimensionPixelSize(R.dimen.search_key_pill_margin) else 0
+            row.addView(this, LinearLayout.LayoutParams(span * cell - 2 * margin, cell).apply {
+                marginStart = margin
+                marginEnd = margin
+            })
+        }
+        fun label(text: String, letter: Boolean) = TextView(context).apply {
+            gravity = Gravity.CENTER
+            if (letter) {
+                typeface = context.font(R.font.vazirmatn_medium)
+                setTextSize(TypedValue.COMPLEX_UNIT_PX, resources.getDimension(R.dimen.search_key_text))
+                setTextColor(context.getColorStateList(R.color.on_button))
+            } else setTextAppearance(R.style.TextAppearance_App_Button)
+            this.text = text
+        }
+        row().let { top ->
+            add(top, label(getString(R.string.search_key_space), false), 2, true) { type(" ") }
+            add(top, label(getString(R.string.search_key_zwnj), false), 3, true) { type("\u200C") }
+            add(top, ImageView(context).apply {
+                setImageResource(R.drawable.search_key_delete)
+                scaleType = ImageView.ScaleType.CENTER
+                contentDescription = getString(R.string.search_key_delete)
+                setOnLongClickListener { delete(all = true); true }
+            }, 2, true) { delete(all = false) }
+        }
+        for (letters in KEYS.chunked(KEY_COLUMNS)) {
+            val row = row()
+            for (letter in letters) add(row, label(letter.toString(), true), 1, false) { type(letter.toString()) }
+        }
+        val last = getChildAt(childCount - 1) as LinearLayout
+        add(last, label(getString(R.string.search_key_close), false), KEY_COLUMNS - last.childCount, true) { showKeys(false, toResults = true) }
+        firstKey = (getChildAt(1) as ViewGroup).getChildAt(0)
+    }
+
+    /**
+     * The keys out or away. Out, they come in from the start edge as the rail's panel does, the
+     * remote on the key it was last on, and the results step aside to three columns beside them,
+     * fading in where they land (a reflow can't glide). Away, the keys fade back toward the edge,
+     * the remote going on to the results ([toResults]) or else the button, and the results take the
+     * width again. Under Reduce Motion both are fades alone.
+     */
+    private fun showKeys(show: Boolean, toResults: Boolean = false) {
+        if (open == show) return
+        open = show
+        toggle.setText(if (show) R.string.search_keyboard_close else R.string.search_keyboard)
+        val slide = Motion.travel(resources.getDimension(R.dimen.rail_slide)) * if (rtl) 1 else -1
+        if (show) {
+            keys.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+            keys.visibility = View.VISIBLE
+            keys.alpha = 0f
+            keys.translationX = slide
+            keys.animate().alpha(1f).translationX(0f).setInterpolator(Motion.emph).setDuration(Motion.EXPAND).start()
+            (lastKey ?: firstKey).requestFocus()
+        } else {
+            if (keys.hasFocus()) ((if (toResults) below() else null) ?: toggle).requestFocus()
+            keys.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+            keys.animate().alpha(0f).translationX(slide / 2).setInterpolator(Motion.easeOut).setDuration(Motion.EXIT)
+                .withEndAction { if (!open) keys.visibility = View.GONE }.start()
+        }
+        // Set again rather than changed in place: a start margin only resolves as the params are set.
+        content.layoutParams = (content.layoutParams as ViewGroup.MarginLayoutParams).apply {
+            marginStart = if (show) KEY_COLUMNS * resources.getDimensionPixelSize(R.dimen.button_target) + resources.getDimensionPixelSize(R.dimen.search_keys_feather) else 0
+        }
+        grid.setNumColumns(columns)
+        // Its selected poster lands in another row at the new width; results away from the remote start from the top again.
+        if (!grid.hasFocus()) grid.selectedPosition = 0
+        content.alpha = 0f
+        content.animate().alpha(1f).setInterpolator(Motion.easeOut).setDuration(Motion.ENTER).start()
+    }
+
+    /** A key into the box, at its end, where the keys only ever write; the bar hands it on as typing (onSearchQueryChange). */
+    private fun type(text: String) {
+        val box = editor as EditText
+        box.text.append(text)
+        box.setSelection(box.length())
+    }
+
+    /** ⌫: the last letter, or held, the whole query. */
+    private fun delete(all: Boolean) {
+        val box = editor as EditText
+        if (box.length() > 0) box.text.delete(if (all) 0 else box.length() - 1, box.length())
+    }
+
+    /**
+     * Off the keys' edge: up to their button, never the field, whose own keyboard would come up over
+     * these; down nowhere; toward the results once there is something there to take the remote; and
+     * past the start edge into the rail, as from any first column.
+     */
+    private fun offKeys(focused: View?, direction: Int): View? = when {
+        FocusFinder.getInstance().findNextFocus(keys, focused, direction) != null -> null
+        direction == View.FOCUS_UP -> toggle
+        direction == View.FOCUS_DOWN -> focused
+        direction == (if (rtl) View.FOCUS_LEFT else View.FOCUS_RIGHT) && !grid.isFocusable && !recentsShown -> focused
+        else -> null
+    }
+
+    /** Back with the keys out puts them away, the remote going on to the results if it was on them. */
+    private fun back(event: KeyEvent): Boolean {
+        if (!open || event.keyCode != KeyEvent.KEYCODE_BACK) return false
+        if (event.action == KeyEvent.ACTION_UP) showKeys(false, toResults = true)
+        return true
+    }
+
+    /**
+     * Down from the box with the keyboard down and the caret at the end goes [under] before the
      * keyboard is offered it. A keyboard that is down still serves the box and sees every key
      * first, and what it makes of Down is its own: on Android TV 11 (CI's search check) the remote
      * stayed in the box over the recent searches. From Android 11, where the window can tell the
@@ -145,7 +315,7 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
         if (Build.VERSION.SDK_INT < 30 || event.keyCode != KeyEvent.KEYCODE_DPAD_DOWN || event.action != KeyEvent.ACTION_DOWN) return false
         val box = editor
         if (!box.isFocused || box.selectionEnd != box.length() || box.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) != false) return false
-        return below()?.requestFocusFromTouch() == true
+        return under()?.requestFocusFromTouch() == true
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -254,6 +424,30 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
         next?.requestFocus()
     }
 
+    /** Down from the box: the keys while they are out, else [below]. */
+    private fun under(): View? = if (open) lastKey ?: firstKey else below()
+
+    /**
+     * Up to the box: the field, or the keyboard's button while the keys are out or the remote comes
+     * up from right under it. A TV's own keyboard takes the D-pad while the field has the remote,
+     * so from under the button is the way to it that never goes through the field.
+     */
+    private fun box(from: View?): View = if (open || from != null && beneath(from, toggle)) toggle else editor
+
+    /** [view]'s middle within [above]'s width on screen. */
+    private fun beneath(view: View, above: View): Boolean {
+        val at = IntArray(2)
+        view.getLocationOnScreen(at)
+        val middle = at[0] + view.width / 2
+        above.getLocationOnScreen(at)
+        return middle in at[0]..at[0] + above.width
+    }
+
+    /** The results' columns: six, or three beside the keys. */
+    private val columns get() = if (open) COLUMNS / 2 else COLUMNS
+
+    private val rtl get() = resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
+
     /** Down from the box: the recent searches while they show, else the results once they can take the remote. */
     private fun below(): View? = when {
         recentsShown -> strip
@@ -284,7 +478,7 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
     private fun showRecents(show: Boolean) {
         val queries = if (show) Recents.read(requireContext()) else emptyList()
         if (queries.isEmpty()) {
-            if (strip.hasFocus()) (if (grid.isFocusable) grid else editor).requestFocus()
+            if (strip.hasFocus()) (if (grid.isFocusable) grid else if (open) toggle else editor).requestFocus()
             recents.visibility = View.GONE
             return
         }
@@ -364,6 +558,10 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
 
     private companion object {
         const val VOICE = 1
+        const val COLUMNS = 6
+        const val KEY_COLUMNS = 7
+        /** The keyboard's letters in the alphabet's order, its hamzas after ی, then the digits. */
+        const val KEYS = "اآبپتثجچحخدذرزژسشصضطظعغفقکگلمنوهیءئؤ۱۲۳۴۵۶۷۸۹۰"
     }
 }
 

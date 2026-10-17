@@ -196,6 +196,7 @@ object SearchGridChecks {
                 runOnMainSync { check(editor.text.toString() == "voice") }
 
                 recentSearches(host, fragment, grid, editor, language)
+                persianKeyboard(host, fragment, grid, editor, language, requests)
                 runOnMainSync { host.finish() }
                 await("Search activity did not close") { host.isDestroyed }
                 activity = null
@@ -210,7 +211,7 @@ object SearchGridChecks {
                     true
                 }
             }
-            result.putString("stream", "PASS: cached pagination after layout, six-column RTL/LTR search, D-pad/editor/rail/clicks, row spacing, pagination, debounce/cancel, empty/error and voice results, recent searches\n")
+            result.putString("stream", "PASS: cached pagination after layout, six-column RTL/LTR search, D-pad/editor/rail/clicks, row spacing, pagination, debounce/cancel, empty/error and voice results, recent searches, in-app Persian keyboard\n")
         } catch (error: Throwable) {
             capture("search-failure")
             result.putString("stream", error.stackTraceToString())
@@ -371,6 +372,95 @@ object SearchGridChecks {
         press(KeyEvent.KEYCODE_DPAD_CENTER)
         await("Clear did not forget the recent searches and hand the remote to the suggestions") {
             Recents.read(targetContext).isEmpty() && recents.visibility == View.GONE && grid.hasFocus()
+        }
+    }
+
+    /**
+     * The box's own Persian keyboard, from the suggestions [recentSearches] left with the remote:
+     * Up from under its button reaches the button without going through the field; OK brings the
+     * keys out on «ا»; the D-pad alone types «کیک‌ها ۲» (ک and ی in their Persian forms, a half
+     * space, a space, a digit, and a slip taken back with delete), which reaches the search as
+     * typing does while the system keyboard stays down; the remote crosses into the results and back,
+     * and up to the button and down again without passing the field; Back puts the keys away onto
+     * the results.
+     */
+    private fun Instrumentation.persianKeyboard(host: Activity, fragment: SearchFragment, grid: VerticalGridView, editor: TextView, language: String, requests: List<Pair<String, Int>>) {
+        val keys = field(fragment, "keys") as ViewGroup
+        val toggle = field(fragment, "toggle") as View
+        val open = { field(fragment, "open") == true }
+        runOnMainSync { grid.selectedPosition = 5 }
+        await("Suggestions could not select the first row's end") { grid.selectedPosition == 5 && grid.hasFocus() && grid.scrollState == 0 }
+        press(KeyEvent.KEYCODE_DPAD_UP)
+        await("Up from under the keyboard's button did not reach it", detail = { "focus=${host.currentFocus}" }) { toggle.hasFocus() }
+        press(KeyEvent.KEYCODE_DPAD_CENTER)
+        await("The Persian keyboard did not open on its first letter", detail = { "open=${open()}, focus=${host.currentFocus}" }) {
+            open() && keys.alpha == 1f && (host.currentFocus as? TextView)?.text?.toString() == "ا"
+        }
+
+        /** Row and place in it, counted from the row's start: the rows run right to left in either language. */
+        fun at(key: View) = keys.indexOfChild(key.parent as View) to (key.parent as ViewGroup).indexOfChild(key)
+        fun reach(name: String, target: (View) -> Boolean) {
+            repeat(24) {
+                var from = 0 to 0
+                var to = 0 to 0
+                runOnMainSync {
+                    val focus = checkNotNull(host.currentFocus) { "Focus left the window on the way to $name" }
+                    check(focus.parent?.parent === keys) { "Focus left the keys on the way to $name: $focus" }
+                    from = at(focus)
+                    to = at((0 until keys.childCount).flatMap { r -> (keys.getChildAt(r) as ViewGroup).let { row -> (0 until row.childCount).map(row::getChildAt) } }.single(target))
+                }
+                if (from == to) return press(KeyEvent.KEYCODE_DPAD_CENTER)
+                press(when {
+                    from.first < to.first -> KeyEvent.KEYCODE_DPAD_DOWN
+                    from.first > to.first -> KeyEvent.KEYCODE_DPAD_UP
+                    from.second < to.second -> KeyEvent.KEYCODE_DPAD_LEFT
+                    else -> KeyEvent.KEYCODE_DPAD_RIGHT
+                })
+            }
+            error("The D-pad did not reach $name")
+        }
+        fun letter(text: String) = reach(text) { (it as? TextView)?.text?.toString() == text }
+
+        val word = "\u06A9\u06CC\u06A9\u200C\u0647\u0627 \u06F2" // کیک‌ها ۲
+        for (c in listOf("\u06A9", "\u06CC", "\u06A9", "\u0628")) letter(c)
+        reach("delete") { it.contentDescription == host.getString(R.string.search_key_delete) }
+        letter(host.getString(R.string.search_key_zwnj))
+        letter("\u0647")
+        letter("\u0627")
+        letter(host.getString(R.string.search_key_space))
+        letter("\u06F2")
+        await("The D-pad's word did not reach the search", detail = {
+            "text=${editor.text.map { "%04X".format(it.code) }}, first=${first(fragment)?.title}, ime=${keyboardVisible(host)}"
+        }) { editor.text.toString() == word && first(fragment)?.title == "$word 0" && grid.isFocusable }
+        check(requests.any { it.first == word }) { "The word never reached the search: $requests" }
+        await("The system keyboard came up over the keys") { !keyboardVisible(host) && !editor.hasFocus() }
+        SystemClock.sleep(400)
+        capture("search-keyboard-$language")
+
+        // The keys' edges: on into the results and back, up to the button (never the field), down again.
+        val towardResults = if (language == "fa") KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT
+        fun pressUntil(code: Int, message: String, done: () -> Boolean) {
+            repeat(10) {
+                var there = false
+                runOnMainSync { there = done(); check(!editor.hasFocus()) { "The keys handed the remote to the field" } }
+                if (there) return
+                press(code)
+            }
+            await(message, detail = { "focus=${host.currentFocus}" }, condition = done)
+        }
+        pressUntil(towardResults, "The keys did not lead on into the results") { grid.hasFocus() }
+        press(if (language == "fa") KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT)
+        await("The results did not lead back into the keys") { keys.hasFocus() }
+        pressUntil(KeyEvent.KEYCODE_DPAD_UP, "Up from the keys did not reach their button") { toggle.hasFocus() }
+        press(KeyEvent.KEYCODE_DPAD_DOWN)
+        await("Down from the button did not go back into the keys") { keys.hasFocus() }
+
+        press(KeyEvent.KEYCODE_BACK)
+        await("Back did not put the keys away onto the results", detail = { "open=${open()}, keys=${keys.visibility}, focus=${host.currentFocus}" }) {
+            !open() && keys.visibility == View.GONE && grid.hasFocus() && !host.isFinishing
+        }
+        await("Putting the keys away lost the word or the button's name") {
+            editor.text.toString() == word && (toggle as TextView).text.toString() == host.getString(R.string.search_keyboard)
         }
     }
 

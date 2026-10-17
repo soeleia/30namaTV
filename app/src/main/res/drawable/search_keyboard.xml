@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Search's own Persian keyboard, on the button beside the field: a keyboard drawn as the rail's
+     icons are (nav_search.xml), 1.8 strokes with round ends on the 24dp grid, keys as dots over a
+     space bar, inked as the button's label is (on_button). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="@dimen/button_icon" android:height="@dimen/button_icon" android:viewportWidth="24" android:viewportHeight="24"
+    android:tint="@color/on_button">
+    <path android:pathData="M5,5.5h14a2,2 0 0,1 2,2v9a2,2 0 0,1 -2,2h-14a2,2 0 0,1 -2,-2v-9a2,2 0 0,1 2,-2z" android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.8" android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <path android:pathData="M7,9.5h0.01M10.33,9.5h0.01M13.67,9.5h0.01M17,9.5h0.01M7,12.5h0.01M10.33,12.5h0.01M13.67,12.5h0.01M17,12.5h0.01"
+        android:strokeColor="#FFFFFFFF" android:strokeWidth="2" android:strokeLineCap="round" />
+    <path android:pathData="M8.5,15.5h7" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8" android:strokeLineCap="round" />
+</vector>

@@ -218,10 +218,10 @@ class Rail(private val activity: TvActivity, private val current: Section?, priv
         return false
     }
 
-    private companion object {
-        const val EXIT_WINDOW = 3_000L
+    companion object {
+        private const val EXIT_WINDOW = 3_000L
         /** Evenly spaced gradient stops: stop positions need API 29, so the curve is sampled. */
-        const val BAND_STOPS = 16
+        private const val BAND_STOPS = 16
 
         /**
          * [color] solid across the first [solid] of the width, then a smoothstep feather to clear:

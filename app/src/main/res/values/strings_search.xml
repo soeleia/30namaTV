@@ -5,4 +5,12 @@
     <string name="search_recent_clear">پاک کردن</string>
     <!-- Clear's spoken name: the label alone does not say what it clears. -->
     <string name="search_recent_clear_all">پاک کردن جست‌وجوهای اخیر</string>
+    <!-- Search's own Persian keyboard, for a TV keyboard without Persian (SearchFragment.showKeys):
+         its button beside the field, then its keys. Delete is the ⌫ key's spoken name. -->
+    <string name="search_keyboard">صفحه‌کلید فارسی</string>
+    <string name="search_keyboard_close">بستن صفحه‌کلید</string>
+    <string name="search_key_space">فاصله</string>
+    <string name="search_key_zwnj">نیم‌فاصله</string>
+    <string name="search_key_delete">حذف</string>
+    <string name="search_key_close">بستن</string>
 </resources>

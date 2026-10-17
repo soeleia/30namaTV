@@ -5,10 +5,23 @@
 <resources>
     <dimen name="lb_search_bar_items_height">52dp</dimen>
     <dimen name="lb_search_bar_items_margin_start">16dp</dimen>
+    <!-- Short of Leanback's 600dp, so the Persian keyboard's button after it ends about where the
+         results' last column does, and inside the 48dp safe edge with its longer English name. -->
+    <dimen name="lb_search_bar_items_width">496dp</dimen>
     <dimen name="lb_search_bar_text_size">20sp</dimen>
     <!-- Half the field's height: a pill. -->
     <dimen name="search_field_radius">26dp</dimen>
     <item name="lb_search_orb_focused_zoom" type="fraction">108%</item>
+
+    <!-- Search's own Persian keyboard (SearchFragment.keyboard): seven keys to a row in the 48dp
+         target (button_target), eight rows from 108dp ending at 492dp, inside the bottom's safe
+         band. Its ink feathers out over the last 32dp, beside the results, so the recent searches
+         slide under it as a row slides under the rail. -->
+    <dimen name="search_keys_feather">32dp</dimen>
+    <!-- A letter or digit: the glyph alone at rest, on the white disc under the remote. -->
+    <dimen name="search_key_text">20sp</dimen>
+    <!-- Space, half space, delete and close are pills, 8dp apart so a lifted one clears the next. -->
+    <dimen name="search_key_pill_margin">4dp</dimen>
 
     <!-- Clear, ending the recent searches: a bare pill with the bin, dim until the remote reaches
          it (the person page's sort pill at rest), beside the queries' glass pills. -->

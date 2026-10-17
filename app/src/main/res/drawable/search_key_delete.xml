@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Persian keyboard's delete key: a key pointing the way the letters go back, a cross on it,
+     in the rail's 1.8 strokes. Drawn for left-to-right and mirrored on the keyboard's
+     right-to-left rows, so it points right, as on a Persian keyboard. Inked as a label (on_button). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24"
+    android:tint="@color/on_button" android:autoMirrored="true">
+    <path android:pathData="M9,5.5h10a2,2 0 0,1 2,2v9a2,2 0 0,1 -2,2h-10l-6,-6.5z" android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.8" android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <path android:pathData="M12.5,9.5l5,5M17.5,9.5l-5,5" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8"
+        android:strokeLineCap="round" />
+</vector>
