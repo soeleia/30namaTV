@@ -82,14 +82,15 @@ private fun outlined(context: Context, word: String): CharSequence {
     return chip(context, word, dim, line = dim)
 }
 
-private fun chip(context: Context, word: String, ink: Int, fill: Int = 0, line: Int = 0) =
-    SpannableString(word).spanned(Chip(context, word, ink, fill, line))
+private fun chip(context: Context, word: String, ink: Int, fill: Int = 0, line: Int = 0, pad: Float = 0.35f) =
+    SpannableString(word).spanned(Chip(context, word, ink, fill, line, pad))
 
 /**
  * The one score a poster or home's billboard has room for: IMDb's, else MyAnimeList's or
  * MyDramaList's. 30nama's own members' score is never shown (the user's call).
  */
-fun JSONObject.rating(context: Context): CharSequence? = imdbScore(context) ?: fanScore(context)
+fun JSONObject.rating(context: Context, tight: Boolean = false): CharSequence? =
+    imdbScore(context, tight = tight) ?: fanScore(context, tight = tight)
 
 /**
  * Every score the title has, for its own page: the one [rating] picks in its source's badge, the
@@ -101,25 +102,26 @@ private fun JSONObject.scores(context: Context): List<CharSequence> {
         .mapNotNull { score -> score(quiet)?.also { quiet = true } }
 }
 
-private fun JSONObject.imdbScore(context: Context, quiet: Boolean = false) =
-    imdb?.let { scored(context, "IMDb", ContextCompat.getColor(context, R.color.imdb), Color.BLACK, it, quiet) }
+private fun JSONObject.imdbScore(context: Context, quiet: Boolean = false, tight: Boolean = false) =
+    imdb?.let { scored(context, "IMDb", ContextCompat.getColor(context, R.color.imdb), Color.BLACK, it, quiet, tight) }
 
 /** Anime carry MyAnimeList's score and Asian dramas MyDramaList's, each in its site's blue. */
-private fun JSONObject.fanScore(context: Context, quiet: Boolean = false) =
-    score("myanimelist")?.let { scored(context, "MAL", MAL_BLUE, Color.WHITE, it, quiet) }
-        ?: score("mydramalist")?.let { scored(context, "MDL", MDL_BLUE, Color.WHITE, it, quiet) }
+private fun JSONObject.fanScore(context: Context, quiet: Boolean = false, tight: Boolean = false) =
+    score("myanimelist")?.let { scored(context, "MAL", MAL_BLUE, Color.WHITE, it, quiet, tight) }
+        ?: score("mydramalist")?.let { scored(context, "MDL", MDL_BLUE, Color.WHITE, it, quiet, tight) }
 
 /**
  * A source's [mark] in its own colours, the score beside it in white bold: «[IMDb] ۷٫۷». A [Gap]
  * between them rather than a word space, whose width is whichever face the space falls to. A
- * [quiet] one is plain words in the line's own grey, «MAL ۸٫۷», as the year is.
+ * [quiet] one is plain words in the line's own grey, «MAL ۸٫۷», as the year is. A [tight] one (an
+ * English poster's, see [facts]) closes the mark round its word and the score up to it.
  */
-private fun scored(context: Context, mark: String, fill: Int, ink: Int, value: Double, quiet: Boolean = false): CharSequence {
+private fun scored(context: Context, mark: String, fill: Int, ink: Int, value: Double, quiet: Boolean = false, tight: Boolean = false): CharSequence {
     val number = "%.1f".format(Locale.getDefault(), value)
     if (quiet) return SpannableStringBuilder(mark).append(" ", Gap(0.3f), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE).append(number)
     val face = context.font(if (number.isLatin) R.font.inter_bold else R.font.vazirmatn_bold)
-    return SpannableStringBuilder(chip(context, mark, ink, fill = fill))
-        .append(" ", Gap(0.3f), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+    return SpannableStringBuilder(chip(context, mark, ink, fill = fill, pad = if (tight) 0.2f else 0.35f))
+        .append(" ", Gap(if (tight) 0.25f else 0.3f), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         .append(SpannableString(number).spanned(Face(face)).spanned(ForegroundColorSpan(Color.WHITE)))
 }
 
@@ -127,8 +129,15 @@ private fun scored(context: Context, mark: String, fill: Int, ink: Int, value: D
 private const val MAL_BLUE = 0xFF2E51A2.toInt()
 private const val MDL_BLUE = 0xFF1675B6.toInt()
 
-/** What every poster says under its art, by the user's rule: the score, then the year. */
-fun JSONObject.facts(context: Context): CharSequence = metaLine(context, rating(context), year, gap = 0.6f)
+/**
+ * What every poster says under its art, by the user's rule: the score, then the year. English sets
+ * it tight: Inter's digits run wider than Persian's, and at the line's own spacing «IMDb 7.6 2005»
+ * ran past a 108dp poster's 104dp caption and lost its year. Tight, it takes 97dp.
+ */
+fun JSONObject.facts(context: Context): CharSequence {
+    val tight = Api.language != "fa"
+    return metaLine(context, rating(context, tight), year, gap = if (tight) 0.4f else 0.6f)
+}
 
 /**
  * When an airing series' next episode comes, while that is still ahead: «قسمت بعد: شنبه ۲۵ مهر»,
@@ -409,13 +418,14 @@ private class Leading(private val digits: Digits) : LineHeightSpan.WithDensity {
 /**
  * A word in a box on the line, drawn over the word itself: IMDb's yellow mark, the age rating's
  * outline, the category's quiet fill. The word stays in the text for screen readers. One spec for
- * every chip, in ems of the line's text: 1.25 tall, its word at 0.8, 0.35 of padding at either
- * side, corners a fifth of the height, the box on whole pixels and centred on the line's [Digits],
- * so every chip and the score or year beside it share one middle. The word centres in the box by
+ * every chip, in ems of the line's text: 1.25 tall, its word at 0.8, [pad] at either side (0.35;
+ * an English poster's score takes 0.2, see [facts]), corners a fifth of the height, the box on
+ * whole pixels and centred on the line's [Digits], so every chip and the score or year beside it
+ * share one middle. The word centres in the box by
  * its own glyphs, not its font box (Yekan Bakh's would set a Persian word 0.15 em high): a Latin
  * word by its capitals, a Persian one by its teeth, the x-height zone where its letters join.
  */
-class Chip(context: Context, word: String, private val ink: Int, private val fill: Int = 0, private val line: Int = 0) : ReplacementSpan() {
+class Chip(context: Context, word: String, private val ink: Int, private val fill: Int = 0, private val line: Int = 0, private val pad: Float = 0.35f) : ReplacementSpan() {
     private val face = context.font(if (word.isLatin) R.font.inter_bold else R.font.vazirmatn_bold)
     private val zone = if (word.isLatin) "H" else "ـسـ"
     private val digits = Digits(context)
@@ -443,7 +453,7 @@ class Chip(context: Context, word: String, private val ink: Int, private val fil
         bottom = top + height
         label.getTextBounds(zone, 0, zone.length, bounds)
         baseline = (top + bottom) / 2f - bounds.exactCenterY()
-        width = (label.measureText(text, start, end) + size * 0.7f).roundToInt()
+        width = (label.measureText(text, start, end) + size * pad * 2).roundToInt()
         // About 1dp on the meta line, whole pixels: a hairline would shimmer on a TV panel.
         stroke = maxOf(1, (size * 0.07f).roundToInt()).toFloat()
     }
@@ -480,6 +490,6 @@ class Chip(context: Context, word: String, private val ink: Int, private val fil
             label.style = Paint.Style.FILL
         }
         label.color = ink
-        canvas.drawText(text, start, end, left + size * 0.35f, y + baseline, label)
+        canvas.drawText(text, start, end, left + size * pad, y + baseline, label)
     }
 }

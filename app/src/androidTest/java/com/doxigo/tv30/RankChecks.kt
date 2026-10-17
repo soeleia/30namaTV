@@ -9,6 +9,7 @@ import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.View
 import android.widget.Button
+import android.widget.TextView
 import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.ImageCardView
 import androidx.leanback.widget.ListRow
@@ -40,7 +41,7 @@ object RankChecks {
         val orders = Collections.synchronizedList(mutableListOf<String>())
         fun posts(name: String, count: Int) = JSONArray().apply {
             for (i in 0 until count) put(JSONObject().put("id", name.hashCode() + i).put("title", JSONObject().put("english", "$name $i"))
-                .put("options", JSONObject().put("title_type", "movie")).put("info", JSONObject().put("year", "${2010 + i}"))
+                .put("options", JSONObject().put("title_type", "movie")).put("info", JSONObject().put("year", "${2000 + i}"))
                 .put("score", JSONObject().put("imdb", JSONObject().put("score", 7.0 + i / 10.0))))
         }
         val client = OkHttpClient.Builder().addInterceptor { chain ->
@@ -119,6 +120,11 @@ object RankChecks {
                     // Leanback's measureChild once took the place's padding off the caption.
                     check(caption.width >= image.width - (16 * dp).toInt()) { "The caption is ${caption.width}px under a ${image.width}px poster" }
                     check(card.contentDescription.startsWith(places[0])) { "The first poster does not say its place: ${card.contentDescription}" }
+                    // Inter's zeros run wide: «IMDb 7.0 2000» once lost its year to «…» at 108dp.
+                    for (i in 0 until row.gridView.childCount) {
+                        val facts = row.gridView.getChildAt(i).findViewById<TextView>(androidx.leanback.R.id.content_text) ?: continue
+                        check(facts.layout?.getEllipsisCount(0) == 0) { "A poster's score and year are cut: ${facts.text}" }
+                    }
                 }
                 SystemClock.sleep(400) // the billboard's art settles before the picture
                 capture("ranks-$language")
