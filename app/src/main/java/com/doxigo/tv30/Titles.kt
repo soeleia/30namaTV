@@ -35,6 +35,8 @@ val JSONObject.englishName get() = (str("title", "english") ?: str("title", "loc
 val JSONObject.localName get() = str("title", "local")?.unescaped()?.takeIf { it != englishName }
 val JSONObject.poster get() = str("image", "poster", "webp", "large") ?: str("image", "poster", "jpg", "large")
 val JSONObject.cover get() = str("image", "cover", "webp") ?: str("image", "cover", "jpg")
+/** Of a title, what the player's controls show beside its name (poster, score, year, age): small enough for an intent. */
+val JSONObject.playerFacts get() = JSONObject().also { facts -> for (key in arrayOf("title", "image", "info", "score", "options")) opt(key)?.let { facts.put(key, it) } }
 val JSONObject.isFree get() = obj("options")?.optBoolean("free_stream") == true
 /** The official app's rule (module 10223): a free title plays for anyone, the rest for a signed-in plan that streams. */
 val JSONObject.streamable get() = Api.loggedIn && Api.user?.optBoolean("user_allowed_to_stream") == true || isFree

@@ -65,6 +65,11 @@
     <dimen name="lb_details_description_under_subtitle_baseline_margin">36dp</dimen>
     <!-- The player's clock, under the bar's two ends: the 16sp floor, as the trailer's. -->
     <dimen name="lb_playback_controls_time_text_size">16sp</dimen>
+    <!-- The seek bar's dot while it has the remote: YouTube's, over three times the 6dp bar (Leanback's
+         is twice it). Leanback's SeekBar rounds the bar's ends with the same radius, clamped to it. -->
+    <dimen name="lb_playback_transport_progressbar_active_radius">10dp</dimen>
+    <!-- The title's poster beside its name on the controls: as tall as the name's three lines. -->
+    <dimen name="player_poster_height">120dp</dimen>
 
     <dimen name="lb_action_text_size">16sp</dimen>
     <dimen name="lb_action_1_line_height">44dp</dimen>

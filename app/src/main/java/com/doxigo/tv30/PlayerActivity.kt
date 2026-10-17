@@ -66,6 +66,9 @@ import androidx.media3.extractor.text.CuesWithTiming
 import androidx.media3.extractor.text.DefaultSubtitleParserFactory
 import androidx.media3.extractor.text.SubtitleParser
 import androidx.media3.ui.leanback.LeanbackPlayerAdapter
+import coil3.asDrawable
+import coil3.imageLoader
+import coil3.request.ImageRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -99,8 +102,10 @@ class PlayerActivity : TvActivity() {
     }
 
     companion object {
-        fun intent(context: Context, id: Int, free: Boolean, fileId: String? = null): Intent =
+        /** [title]: what the controls show beside its name (poster, score, year, age); the `stream` answer carries none of it. */
+        fun intent(context: Context, id: Int, free: Boolean, fileId: String? = null, title: JSONObject? = null): Intent =
             Intent(context, PlayerActivity::class.java).putExtra("id", id).putExtra("free", free).putExtra("file", fileId)
+                .putExtra("title", title?.playerFacts?.toString())
     }
 }
 
@@ -126,6 +131,8 @@ class PlayerFragment : VideoSupportFragment() {
     private val prefs by lazy { requireContext().getSharedPreferences("player", Context.MODE_PRIVATE) }
 
     private var postId = 0
+    /** The title as the screen that opened this one had it (Titles.playerFacts): its poster, score, year and age. */
+    private var facts = JSONObject()
     private var stream: JSONObject? = null
     private var files: List<JSONObject> = emptyList()
     private var file: JSONObject? = null
@@ -348,6 +355,7 @@ class PlayerFragment : VideoSupportFragment() {
     private suspend fun load() {
         val args = requireActivity().intent
         postId = args.getIntExtra("id", 0)
+        facts = args.getStringExtra("title")?.let { runCatching { JSONObject(it) }.getOrNull() } ?: JSONObject()
         val loaded = runCatching { Api.stream(postId, args.getBooleanExtra("free", false)) }
         val context = context ?: return // left while loading
         val stream = loaded.getOrElse {
@@ -367,14 +375,13 @@ class PlayerFragment : VideoSupportFragment() {
         files = stream.optJSONArray("hls").objects()
         val resume = stream.optJSONObject("continue_watching")
         val chosen = args.getStringExtra("file")
-        val wanted = chosen ?: resume?.str("file_id")
-        val start = files.firstOrNull { it.str("info", "file_id") == wanted } ?: files.firstOrNull() ?: run {
+        // The server's point or where this TV left the title, whichever is further on (Watched).
+        val point = Watched.resumePoint(context, postId, files, resume)
+        val start = chosen?.let { id -> files.firstOrNull { it.str("info", "file_id") == id } } ?: files.getOrNull(point?.first ?: 0) ?: run {
             requireActivity().finish()
             return
         }
-        // A film has one file, so its resume point applies whatever file id it was saved with.
-        val resumes = resume != null && (resume.str("file_id") == start.str("info", "file_id") || files.size == 1)
-        val saved = files.indexOf(start) to if (resumes) resume.optLong("time") else 0L
+        val saved = files.indexOf(start) to if (point?.first == files.indexOf(start)) point.second else 0L
         // Saved in the credits, Play goes on to what comes next not yet seen (UpNext.kt, Watched), as
         // the title page's Play says; an episode tile means exactly that episode, credits and all.
         Watched.seed(context, files, resume)
@@ -388,6 +395,13 @@ class PlayerFragment : VideoSupportFragment() {
         }
         progressBarManager.hide()
         play(files[index], at * 1000)
+        showPoster(context, facts.poster)
+    }
+
+    /** The title's poster beside its name on the controls; without one the name has the row to itself. */
+    private fun showPoster(context: Context, url: String?) = lifecycleScope.launch {
+        val image = context.imageLoader.execute(ImageRequest.Builder(context).data(url ?: return@launch).build()).image ?: return@launch
+        glue?.art = image.asDrawable(resources)
     }
 
     private fun play(next: JSONObject, positionMs: Long) {
@@ -401,6 +415,8 @@ class PlayerFragment : VideoSupportFragment() {
             applySubtitleStyle()
         }
         file = next
+        // Picked up part-way (a minute in, as Watched counts a start), the pill offers the start for its first seconds.
+        startOverMs = positionMs.takeIf { it >= Watched.STARTED * 1000 } ?: 0L
         if (::panel.isInitialized && panel.shows(findPage)) panel.back()
         reportedAt = -1
         qualities = qualities(next)
@@ -409,35 +425,35 @@ class PlayerFragment : VideoSupportFragment() {
         val season = info?.optInt("season") ?: 0
         val episode = info?.optInt("episode_number", info.optInt("episode")) ?: 0
         glue?.setTitle(stream?.optJSONObject("info")?.englishName)
-        // The server's episode_name reads "فصل 1 - قسمت 4"; shown the way the rest of the app writes it.
-        episodeLine = if (files.size > 1) info?.str("episode_name")?.episodeLabel() ?: getString(R.string.season_episode, season, episode) else null
+        // 30nama's episode_name is nearly always "فصل 1 - قسمت 4", which the numbers already say: a real one follows them.
+        episodeLine = if (files.size > 1) getString(R.string.season_episode, season, episode) else null
+        val episodeName = info?.str("episode_name")?.takeUnless { it.isGenericEpisode }?.unescaped()?.localDigits()
         // Title, episode and cover for the system and Assistant; next and previous follow the series.
         val titleInfo = stream?.optJSONObject("info")
         val index = files.indexOf(next)
-        session.nowPlaying(titleInfo?.englishName, episodeLine, titleInfo?.cover ?: titleInfo?.poster, hasPrevious = index > 0, hasNext = index < files.lastIndex)
+        session.nowPlaying(titleInfo?.englishName, episodeLine, stream?.cover, hasPrevious = index > 0, hasNext = index < files.lastIndex)
         setSource(positionMs)
+        // The line under the names: what plays, the score, the year, the age (Meta.playerMeta).
+        glue?.subtitle = facts.playerMeta(requireContext(), episodeLine, episodeName, year()?.localDigits())
+        retitled = true
         showEndTime() // after the new item is set: the old one's duration would give a wrong time
     }
 
-    /** The controls' line under the title and its Persian name: the year, the episode (a series), and when it ends ([showEndTime]). */
+    /** What plays, for a series: «فصل ۲، قسمت ۱۰». */
     private var episodeLine: String? = null
-    private var subtitle: String? = "" // "" so the first call sets it, null included
-    /** The subtitle changed width since the cues were placed beside it (see [arrange]). */
+    /** The line under the names changed width since the cues were placed beside it (see [arrange]). */
     private var retitled = false
 
     /**
-     * Netflix's «پایان ساعت ۲۲:۴۵»: now plus what is left at the current speed, once the duration
-     * is known. Checked every tick, so a seek, a pause or a speed change shows within a second; the
-     * glue hears of it only when the minute changes.
+     * Netflix's «پایان ساعت ۲۲:۴۵», beside the length at the bar's end: now plus what is left at the
+     * current speed, once the duration is known. Checked every tick, so a seek, a pause or a speed
+     * change shows within a second; the text changes only when the minute does.
      */
     private fun showEndTime() {
         val left = player.duration.takeIf { it > 0 }?.let { (it - player.currentPosition).coerceAtLeast(0) }
-        val endsAt = left?.let { getString(R.string.player_ends_at, clock(System.currentTimeMillis() + (it / player.playbackParameters.speed).toLong())) }
-        val line = dotted(year()?.localDigits(), episodeLine, endsAt).ifEmpty { null }
-        if (line == subtitle) return
-        subtitle = line
-        glue?.setSubtitle(line)
-        retitled = true
+        val endsAt = left?.let { getString(R.string.player_ends_at, clock(System.currentTimeMillis() + (it / player.playbackParameters.speed).toLong())) }.orEmpty()
+        val shown = view?.findViewById<TextView>(R.id.player_ends) ?: return
+        if (shown.text.toString() != endsAt) shown.text = endsAt
     }
 
     /** 22:45 in Persian digits; in English the device's own 12- or 24-hour clock ("10:45 PM"). */
@@ -503,7 +519,10 @@ class PlayerFragment : VideoSupportFragment() {
         val duration = player.duration.takeIf { it > 0 }?.div(1000) ?: return
         if (seconds <= 0) return
         reportedAt = seconds
-        context?.let { Watched.record(it, f, seconds, duration) }
+        context?.let {
+            Watched.record(it, f, seconds, duration)
+            Watched.leave(it, postId, f, seconds)
+        }
         val mark = Api.progressMark(seconds)
         if (mark <= 0 || Api.user?.optBoolean("user_allowed_to_stream") != true) return
         Api.scope.launch {
@@ -531,6 +550,8 @@ class PlayerFragment : VideoSupportFragment() {
     private var due = 0L
     private var counted = 0L
     private var onDue: (() -> Unit)? = null
+    /** Where the file was picked up part-way, in ms (0: from its start); the pill offers the start from there for [START_OVER_MS]. */
+    private var startOverMs = 0L
     /** Episodes autoplayed in a row with no key pressed in between. */
     private var unattended = 0
     /** Where the pill is: [HIDDEN], [REST] at its corner or [LIFTED] over the controls. */
@@ -599,7 +620,14 @@ class PlayerFragment : VideoSupportFragment() {
         val recapEnd = mark("previously_end")
         val end = f.endMark
         val next = nextFile()
+        // Seeking out of its seconds, or past them, ends the offer for good.
+        if (startOverMs > 0 && t * 1000 !in startOverMs - 1_000 until startOverMs + START_OVER_MS) startOverMs = 0
         val (label, action) = when {
+            startOverMs > 0 -> R.string.player_start_over to {
+                startOverMs = 0
+                player.seekTo(0)
+                player.play()
+            }
             introEnd != null && t >= (mark("intro_start") ?: 0) + 1 && t < introEnd -> R.string.skip_intro to {
                 player.seekTo(introEnd * 1000)
                 player.play()
@@ -612,11 +640,13 @@ class PlayerFragment : VideoSupportFragment() {
             else -> 0 to null
         }
         skipStartMs = when (label) {
+            R.string.player_start_over -> startOverMs
             R.string.skip_intro -> (mark("intro_start") ?: 0) * 1000
             R.string.player_skip_recap -> (recapStart ?: 0) * 1000
             else -> 0
         }
         skipEndMs = when (label) {
+            R.string.player_start_over -> startOverMs + START_OVER_MS
             R.string.skip_intro -> (introEnd ?: 0) * 1000
             R.string.player_skip_recap -> (recapEnd ?: 0) * 1000
             else -> 0
@@ -651,13 +681,17 @@ class PlayerFragment : VideoSupportFragment() {
                     text.setSpan(span, from, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
             skip.text = text
-            val glyph = ContextCompat.getDrawable(context, if (label == R.string.next_episode) R.drawable.player_skip_next else R.drawable.player_skip_forward)!!
+            val glyph = ContextCompat.getDrawable(context, when (label) {
+                R.string.next_episode -> R.drawable.player_skip_next
+                R.string.player_start_over -> R.drawable.player_start_over
+                else -> R.drawable.player_skip_forward
+            })!!
             val size = resources.getDimensionPixelSize(R.dimen.button_icon)
             glyph.setBounds(0, 0, size, size)
             skip.setCompoundDrawablesRelative(glyph, null, null, null)
             when {
                 label == R.string.next_episode -> if (autoplays) countdown(NEXT_MS, ::autoplayNext)
-                action != null && Settings.autoSkip && autoSkipped.add(label) -> countdown(AUTO_SKIP_MS, action)
+                label != R.string.player_start_over && action != null && Settings.autoSkip && autoSkipped.add(label) -> countdown(AUTO_SKIP_MS, action)
             }
         }
         if (view != null) arrange()
@@ -1130,7 +1164,7 @@ class PlayerFragment : VideoSupportFragment() {
     /** The title's year, wherever the stream's answer keeps it, else the one its English name ends in ("Dune 2021"). */
     private fun year(): String? {
         val title = stream?.optJSONObject("info") ?: return null
-        return listOf(title.str("info", "year"), title.str("year"), title.str("title", "english")?.let { Regex("\\d{4}$").find(it)?.value })
+        return listOf(facts.str("info", "year"), title.str("info", "year"), title.str("year"), title.str("title", "english")?.let { Regex("\\d{4}$").find(it)?.value })
             .firstOrNull { (it?.toIntOrNull() ?: 0) > 0 }
     }
 
@@ -1521,7 +1555,7 @@ class PlayerFragment : VideoSupportFragment() {
         val watching = JSONObject().put("progress", player.duration.takeIf { it > 0 }?.let { player.currentPosition * 100 / it } ?: 0L)
         val shelves = seasons.map { (season, list) ->
             getString(R.string.season_n, season) to list.map { f ->
-                context.episodeCard(f, watching.takeIf { f === playing }, art = stream?.optJSONObject("info")?.cover) {
+                context.episodeCard(f, watching.takeIf { f === playing }, art = stream?.cover) {
                     panel.close(controls = f === playing)
                     if (f !== playing) play(f, 0)
                 }
@@ -1558,6 +1592,8 @@ class PlayerFragment : VideoSupportFragment() {
         /** The next episode's countdown, and auto-skip's sweep before it takes an intro or recap. */
         const val NEXT_MS = 10_000L
         const val AUTO_SKIP_MS = 1_500L
+        /** How long a title picked up part-way offers its start, in playing time. */
+        const val START_OVER_MS = 10_000L
         /** How long before the end the next episode's opening starts loading, without a credits mark or before a late one. */
         const val NEAR_END_MS = 120_000L
         /** The seek bar's step for a press, and the pause after the last one before the seek lands. */
@@ -1575,8 +1611,8 @@ class PlayerFragment : VideoSupportFragment() {
         const val TIMING_MAX_MS = 10_000L
         /** In step with the player_speeds labels. */
         val SPEEDS = floatArrayOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
-        /** The title, its Persian name and the episode line, which lifted subtitles clear vertically. */
-        val TITLE = intArrayOf(androidx.leanback.R.id.lb_details_description_title, androidx.leanback.R.id.lb_details_description_subtitle, androidx.leanback.R.id.lb_details_description_body)
+        /** The title, its Persian name, the episode line and the poster beside them, which lifted subtitles clear vertically. */
+        val TITLE = intArrayOf(androidx.leanback.R.id.lb_details_description_title, androidx.leanback.R.id.lb_details_description_subtitle, androidx.leanback.R.id.lb_details_description_body, androidx.leanback.R.id.image)
     }
 
     private object Retry403 : DefaultLoadErrorHandlingPolicy() {
@@ -1639,7 +1675,7 @@ class PlayerFragment : VideoSupportFragment() {
                     vh.title.includeFontPadding = true
                     vh.title.text = title?.let { latin(context, it, R.font.inter_bold) }
                     vh.subtitle.text = persianName
-                    vh.body.text = subtitle?.let { latin(context, it, R.font.inter_regular) }
+                    vh.body.text = subtitle // Meta.metaLine's own faces
                 }
             })
         }

@@ -15,6 +15,7 @@
     <string name="player_sample">Subtitles look like this</string>
     <string name="player_track">Track %d</string>
     <string name="player_skip_recap">Skip recap</string>
+    <string name="player_start_over">Start from the beginning</string>
 
     <string name="player_error_network">The internet connection dropped. Once it\'s back, press Play again.</string>
     <string name="player_error_server">This video isn\'t available right now. Press Play again in a moment.</string>

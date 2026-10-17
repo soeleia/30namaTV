@@ -20,6 +20,8 @@
     <string name="player_track">صدای %d</string>
     <!-- The skip pill over the video: the recap's label, short beside «رد تیتراژ». -->
     <string name="player_skip_recap">رد خلاصه</string>
+    <!-- The same pill for a title picked up part-way, its first seconds: back to the start. -->
+    <string name="player_start_over">پخش از ابتدا</string>
 
     <!-- Playback stopped (PlayerFragment.errorMessage): what went wrong and what to do. Play
          («پخش», the transport's button) retries. -->

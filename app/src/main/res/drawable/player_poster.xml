@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The controls' poster: the posters' corner, and the shape its outline clips the art to. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <corners android:radius="@dimen/corner" />
+    <solid android:color="#1AFFFFFF" />
+</shape>

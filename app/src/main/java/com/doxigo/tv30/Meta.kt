@@ -53,6 +53,17 @@ fun JSONObject.meta(context: Context, lead: String? = null, left: String? = null
     )
 }
 
+/**
+ * The player's line under the title's names, set as home's billboard sets a continue card's: what
+ * plays leading in white (the [episode] and its [name], when 30nama has a real one), then the score
+ * beside its source's mark, the [year] and the age rating. The length and the end are the clock's,
+ * at the bar's end.
+ */
+fun JSONObject.playerMeta(context: Context, episode: String?, name: String?, year: String?): CharSequence {
+    val white = ContextCompat.getColor(context, R.color.text)
+    return metaLine(context, episode?.tinted(white), name?.tinted(white), rating(context), year, str("info", "age")?.let { outlined(context, it) })
+}
+
 /** What the title is, from options.title_type, in a chip; nothing for a type with no name here. */
 fun JSONObject.category(context: Context): CharSequence? {
     val name = when (str("options", "title_type")) {

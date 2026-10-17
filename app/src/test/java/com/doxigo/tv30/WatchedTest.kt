@@ -83,6 +83,25 @@ class WatchedTest {
     }
 
     @Test
+    fun resumePointFurtherAlong() {
+        val ids = listOf("e1", "e2", "e3")
+        fun saved(id: String, time: Long) = org.json.JSONObject().put("file_id", id).put("time", time)
+        // The server kept e2 at 0, the TV left it 20 minutes in: the TV's.
+        assertEquals(1 to 1_200L, Watched.resumePoint(ids, saved("e2", 0), "e2 1200"))
+        // The TV left e2 for e3: the later file, though the server is further into e2.
+        assertEquals(2 to 15L, Watched.resumePoint(ids, saved("e2", 2_000), "e3 15"))
+        // Moved on since on another device: the server's.
+        assertEquals(1 to 900L, Watched.resumePoint(ids, saved("e2", 900), "e1 2400"))
+        // Either alone; neither, or a file no longer listed, is none.
+        assertEquals(0 to 300L, Watched.resumePoint(ids, null, "e1 300"))
+        assertEquals(2 to 60L, Watched.resumePoint(ids, saved("e3", 60), null))
+        assertNull(Watched.resumePoint(ids, null, "gone 300"))
+        assertNull(Watched.resumePoint(ids, null, "e1 broken"))
+        // A film's one file takes either point whatever id it was saved with.
+        assertEquals(0 to 1_590L, Watched.resumePoint(listOf("new"), saved("old", 1_590), "older 30"))
+    }
+
+    @Test
     fun upNextPastSeenEpisodes() {
         val ends = listOf(2_580L, 2_640L, 2_700L, 2_760L)
         // E2 watched again to its credits, E3 already seen: Play goes on to E4.

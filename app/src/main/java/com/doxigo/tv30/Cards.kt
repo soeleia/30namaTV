@@ -59,7 +59,7 @@ fun Context.openDetails(title: JSONObject) = startActivity(DetailsActivity.inten
 
 /** Play, from the title page or the hero: a guest without a free title signs in first, and a plan that can't stream is told so. */
 fun Context.play(title: JSONObject) = when {
-    title.streamable -> startActivity(PlayerActivity.intent(this, title.titleId, title.isFree))
+    title.streamable -> startActivity(PlayerActivity.intent(this, title.titleId, title.isFree, title = title))
     !Api.loggedIn -> startActivity(Intent(this, LoginActivity::class.java))
     else -> toast(getString(R.string.not_allowed_to_stream))
 }

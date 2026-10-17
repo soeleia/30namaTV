@@ -274,12 +274,15 @@ class DetailsActivity : TvActivity() {
         // not yet seen, from its start (a finale starts over), so the button and the marked tile say what Play does.
         val all = stream.optJSONArray("hls").objects()
         val saved = stream.optJSONObject("continue_watching")
+        // The server's point or where this TV left it, as the player picks (Watched.resumePoint).
+        val point = Watched.resumePoint(this, title.titleId, all, saved)
         Watched.seed(this, all, saved)
-        val savedIndex = saved?.str("file_id")?.let { id -> all.indexOfFirst { it.str("info", "file_id") == id } } ?: -1
-        val (playIndex, playAt) = Watched.upNext(this, all, savedIndex, saved?.optLong("time") ?: 0L)
+        val savedIndex = point?.first ?: -1
+        val (playIndex, playAt) = Watched.upNext(this, all, savedIndex, point?.second ?: 0L)
         val resumeFile = all.getOrNull(playIndex)?.str("info", "file_id")
-        // The marked tile: its saved progress where Play resumes it, none where Play starts it.
-        val watching = if (playIndex == savedIndex && playAt > 0) saved else resumeFile?.let { JSONObject().put("progress", 0) }
+        // The marked tile: how far in where Play resumes it, none where Play starts it.
+        val length = all.getOrNull(playIndex)?.let { Watched.of(this, it)?.duration }?.takeIf { it > 0 }
+        val watching = resumeFile?.let { JSONObject().put("progress", if (playIndex == savedIndex && length != null) playAt * 100 / length else 0) }
         playVerb = when {
             playIndex != savedIndex -> R.string.upnext_play
             playAt > 0 -> R.string.resume
@@ -295,7 +298,7 @@ class DetailsActivity : TvActivity() {
             fun card(file: JSONObject): Card {
                 val fileId = file.str("info", "file_id")
                 return episodeCard(file, watching?.takeIf { fileId != null && fileId == resumeFile }, title.cover) {
-                    startActivity(PlayerActivity.intent(this, title.titleId, title.isFree, fileId))
+                    startActivity(PlayerActivity.intent(this, title.titleId, title.isFree, fileId, title))
                 }
             }
             val resumeAt = files.indexOfFirst { resumeFile != null && it.str("info", "file_id") == resumeFile }

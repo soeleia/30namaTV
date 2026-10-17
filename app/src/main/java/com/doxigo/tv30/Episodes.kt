@@ -87,7 +87,7 @@ fun Context.rangeLabel(files: List<JSONObject>, range: IntRange): String = getSt
 )
 
 /** "فصل 1 - قسمت 2", "Episode 2": a number, not a name. */
-private val String.isGenericEpisode get() = any { it.isDigit() } && (contains("قسمت") || contains("Episode", ignoreCase = true))
+val String.isGenericEpisode get() = any { it.isDigit() } && (contains("قسمت") || contains("Episode", ignoreCase = true))
 
 /**
  * Episodes as tiles: the number large at the top, the name and length at the foot, Netflix's red

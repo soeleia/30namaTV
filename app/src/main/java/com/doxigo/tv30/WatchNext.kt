@@ -23,6 +23,7 @@ object WatchNext {
     /** The launcher's way back in: MainActivity opens the player on this title over home. */
     const val EXTRA_PLAY = "play"
     const val EXTRA_FREE = "free"
+    const val EXTRA_TITLE = "title"
 
     /** Loads overlap (start, return from the player, a dismiss): one sync at a time, or a title lands twice. */
     private val lock = Mutex()
@@ -86,6 +87,7 @@ object WatchNext {
         put(WatchNextPrograms.COLUMN_INTENT_URI, Intent(context, MainActivity::class.java)
             .putExtra(EXTRA_PLAY, titleId)
             .putExtra(EXTRA_FREE, isFree)
+            .putExtra(EXTRA_TITLE, playerFacts.toString())
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             .toUri(Intent.URI_INTENT_SCHEME))
     }

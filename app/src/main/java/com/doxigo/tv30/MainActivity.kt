@@ -73,7 +73,7 @@ class MainActivity : TvActivity() {
         val play = if (savedInstanceState == null) intent.getIntExtra(WatchNext.EXTRA_PLAY, 0) else 0
         if (play != 0) {
             Intro.shown = true
-            startActivity(PlayerActivity.intent(this, play, intent.getBooleanExtra(WatchNext.EXTRA_FREE, false)))
+            startActivity(PlayerActivity.intent(this, play, intent.getBooleanExtra(WatchNext.EXTRA_FREE, false), title = intent.getStringExtra(WatchNext.EXTRA_TITLE)?.let(::JSONObject)))
         }
         // The first home of the process opens on the intro, which plays while home loads.
         if (!Intro.shown) {
@@ -598,7 +598,7 @@ class HomeFragment : BrowseSupportFragment() {
                 val where = t.str("data", "episode_title")?.episodeLabel()
                 val progress = t.str("data", "progress")?.toFloatOrNull()?.div(100)
                 t.toCard(context, lead = where, progress = progress, left = t.timeLeft(context), caption = t.shortTimeLeft(context), onLongClick = { confirmDismiss(t) }) {
-                    startActivity(PlayerActivity.intent(context, t.titleId, t.isFree))
+                    startActivity(PlayerActivity.intent(context, t.titleId, t.isFree, title = t))
                 }
             }
         }

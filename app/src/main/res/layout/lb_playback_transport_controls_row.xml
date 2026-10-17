@@ -2,9 +2,10 @@
 <!-- Leanback's player row under its own name (PlaybackTransportRowPresenter finds each part by its
      id), set as the trailer's (trailer_controls): the play cluster over the bar (Glue.dress centres
      it), the clock beneath the bar's two ends, elapsed at the left and the length at the right in
-     either language as the bar fills, and under them the player's own buttons at the start edge,
-     below the title (the right in Persian). Leanback's "/" between the times is gone with them
-     apart. The top half, title and thumbnails, is Leanback's as it was. -->
+     either language as the bar fills, when it ends beside the length, and under them the player's
+     own buttons at the start edge, below the title (the right in Persian). Leanback's "/" between
+     the times is gone with them apart. Above, the title's poster beside its names and facts, their
+     foot level with the poster's; the thumbnails are Leanback's as they were. -->
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -28,20 +29,24 @@
             android:layout_marginBottom="@dimen/lb_playback_transport_control_info_margin_bottom"
             android:orientation="horizontal">
 
+            <!-- The title's poster (Glue's art), rounded as the posters are everywhere else. -->
             <ImageView
                 android:id="@+id/image"
                 android:layout_width="wrap_content"
-                android:layout_height="@dimen/lb_playback_transport_image_height"
-                android:layout_gravity="top"
+                android:layout_height="@dimen/player_poster_height"
+                android:layout_gravity="bottom"
                 android:adjustViewBounds="true"
                 android:layout_marginEnd="@dimen/lb_playback_transport_image_margin_end"
+                android:background="@drawable/player_poster"
+                android:clipToOutline="true"
+                android:importantForAccessibility="no"
                 android:scaleType="fitStart" />
 
             <FrameLayout
                 android:id="@+id/description_dock"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="top"
+                android:layout_gravity="bottom"
                 android:clipToPadding="false"
                 android:gravity="bottom" />
         </LinearLayout>
@@ -90,12 +95,26 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="start" />
 
-            <TextView
-                android:id="@+id/total_time"
-                style="?attr/playbackControlsTimeStyle"
+            <!-- The end, then the length: both the timeline's, so they share its end. -->
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="end" />
+                android:layout_gravity="end"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/player_ends"
+                    style="?attr/playbackControlsTimeStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="20dp" />
+
+                <TextView
+                    android:id="@+id/total_time"
+                    style="?attr/playbackControlsTimeStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
         </FrameLayout>
 
         <!-- A glyph sits 12dp inside its 48dp button, so -12dp lines the first one up with the
