@@ -22,4 +22,17 @@ class HomeTextTest {
         assertEquals("به هم می زند.", "به هم می زند.".trailed())
         assertEquals("a.. b", "a.. b".trailed())
     }
+
+    @Test
+    fun englishNameWithoutYear() {
+        fun title(english: String, year: Int?) = org.json.JSONObject()
+            .put("title", org.json.JSONObject().put("english", english))
+            .put("info", org.json.JSONObject().put("year", year ?: org.json.JSONObject.NULL))
+        assertEquals("Cruella", title("Cruella 2021", 2021).englishName)
+        // 30nama sends the film 1917 year first; trimming the end left «2019» under its poster.
+        assertEquals("1917", title("2019 1917", 2019).englishName)
+        assertEquals("1917", title("1917 2019", 2019).englishName)
+        assertEquals("The Forsytes", title("The Forsytes 2026", 2025).englishName) // the name's year off by one
+        assertEquals("Ted Lasso", title("Ted Lasso 2020", null).englishName) // a stream's info: no year
+    }
 }

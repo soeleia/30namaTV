@@ -30,7 +30,13 @@ fun JSONArray?.objects(): List<JSONObject> = if (this == null) emptyList() else 
 
 val JSONObject.titleId get() = optInt("id")
 // The English name ends in the year ("Black Clover 2017"); the official app trims it and shows the year apart.
-val JSONObject.englishName get() = (str("title", "english") ?: str("title", "local").orEmpty()).replace(Regex("\\s+\\d{4}$"), "").unescaped()
+val JSONObject.englishName get() = (str("title", "english") ?: str("title", "local").orEmpty()).withoutYear(str("info", "year")).unescaped()
+/**
+ * Now and then the year comes first ("2019 1917", the film 1917), so a leading [year] goes before
+ * any trailing four digits. Not [year] alone at the end: it can differ by one ("The Forsytes 2026", 2025).
+ */
+private fun String.withoutYear(year: String?) =
+    if (year != null && startsWith("$year ")) removePrefix("$year ") else replace(Regex("\\s+\\d{4}$"), "")
 /** The Persian name, when 30nama has one that says more than the English. */
 val JSONObject.localName get() = str("title", "local")?.unescaped()?.takeIf { it != englishName }
 val JSONObject.poster get() = str("image", "poster", "webp", "large") ?: str("image", "poster", "jpg", "large")
