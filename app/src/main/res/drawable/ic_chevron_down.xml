@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A filter pill's "opens a list": a small chevron after the label, in the app's outline stroke and
+     the button's ink. Smaller than a leading icon, so the label leads. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="16dp" android:height="16dp" android:viewportWidth="24" android:viewportHeight="24"
+    android:tint="@color/on_button">
+    <path
+        android:pathData="M6.5,9.5l5.5,5.5l5.5,-5.5"
+        android:strokeWidth="2.2"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

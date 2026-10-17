@@ -260,7 +260,12 @@ object Api {
         result("search", "query" to query, "streamonly" to true, "page" to page) as JSONObject
     suspend fun archive(slugs: String, page: Int, orderBy: String) =
         result("archive", "slugs" to slugs, "streamonly" to true, "page" to page, "orderby" to orderBy, "order" to "DESC") as JSONObject
-    /** [params] as the official SDK sends them, e.g. {"actor": "nm1172478", "stream": "true"}: people by IMDb id, as names match loosely. */
+    /** What advanced_search can narrow by: {genre, country, imdb_rate: [{name, value}], min_year, max_year, …}. */
+    suspend fun filterChoices() = result("advanced_search_parameters") as JSONObject
+    /**
+     * [params] as the official SDK sends them, e.g. {"actor": "nm1172478", "stream": "true"}: people by IMDb id, as names match loosely.
+     * The server ignores a `type` or `genre` given as a string, and finds nothing for a `country` given as a list (Filter.parameters).
+     */
     suspend fun advancedSearch(params: JSONObject, page: Int, orderBy: String) =
         result("advanced_search", "parameters" to params.toString(), "page" to page, "orderby" to orderBy, "order" to "DESC") as JSONObject
     suspend fun continueWatching() = result("continue_watching")

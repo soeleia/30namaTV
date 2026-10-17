@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A catalogue's filters (GridFragment): each pill names its kind until a choice names it instead;
+     a picker's first row takes the filter off again. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fa">
+    <string name="filter_genre">ژانر</string>
+    <string name="filter_country">کشور</string>
+    <string name="filter_decade">دهه</string>
+    <string name="filter_all_genres">همهٔ ژانرها</string>
+    <string name="filter_all_countries">همهٔ کشورها</string>
+    <string name="filter_any_score">همهٔ امتیازها</string>
+    <string name="filter_any_decade">همهٔ دهه‌ها</string>
+    <!-- %s is the decade's first year in Persian digits: «دههٔ ۲۰۱۰». -->
+    <string name="filter_decade_value">دههٔ %s</string>
+    <!-- The round × before the pills, and the empty result's one button. -->
+    <string name="filter_clear">حذف فیلترها</string>
+    <string name="filter_empty_title">با این فیلترها عنوانی پیدا نشد</string>
+    <string name="filter_empty_hint">یکی از فیلترها را بردارید یا همه را با هم حذف کنید.</string>
+</resources>

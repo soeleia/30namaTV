@@ -15,6 +15,7 @@ import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewOutlineProvider
 import android.view.Window
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
@@ -24,6 +25,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.annotation.DrawableRes
 import androidx.core.content.ContextCompat
@@ -69,9 +71,11 @@ import java.util.Locale
 //     requireActivity().choose(getString(R.string.sort_by), SORTS.map { getString(it.second) }, sort) { picked ->
 //         if (picked != sort) { sort = picked; pager.reset() }
 //     }
-//     One of a short list (up to about nine), from a panel at the end edge as the player's
-//     settings come in: the current one checked and under the remote. OK applies and closes;
-//     onChoose gets the index of any pick, the current one too. Back and Esc close without it.
+//     One of a list, from a panel at the end edge as the player's settings come in: the current
+//     one checked and under the remote. About nine rows fit; a longer list (a catalogue's 87
+//     countries) scrolls with the remote, fading over 48dp at an edge with more past it, as
+//     Settings' panel does. OK applies and closes; onChoose gets the index of any pick, the
+//     current one too. Back and Esc close without it.
 //
 //   Activity.ask(title, value: String, link: String,
 //                onSave: (key: String, answer: (note: CharSequence?, works: Boolean?) -> Unit) -> Unit)
@@ -165,10 +169,21 @@ fun Activity.choose(title: CharSequence, options: List<CharSequence>, current: I
     }
     panel.addView(text(title, R.style.TextAppearance_App_DialogTitle).apply { textAlignment = View.TEXT_ALIGNMENT_VIEW_START },
         linear(MATCH, WRAP).apply { bottomMargin = px(20) })
-    // ponytail: no scrolling; the panel holds about nine rows on a 540dp screen. Wrap the rows
-    // in a ScrollView if a longer list ever comes.
     val rows = options.mapIndexed { i, label -> choice(label, i == current) }
-    rows.forEach { panel.addView(it, linear(MATCH, px(44)).apply { bottomMargin = px(4) }) }
+    val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+    rows.forEach { list.addView(it, linear(MATCH, px(44)).apply { bottomMargin = px(4) }) }
+    // ScrollView brings the focused row into view itself, the current one too as the sheet opens.
+    panel.addView(ScrollView(this).apply {
+        // The panel lets lifted rows past its edges, which stops it clipping this to its bounds:
+        // the scrolled rows drew over the title and on up the screen. The outline clips instead.
+        outlineProvider = ViewOutlineProvider.BOUNDS
+        clipToOutline = true
+        isVerticalScrollBarEnabled = false
+        overScrollMode = View.OVER_SCROLL_NEVER
+        isVerticalFadingEdgeEnabled = true
+        setFadingEdgeLength(px(48))
+        addView(list)
+    }, linear(MATCH, 0, 1f))
 
     // In from the end edge, where the player's settings come from too.
     val sheet = Sheet(this, panel, FrameLayout.LayoutParams(px(400), MATCH, Gravity.END), SCRIM_PANEL, dx = 48 * dp * if (rtl) -1 else 1)

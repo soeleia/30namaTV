@@ -307,6 +307,7 @@ White glass that turns solid white under the remote: quiet and sure under a 38sp
 - **Primary:** Play / Resume and the hero's «اطلاعات بیشتر» / "More info": glass-primary (25% white) with a 20dp leading icon, 16dp padding on the icon side and 22dp on the label side.
 - **Secondary:** label only (Check now, Guest, Retry, dialogs): glass-secondary (14% white), 22dp padding.
 - **Round:** an icon-only toggle (favourite, watchlist, notify), the pill closed to a 44dp circle with the 20dp icon centred.
+- **Filter:** the catalogue grids' genre, country, IMDb and decade (Movies, Series, Anime), on their own line under the page name so they never crowd it, from the reading start. The label, then a 16dp chevron 4dp after it (16dp padding on that side, 22dp on the label's), at most 168dp wide. Unset, it names its kind on secondary glass («ژانر», "IMDb"); set, it names the choice («درام», «IMDb ۷+», «دههٔ ۲۰۱۰») on primary glass (activated, never a swapped drawable). A round × after them clears all, there only while a filter is set. Each opens choose's end-edge panel, its first row taking that filter off; a long list scrolls, fading over 48dp at an edge.
 - **Focus:** fill fades to solid white in 150ms (100ms out), label and icon turn ink, and the button scales to 1.05 over 180ms (ease-out), settling over 120ms. **Pressed:** text-body, back to scale 1. **Disabled:** 7% white, faint label.
 
 ### Chips

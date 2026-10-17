@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Takes every filter off: a cross, in the app's outline stroke and the button's ink. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="@dimen/button_icon" android:height="@dimen/button_icon" android:viewportWidth="24" android:viewportHeight="24"
+    android:tint="@color/on_button">
+    <path
+        android:pathData="M6.5,6.5L17.5,17.5M17.5,6.5L6.5,17.5"
+        android:strokeWidth="1.8"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round" />
+</vector>

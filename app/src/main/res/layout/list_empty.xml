@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- An empty list, in the middle of where its grid would be: what is (not) here, how titles get
-     here, and one button to the suggested archive. -->
+     here, and one button to the suggested archive. A filtered catalogue with nothing in it says so
+     here too, its button taking the filters off (GridFragment). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/list_empty"
     android:layout_width="wrap_content"
@@ -10,12 +11,14 @@
     android:orientation="vertical">
 
     <TextView
+        android:id="@+id/list_empty_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/lists_empty_title"
         android:textAppearance="@style/TextAppearance.App.DialogTitle" />
 
     <TextView
+        android:id="@+id/list_empty_hint"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"

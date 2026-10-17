@@ -10,7 +10,7 @@ import sys
 import tarfile
 import tempfile
 
-CHECKS = ("performance", "intro", "controls", "alignment", "subtitles", "translate", "skip", "title", "lists", "search", "genres", "trailer", "updates", "watched", "resume")
+CHECKS = ("performance", "intro", "controls", "alignment", "subtitles", "translate", "skip", "title", "lists", "search", "genres", "trailer", "updates", "watched", "resume", "filters")
 
 
 def passed(output):

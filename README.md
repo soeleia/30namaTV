@@ -6,7 +6,7 @@ An **unofficial, independent** native Kotlin app for browsing and watching 30nam
 
 Android 6.0+ (API 23). Universal APK; no React Native runtime. Release builds use R8 optimization and resource shrinking. Browsing stays available while account/menu extras load, posters are decoded to display size, and search requests are cancelled when replaced.
 
-Search uses a six-column vertical grid. Home shows every genre in its row, ending in a link to the dedicated four-column genre page.
+Search uses a six-column vertical grid. Home shows every genre in its row, ending in a link to the dedicated four-column genre page. Movies, Series and Anime can be narrowed by genre, country, a minimum IMDb score and decade, alone or together, under any of the six sort orders.
 
 ## Features
 
@@ -70,7 +70,7 @@ Public APKs carry no API keys (see [service keys](#service-keys)). For your own 
 python3 scripts/tv-checks.py --serial emulator-5554
 ```
 
-Use a disposable emulator. Fixture checks replace local preferences and use mocked account data; the runner rejects physical devices. They cover startup/cancellation, logo playback and cleanup, five-second control hiding, play/pause focus, accelerating and self-landing seeks, cancelled/backward seeks, column alignment, Persian lines fitting their width, subtitle direction and centering, making Persian subtitles (part by part, with a refused key), title clipping, intro/recap countdown, watched episodes, My Lists, vertical search and recent searches, the complete genre page, update validation/status and trailer playback/lifecycle.
+Use a disposable emulator. Fixture checks replace local preferences and use mocked account data; the runner rejects physical devices. They cover startup/cancellation, logo playback and cleanup, five-second control hiding, play/pause focus, accelerating and self-landing seeks, cancelled/backward seeks, column alignment, Persian lines fitting their width, subtitle direction and centering, making Persian subtitles (part by part, with a refused key), title clipping, intro/recap countdown, watched episodes, My Lists, vertical search and recent searches, the complete genre page, catalogue filters (D-pad, parameters, stale pages, paging, clear and empty results), update validation/status and trailer playback/lifecycle.
 
 The trailer check attempts the public Animals trailer. If its CDN is unreachable, logs state `PUBLIC_UNAVAILABLE` and use a silence fixture for interaction/lifecycle checks. That result does not certify live CDN playback.
 

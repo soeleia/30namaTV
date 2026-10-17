@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="filter_genre">Genre</string>
+    <string name="filter_country">Country</string>
+    <string name="filter_decade">Decade</string>
+    <string name="filter_all_genres">All genres</string>
+    <string name="filter_all_countries">All countries</string>
+    <string name="filter_any_score">Any rating</string>
+    <string name="filter_any_decade">Any decade</string>
+    <string name="filter_decade_value">%ss</string>
+    <string name="filter_clear">Clear filters</string>
+    <string name="filter_empty_title">Nothing matches these filters</string>
+    <string name="filter_empty_hint">Remove one of them, or clear them all.</string>
+</resources>

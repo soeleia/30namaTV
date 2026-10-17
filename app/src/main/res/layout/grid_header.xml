@@ -3,32 +3,92 @@
      starts, the sort button at the other end naming the order now. Leanback's bar had a search
      orb there that pulsed red and cast a shadow under focus; this is the app's own button, white
      under the remote like every other. Same padding and 60dp line as Leanback's, so the grid
-     beneath keeps its place; the padding doesn't clip, so the button's lift draws whole. -->
+     beneath keeps its place; nothing clips, so a button's lift draws whole.
+     On Movies, Series and Anime a second line holds the filters, under the page name: genre,
+     country, IMDb, decade, then clear while any is set. On the title's line they crowded the page
+     name out. -->
 <com.doxigo.tv30.GridHeader xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@id/browse_title_group"
     style="?attr/browseTitleViewStyle"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:clipChildren="false"
     android:clipToPadding="false"
-    android:gravity="center_vertical"
-    android:orientation="horizontal">
+    android:orientation="vertical">
 
-    <TextView
-        android:id="@id/title_text"
-        android:layout_width="0dp"
-        android:layout_height="@dimen/lb_browse_title_height"
-        android:layout_weight="1"
-        android:ellipsize="end"
-        android:gravity="center_vertical|start"
-        android:maxLines="1"
-        android:textAlignment="viewStart"
-        android:textAppearance="@style/TextAppearance.Leanback.Title" />
-
-    <Button
-        android:id="@+id/grid_sort"
-        style="@style/Widget.App.Button.Icon"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="24dp"
-        android:drawableStart="@drawable/ic_sort" />
+        android:clipChildren="false"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@id/title_text"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/lb_browse_title_height"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:gravity="center_vertical|start"
+            android:maxLines="1"
+            android:textAlignment="viewStart"
+            android:textAppearance="@style/TextAppearance.Leanback.Title" />
+
+        <Button
+            android:id="@+id/grid_sort"
+            style="@style/Widget.App.Button.Icon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="24dp"
+            android:drawableStart="@drawable/ic_sort" />
+    </LinearLayout>
+
+    <!-- Hidden until 30nama lists the choices; clear is invisible rather than gone while nothing
+         is set, so nothing shifts as it comes and goes. -->
+    <LinearLayout
+        android:id="@+id/grid_filters"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:clipChildren="false"
+        android:gravity="center_vertical|start"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <Button
+            android:id="@+id/filter_genre"
+            style="@style/Widget.App.Button.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+        <Button
+            android:id="@+id/filter_country"
+            style="@style/Widget.App.Button.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/button_gap" />
+
+        <Button
+            android:id="@+id/filter_score"
+            style="@style/Widget.App.Button.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/button_gap" />
+
+        <Button
+            android:id="@+id/filter_decade"
+            style="@style/Widget.App.Button.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/button_gap" />
+
+        <Button
+            android:id="@+id/filter_clear"
+            style="@style/Widget.App.Button.Round"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/button_gap"
+            android:contentDescription="@string/filter_clear"
+            android:drawableStart="@drawable/ic_clear"
+            android:visibility="invisible" />
+    </LinearLayout>
 </com.doxigo.tv30.GridHeader>
