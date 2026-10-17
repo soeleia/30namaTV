@@ -12,6 +12,7 @@ import android.os.Bundle
 import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
 import androidx.media3.exoplayer.ExoPlayer
 import okhttp3.OkHttpClient
@@ -80,6 +81,21 @@ object ResumeChecks {
 
         fun Opened.offersStart() = skip.isShown && skip.text.toString() == activity.getString(R.string.player_start_over)
 
+        /**
+         * The controls up with the remote on play/pause, as a viewer gets them: hidden, then a key.
+         * Leanback hands the row's focus to the bar whenever they fade out (onReappear) and the app
+         * moves it to play/pause as they show, so only a reveal says where the remote starts.
+         */
+        fun Opened.revealed() {
+            runOnMainSync { fragment.hideControlsOverlay(false) }
+            await("The controls did not hide") { !fragment.isControlsOverlayVisible }
+            sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN)
+            await("The controls did not open on play/pause") {
+                val actions = activity.findViewById<View>(androidx.leanback.R.id.controls_dock).findViewById<ViewGroup>(androidx.leanback.R.id.control_bar)
+                fragment.isControlsOverlayVisible && actions.getChildAt(actions.childCount / 2).hasFocus()
+            }
+        }
+
         fun Opened.close() {
             runOnMainSync { activity.finish() }
             await("Player did not close") { activity.isDestroyed }
@@ -99,12 +115,11 @@ object ResumeChecks {
             runOnMainSync { check(opened.exo.currentPosition in 299_000..305_000) { "Started at ${opened.exo.currentPosition} ms, not the saved 300 s" } }
             await("The start was not offered") { opened.offersStart() }
             await("The poster did not show") { opened.activity.findViewById<View>(androidx.leanback.R.id.image)?.let { it.isShown && it.width > 0 } == true }
-            runOnMainSync { opened.fragment.tickle() } // the controls up, whatever their timer says
+            opened.revealed()
             SystemClock.sleep(1_500) // the pill settled over them
             capture("resume-start-over")
             // The seek bar with the remote: its dot.
-            runOnMainSync { opened.fragment.tickle() }
-            SystemClock.sleep(600) // Leanback's fade-in hands the remote to play/pause first
+            opened.revealed()
             sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP) // play/pause, under the bar, up to it
             await("The seek bar did not take the remote") { opened.activity.findViewById<View>(androidx.leanback.R.id.playback_progress).isFocused }
             SystemClock.sleep(300)
@@ -130,11 +145,12 @@ object ResumeChecks {
             saved = """{"file_id":"$id","time":300,"progress":50}"""
             opened = open()
             await("The start was not offered in English") { opened.offersStart() }
-            runOnMainSync { opened.fragment.tickle() }
             await("The poster did not show in English") { opened.activity.findViewById<View>(androidx.leanback.R.id.image)?.let { it.isShown && it.width > 0 } == true }
+            opened.revealed()
             SystemClock.sleep(1_500)
             capture("resume-start-over-en")
             // One row: Right from play/pause runs past next into the panels' buttons.
+            opened.revealed()
             repeat(3) { sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_RIGHT) }
             runOnMainSync {
                 val panels = opened.activity.findViewById<View>(androidx.leanback.R.id.secondary_controls_dock)
