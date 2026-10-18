@@ -68,6 +68,7 @@ class PerformanceChecks : Instrumentation() {
             "resume" -> return ResumeChecks.run(this)
             "filters" -> return FiltersChecks.run(this)
             "captions" -> return CaptionChecks.run(this)
+            "dismiss" -> return DismissChecks.run(this)
         }
         val result = Bundle()
         try {

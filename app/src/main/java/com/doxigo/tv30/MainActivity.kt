@@ -1,5 +1,6 @@
 package com.doxigo.tv30
 
+import android.content.Context
 import android.content.Intent
 import android.annotation.SuppressLint
 import android.os.Bundle
@@ -598,21 +599,33 @@ class HomeFragment : BrowseSupportFragment() {
         else forgetSession(requireContext())
     }
 
+    /** The continue row's last answer, as the server sent it; what shows leaves out [dismissed] titles. */
+    private var watching = JSONArray()
+
     /** A failed fetch keeps what is there; one from the last run is replaced as soon as this answers, as progress moves. */
     private suspend fun loadContinueWatching() {
         val result = runCatching { Api.continueWatching() }.getOrNull() ?: return
         val context = context ?: return
         val posts = (result as? JSONObject)?.optJSONArray("posts") ?: result as? JSONArray ?: JSONArray()
-        keep(HomeCache.WATCHING, posts)
-        // The launcher's Play Next row mirrors this one. Api.scope, so leaving home mid-sync can't cut it short.
-        Api.scope.launch { WatchNext.sync(context.applicationContext, posts.objects()) }
+        // Gone from the server's list too: watched again later, a title may come back.
+        dismissed.retainAll(posts.objects().map { it.titleId }.toSet())
         showContinueWatching(posts)
+        mirror(context)
+    }
+
+    /** The row as it shows, kept for the next launch and mirrored on the launcher's Play Next row (WatchNext). */
+    private fun mirror(context: Context) {
+        val shown = JSONArray(watching.objects().filter { it.titleId !in dismissed })
+        keep(HomeCache.WATCHING, shown)
+        // Api.scope, so leaving home mid-sync can't cut it short.
+        Api.scope.launch { WatchNext.sync(context.applicationContext, shown.objects()) }
     }
 
     private suspend fun showContinueWatching(posts: JSONArray) {
         val context = context ?: return
+        watching = posts
         val cards = withContext(Dispatchers.Default) {
-            posts.objects().map { t ->
+            posts.objects().filter { it.titleId !in dismissed }.map { t ->
                 // data: {episode_title: "فصل 1 - قسمت 4", display_time: "00:33:00", progress, ...}. The
                 // red bar already says how far in, so the line names only the episode: «فصل ۱، قسمت ۴».
                 val where = t.str("data", "episode_title")?.episodeLabel()
@@ -631,8 +644,15 @@ class HomeFragment : BrowseSupportFragment() {
         activity.confirm(title.englishName, getString(R.string.continue_remove_question), getString(R.string.continue_remove), art = title.poster,
             secondary = getString(R.string.continue_info), onSecondary = { activity.openDetails(title) },
             actionIcon = R.drawable.settings_ic_clear, secondaryIcon = R.drawable.promo_info) {
+            // Off the row at once: the server takes a while to answer, and its list longer to drop the title.
+            dismissed += title.titleId
             lifecycleScope.launch {
-                runCatching { Api.dismissContinueWatching(title.titleId) }
+                showContinueWatching(watching)
+                mirror(activity)
+                runCatching { Api.dismissContinueWatching(title.titleId) }.onFailure {
+                    dismissed -= title.titleId // the server kept it: it comes back, and says why
+                    activity.toast(it)
+                }
                 loadContinueWatching()
             }
         }
@@ -706,6 +726,12 @@ class HomeFragment : BrowseSupportFragment() {
                     old.progress == new.progress && old.free == new.free && old.plot == new.plot && old.backdrop == new.backdrop &&
                     old.mosaic == new.mosaic
         }
+
+        /**
+         * Titles taken off Continue Watching on this TV that the server may still send for a while;
+         * each is forgotten once its list stops sending it. Main thread only.
+         */
+        private val dismissed = HashSet<Int>()
 
         const val TOP = -1
         const val CONTINUE = 0
