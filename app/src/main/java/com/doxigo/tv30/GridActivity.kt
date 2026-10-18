@@ -51,9 +51,8 @@ class GridActivity : TvActivity() {
     }
 
     companion object {
-        /** [sort] opens it in that order (one of the sort button's), as home's ranked rows do; else the first. */
-        fun archive(context: Context, slug: String, name: String, sort: String? = null): Intent =
-            Intent(context, GridActivity::class.java).putExtra("slug", slug).putExtra("name", name).putExtra("sort", sort)
+        fun archive(context: Context, slug: String, name: String): Intent =
+            Intent(context, GridActivity::class.java).putExtra("slug", slug).putExtra("name", name)
 
         fun list(context: Context, group: String, name: String): Intent =
             Intent(context, GridActivity::class.java).putExtra("group", group).putExtra("name", name)
@@ -86,7 +85,6 @@ class GridFragment : VerticalGridSupportFragment() {
         val shared = listOf("update" to R.string.sort_update, "year" to R.string.sort_year, "favorite" to R.string.sort_favorite,
             "imdb-rate" to R.string.sort_imdb)
         sorts = listOf((if (group != null) "add_list" to R.string.sort_added else "relevant" to R.string.sort_relevant)) + shared
-        sort = sorts.indexOfFirst { it.first == extras.getStringExtra("sort") }.coerceAtLeast(0)
 
         setGridPresenter(VerticalGridPresenter(FocusHighlight.ZOOM_FACTOR_NONE, false).apply {
             numberOfColumns = if (genreMenu) 4 else 6

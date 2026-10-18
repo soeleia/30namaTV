@@ -46,15 +46,14 @@ import org.json.JSONObject
 /**
  * A title as a poster, carrying what the billboard shows when the remote rests on it. A continue
  * card's caption is its time [left] instead of the score and year, or [caption], a shorter way of saying it.
- * A ranked row's card carries its place, [rank], drawn beside the poster (PosterPresenter's ranked).
  * OK held opens the title's quick actions (Sheets.kt), unless [onLongClick] says otherwise, as
  * Continue Watching's does.
  */
 fun JSONObject.toCard(
-    context: Context, lead: String? = null, progress: Float? = null, left: String? = null, caption: String? = left, rank: String? = null,
+    context: Context, lead: String? = null, progress: Float? = null, left: String? = null, caption: String? = left,
     onLongClick: (() -> Unit)? = { (context as? FragmentActivity)?.quickActions(this) }, onClick: () -> Unit,
 ) = Card(englishName, meta(context, lead, left), poster, plot = plot, backdrop = cover, localTitle = localName, source = this,
-    facts = caption ?: facts(context), numeral = rank, progress = progress, free = isFree, onLongClick = onLongClick, onClick = onClick)
+    facts = caption ?: facts(context), progress = progress, free = isFree, onLongClick = onLongClick, onClick = onClick)
 
 fun Context.openDetails(title: JSONObject) = startActivity(DetailsActivity.intent(this, title))
 
@@ -85,7 +84,7 @@ class Card(
     val source: JSONObject? = null,
     /** A poster's caption under the title: the IMDb score and the year. */
     val facts: CharSequence? = null,
-    /** An episode's number, set large on its tile; a ranked poster's place, set large beside it. */
+    /** An episode's number, set large on its tile. */
     val numeral: String? = null,
     /** An episode seen through (Watched.kt): its tile wears a check and steps back. */
     val watched: Boolean = false,
@@ -179,11 +178,8 @@ private class RowTitle : RowHeaderPresenter() {
     }
 }
 
-/**
- * Posters: artwork only, the white focus frame, and the red progress bar when there is one.
- * [ranked] posters stand beside their place (Card.numeral), Netflix's Top 10 (see [RankNumeral]).
- */
-class PosterPresenter(private val width: Int = 124, private val height: Int = 186, private val ranked: Boolean = false) : Presenter() {
+/** Posters: artwork only, the white focus frame, and the red progress bar when there is one. */
+class PosterPresenter(private val width: Int = 124, private val height: Int = 186) : Presenter() {
     /**
      * The caption's two faces, resolved once: Inter for Latin names and Peyda for a title 30nama has only in Persian, which would otherwise fall back
      * to the system's Arabic font.
@@ -191,7 +187,6 @@ class PosterPresenter(private val width: Int = 124, private val height: Int = 18
     private var latin: Typeface? = null
     private var persian: Typeface? = null
     private var badge: FreeBadge? = null
-    private var numeral: RankNumeral? = null
 
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
         val card = PosterCard(parent.context)
@@ -199,13 +194,9 @@ class PosterPresenter(private val width: Int = 124, private val height: Int = 18
             latin = card.title?.typeface
             persian = parent.context.font(R.font.peyda_semibold)
             badge = FreeBadge(parent.context)
-            if (ranked) numeral = RankNumeral(parent.context)
         }
         val dp = parent.resources.displayMetrics.density
         card.setMainImageDimensions((width * dp).toInt(), (height * dp).toInt())
-        // The place stands in the card's start padding, so the caption keeps to the poster's width.
-        card.numeral = numeral
-        if (ranked) card.setPaddingRelative((RankNumeral.SLOT * dp).toInt(), 0, 0, 0)
         card.isFocusable = true
         card.mainImageView!!.apply {
             outlineProvider = ROUNDED
@@ -221,8 +212,7 @@ class PosterPresenter(private val width: Int = 124, private val height: Int = 18
         view.titleText = card.title
         view.title?.typeface = if (card.title.isLatin) latin else persian
         view.contentText = card.facts
-        view.rank = card.numeral
-        view.contentDescription = listOfNotNull(view.rank, card.title, card.facts?.toString()).joinToString("، ")
+        view.contentDescription = listOfNotNull(card.title, card.facts?.toString()).joinToString("، ")
         view.light(light(view.context, card.progress))
         view.badge = badge.takeIf { card.free }
         view.mainImageView!!.load(card.image) { placeholder(blank(view.context)); error(blank(view.context)); crossfade(Motion.IMAGE) }
@@ -270,13 +260,6 @@ private class PosterCard(context: Context) : ImageCardView(context) {
             if (field !== value) invalidate()
             field = value
         }
-    /** A ranked poster's place and the paint that draws it, in the start padding beside the art. */
-    var numeral: RankNumeral? = null
-    var rank: String? = null
-        set(value) {
-            if (field != value) invalidate()
-            field = value
-        }
     /** This press of OK already long-pressed, so its release must not also click. */
     private var longPressed = false
 
@@ -294,23 +277,12 @@ private class PosterCard(context: Context) : ImageCardView(context) {
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         val image = mainImageView ?: return
-        // The art's own centre: a ranked card's place lifts with it from beside it.
-        pivotX = (image.left + image.right) / 2f
+        pivotX = width / 2f
         pivotY = image.bottom.toFloat()
         info?.let {
             it.pivotX = pivotX - it.left
             it.pivotY = pivotY - it.top
         }
-    }
-
-    /**
-     * BaseCardView sizes the caption to the art, then ViewGroup's measureChild takes the start
-     * padding (a ranked card's place) off it again; the caption spans the art whatever the padding.
-     */
-    override fun measureChild(child: View, parentWidthMeasureSpec: Int, parentHeightMeasureSpec: Int) {
-        val params = child.layoutParams
-        child.measure(getChildMeasureSpec(parentWidthMeasureSpec, 0, params.width),
-            getChildMeasureSpec(parentHeightMeasureSpec, paddingTop + paddingBottom, params.height))
     }
 
     /** The caption undoes the card's scale. */
@@ -382,8 +354,6 @@ private class PosterCard(context: Context) : ImageCardView(context) {
     private val Int.isOk get() = this == KeyEvent.KEYCODE_DPAD_CENTER || this == KeyEvent.KEYCODE_ENTER || this == KeyEvent.KEYCODE_NUMPAD_ENTER
 
     override fun dispatchDraw(canvas: Canvas) {
-        // The place first, so the art covers the part tucked under it.
-        rank?.let { rank -> mainImageView?.let { numeral?.draw(canvas, it, rank) } }
         super.dispatchDraw(canvas)
         val image = mainImageView ?: return
         badge?.draw(canvas, image)
@@ -421,60 +391,6 @@ private class FreeBadge(context: Context) {
         canvas.drawRoundRect(box, corner, corner, fill)
         val font = ink.fontMetrics
         canvas.drawText(word, box.left + pad, box.centerY() - (font.ascent + font.descent) / 2, ink)
-    }
-}
-
-/**
- * A ranked poster's place, as Netflix's Top 10 sets it: a numeral two-thirds the poster's height in
- * the display face (Peyda Bold for Persian digits, Inter Bold for Latin), standing on the art's
- * foot at its start side and tucked under its edge. Ink with a faint rim: it reads on the ink
- * ground from the sofa and stays out of the white that means focus. Flat, no shadow.
- */
-private class RankNumeral(context: Context) {
-    private val dp = context.resources.displayMetrics.density
-    private val latin = context.font(R.font.inter_bold)
-    private val persian = context.font(R.font.peyda_bold)
-    private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = ContextCompat.getColor(context, R.color.ink)
-        textSize = SIZE * dp
-    }
-    private val rim = Paint(fill).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = 2 * dp
-        strokeJoin = Paint.Join.ROUND
-        color = ContextCompat.getColor(context, R.color.text_faint)
-    }
-    private val bounds = Rect()
-
-    /**
-     * Snug to the art: a quarter of its width (up to [TUCK]dp) goes under it, more only for one
-     * wider than the slot, and past [TUCK_MAX]dp it narrows instead (a Latin "10") rather than hide.
-     */
-    fun draw(canvas: Canvas, image: View, rank: String) {
-        fill.typeface = if (rank.isLatin) latin else persian
-        fill.textScaleX = 1f
-        fill.getTextBounds(rank, 0, rank.length, bounds)
-        val slot = SLOT * dp
-        val max = TUCK_MAX * dp
-        if (bounds.width() > slot + max) {
-            fill.textScaleX = (slot + max) / bounds.width()
-            fill.getTextBounds(rank, 0, rank.length, bounds)
-        }
-        rim.typeface = fill.typeface
-        rim.textScaleX = fill.textScaleX
-        val tuck = maxOf(minOf(TUCK * dp, bounds.width() / 4f), bounds.width() - slot).coerceAtMost(max)
-        val x = if (image.layoutDirection == View.LAYOUT_DIRECTION_RTL) image.right - tuck - bounds.left else image.left + tuck - bounds.right
-        val y = image.bottom - bounds.bottom.toFloat()
-        canvas.drawText(rank, x, y, fill)
-        canvas.drawText(rank, x, y, rim)
-    }
-
-    companion object {
-        /** The numeral's size and the room beside the poster for it, in dp, at a 108 × 162 poster. */
-        const val SIZE = 150f
-        const val SLOT = 72f
-        const val TUCK = 16f
-        const val TUCK_MAX = 40f
     }
 }
 

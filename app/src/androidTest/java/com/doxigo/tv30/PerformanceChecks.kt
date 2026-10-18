@@ -67,7 +67,7 @@ class PerformanceChecks : Instrumentation() {
             "watched" -> return WatchedChecks.run(this)
             "resume" -> return ResumeChecks.run(this)
             "filters" -> return FiltersChecks.run(this)
-            "ranks" -> return RankChecks.run(this)
+            "captions" -> return CaptionChecks.run(this)
         }
         val result = Bundle()
         try {
@@ -139,8 +139,6 @@ class PerformanceChecks : Instrumentation() {
                         "user", "user_mylist" -> "{}"
                         "user_list" -> """{"posts":[]}"""
                         "continue_watching" -> """{"posts":[{"id":2,"title":{"english":"Continue test"},"options":{"title_type":"movie"}}]}"""
-                        // The ranked rows come after the catalogue too, so they wait with the extras.
-                        "archive" -> """{"posts":[{"id":3,"title":{"english":"Ranked test"},"options":{"title_type":"movie"}}],"page":1,"pages":1}"""
                         else -> error("Unexpected request: $action")
                     }
                 }
@@ -172,7 +170,7 @@ class PerformanceChecks : Instrumentation() {
             withTimeout(5_000) {
                 while (!withContext(Dispatchers.Main) {
                     val home = activity.supportFragmentManager.findFragmentById(R.id.browse_host) as? HomeFragment
-                    home?.adapter?.size() == (if (signedIn) 6 else 4)
+                    home?.adapter?.size() == (if (signedIn) 4 else 2)
                 }) delay(20)
             }
             withContext(Dispatchers.Main) {

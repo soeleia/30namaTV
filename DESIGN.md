@@ -41,10 +41,6 @@ typography:
     fontFamily: "Peyda Bold"
     fontSize: "40sp"
     fontWeight: 700
-  rank:
-    fontFamily: "Peyda Bold (Persian digits), Inter Bold (Latin digits)"
-    fontSize: "150dp"
-    fontWeight: 700
   page-title:
     fontFamily: "Peyda Bold"
     fontSize: "28sp"
@@ -168,12 +164,6 @@ components:
     rounded: "{rounded.artwork}"
     width: "108dp"
     height: "162dp"
-  ranked-poster-card:
-    textColor: "{colors.ink}"
-    typography: "{typography.rank}"
-    rounded: "{rounded.artwork}"
-    width: "180dp"
-    height: "162dp"
   settings-panel:
     backgroundColor: "{colors.surface}"
     rounded: "{rounded.panel}"
@@ -282,7 +272,6 @@ A near-black neutral ladder, white glass controls, and three borrowed marks (30n
 ### Hierarchy
 - **Display** (Bold, 38sp, shrinks to fit): the billboard's name. Inter with -0.01em tracking for an English name, Peyda for a Persian one.
 - **Numeral** (Peyda Bold, 40sp): an episode's number over its art.
-- **Rank** (Peyda Bold for Persian digits, Inter Bold for Latin, 150dp): a ranked poster's place beside it, its digits about two-thirds of the poster's height. It is sized in dp to the poster, not in sp, because it is part of the artwork rather than text to read.
 - **Headline** (Peyda Bold, 30sp): a page's own heading on sign-in and Settings.
 - **Page Title** (Peyda Bold, 28sp): Leanback's browse title (grid and catalogue pages).
 - **Dialog Title** (Peyda Bold, 21sp): sheets and dialogs.
@@ -306,7 +295,7 @@ A near-black neutral ladder, white glass controls, and three borrowed marks (30n
 
 A 960 × 540dp canvas read from a sofa. A 64dp navigation rail sits at the start edge (right in Persian, left in English) on solid ink with a feather; content starts at 96dp from that edge, and the billboard's text, row titles and the first poster all align there. Both browse paddings stay equal at 96dp because Leanback resolves row padding before RTL. Persian sets about 10% larger than Latin and needs more leading, so sizes run above Leanback's defaults.
 
-Home: the billboard holds the top 252dp; rows start beneath with a 36dp title band. The top end corner stays clear for the update notice, its centre level with the rail's brand mark (60dp down) and 48dp in from the safe edge. The ranked rows (most-popular movies, then series) sit under Suggested, before the long catalogues. Poster rows use 108 × 162dp posters (124 × 186dp elsewhere) with 16dp between neighbours (room for the 1.08 focus lift) and 20dp between rows; unfocused rows are never dimmed. While the promoted hero is up, the rows drop 172dp so posters peek in under it; its pill sits 142dp from the foot and the words stack upward from 212dp. The title page keeps its reading measure to 500dp and parks its rows at 431dp, raising them to 186dp when the remote moves down. Settings runs three columns on a 4dp scale between the content start and a 48dp safe edge: sections 176dp, a 24dp gap, a 320dp panel, a 40dp gap, the explanation. A section taller than the screen scrolls its panel with the remote, the panel fading over 48dp at an edge with more past it.
+Home: the billboard holds the top 252dp; rows start beneath with a 36dp title band. The top end corner stays clear for the update notice, its centre level with the rail's brand mark (60dp down) and 48dp in from the safe edge. Poster rows use 108 × 162dp posters (124 × 186dp elsewhere) with 16dp between neighbours (room for the 1.08 focus lift) and 20dp between rows; unfocused rows are never dimmed. While the promoted hero is up, the rows drop 172dp so posters peek in under it; its pill sits 142dp from the foot and the words stack upward from 212dp. The title page keeps its reading measure to 500dp and parks its rows at 431dp, raising them to 186dp when the remote moves down. Settings runs three columns on a 4dp scale between the content start and a 48dp safe edge: sections 176dp, a 24dp gap, a 320dp panel, a 40dp gap, the explanation. A section taller than the screen scrolls its panel with the remote, the panel fading over 48dp at an edge with more past it.
 
 Controls: 48dp is the remote's target everywhere (buttons, settings rows, the skip pill), 12dp between buttons in a row, 8dp between an icon and its label.
 
@@ -342,7 +331,6 @@ White glass that turns solid white under the remote: quiet and sure under a 38sp
 
 ### Cards / Containers
 - **Poster card:** artwork with its caption always shown beneath (title, then IMDb score and year); no plate, no background. 6dp corners. In English the score and year run tight so the year fits a 108dp poster whole: IMDb's badge keeps 0.2em of padding a side (0.35 elsewhere), the score 0.25em after it, the year 0.4em after that; Persian, with narrower digits, keeps 0.35, 0.3 and 0.6em. Focus: a 3dp white ring drawn inside the art's edge, fading in over 150ms, plus a 1.08 lift. Art fades in over 240ms only when it arrives off network or disk.
-- **Ranked poster card:** home's most-popular rows, Netflix's Top 10 played straight: the poster card with its place beside it, «۱» to «۱۰» in Persian and 1 to 10 in English. A 72dp slot at the poster's start side holds the Rank numeral, standing on the art's foot and tucked under its edge by a quarter of the numeral's width, up to 16dp. A numeral wider than the slot tucks up to 40dp; past that it narrows (only a Latin «10» does) rather than hide more. The art covers the tucked part. The numeral is ink with a 2dp text-faint rim, so it reads on the ink ground and never competes with the white focus ring. Flat, no shadow. The caption keeps to the poster's width, the place lifts with the poster on focus, and each row holds ten titles, then More. These rows depart from the official TV app's home on purpose (PRODUCT.md).
 - **Panel / sheet:** surface (#1F1F1F) at 20dp radius, 12dp inner pad, no border, no shadow.
 
 ### Inputs / Fields
