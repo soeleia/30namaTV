@@ -36,7 +36,7 @@ The application ID is `com.doxigo.tv30`. Public builds use one dedicated release
 
 ## Updates
 
-After opening, the app checks the latest stable GitHub release once a day and automatically downloads a newer APK using Android's Download Manager. Downloads continue in the background. Open **Settings > App > App update** to see progress, check again or install a ready update. Android requires installation confirmation and may ask you to allow updates from this app.
+Each time home comes to the front (at launch, back from the player, out of standby), the app checks the latest stable GitHub release, at most once every six hours, and automatically downloads a newer APK using Android's Download Manager. Downloads continue in the background. Once a new version is downloaded and verified, home says so in its top corner, "Version 1.5.0 is ready" with **Install**: press Up from the featured title to reach it and OK to install. Back puts that version's notice away for good, and a red dot stays on the rail's **Settings** icon until it is installed. That dot leads to **Settings > App > App update**, where you can also follow a download, check again or install. Android requires installation confirmation and may ask you to allow updates from this app.
 
 Before installation, the app verifies the package name, newer version code and signing certificate. It rejects incompatible or invalid APKs. The first migration from an older personal test key to the public release key still requires the manual installation described above.
 
@@ -73,7 +73,7 @@ Public APKs carry no API keys (see [service keys](#service-keys)). For your own 
 python3 scripts/tv-checks.py --serial emulator-5554
 ```
 
-Use a disposable emulator. Fixture checks replace local preferences and use mocked account data; the runner rejects physical devices. They cover startup/cancellation, logo playback and cleanup, five-second control hiding, play/pause focus, accelerating and self-landing seeks, cancelled/backward seeks, column alignment, Persian lines fitting their width, subtitle direction and centering, making Persian subtitles (part by part, with a refused key), title clipping, intro/recap countdown, watched episodes, My Lists, vertical search and recent searches, the complete genre page, catalogue filters (D-pad, parameters, stale pages, paging, clear and empty results), update validation/status and trailer playback/lifecycle.
+Use a disposable emulator. Fixture checks replace local preferences and use mocked account data; the runner rejects physical devices. They cover startup/cancellation, logo playback and cleanup, five-second control hiding, play/pause focus, accelerating and self-landing seeks, cancelled/backward seeks, column alignment, Persian lines fitting their width, subtitle direction and centering, making Persian subtitles (part by part, with a refused key), title clipping, intro/recap countdown, watched episodes, My Lists, vertical search and recent searches, the complete genre page, catalogue filters (D-pad, parameters, stale pages, paging, clear and empty results), update validation/status, home's update notice and the rail's Settings dot, and trailer playback/lifecycle.
 
 The trailer check attempts the public Animals trailer. If its CDN is unreachable, logs state `PUBLIC_UNAVAILABLE` and use a silence fixture for interaction/lifecycle checks. That result does not certify live CDN playback.
 

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fa">
     <string name="app_update">به‌روزرسانی</string>
-    <string name="app_update_help">برنامه روزی یک بار پس از باز شدن، نسخهٔ تازه را در GitHub بررسی و خودکار دانلود می‌کند. برای بررسی دوباره یا نصب نسخهٔ آماده، این گزینه را انتخاب کنید. نصب با تأیید شما در اندروید انجام می‌شود.</string>
+    <string name="app_update_help">هر بار که به صفحهٔ اصلی برمی‌گردید، برنامه حداکثر هر شش ساعت یک بار نسخهٔ تازه را در GitHub بررسی و خودکار دانلود می‌کند و آماده شدنش را در صفحهٔ اصلی خبر می‌دهد. برای بررسی دوباره یا نصب، این گزینه را انتخاب کنید. نصب با تأیید شما در اندروید انجام می‌شود.</string>
     <string name="update_check">بررسی</string>
     <string name="update_checking">در حال بررسی</string>
     <string name="update_current">به‌روز</string>
@@ -16,4 +16,8 @@
     <string name="update_no_installer">نصب‌کنندهٔ اندروید در این دستگاه در دسترس نیست.</string>
     <string name="update_browser_missing">با گوشی یا رایانه، صفحهٔ github.com/soeleia/30namaTV/releases را باز کنید.</string>
     <string name="update_failed">بررسی یا دانلود انجام نشد. اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.</string>
+    <!-- Home's notice (UpdateNotice.kt) and the rail's Settings item while a version is ready. -->
+    <string name="update_notice">نسخهٔ %1$s آماده است</string>
+    <string name="update_notice_spoken">نسخهٔ %1$s آماده است. برای نصب تأیید و برای بستن بازگشت را بزنید.</string>
+    <string name="update_rail_spoken">تنظیمات، نسخهٔ %1$s آمادهٔ نصب است</string>
 </resources>

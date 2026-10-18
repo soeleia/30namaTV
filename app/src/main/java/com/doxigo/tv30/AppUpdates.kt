@@ -39,7 +39,8 @@ object AppUpdates {
     const val RELEASES_URL = "https://github.com/soeleia/30namaTV/releases/latest"
     private const val API_URL = "https://api.github.com/repos/soeleia/30namaTV/releases/latest"
     private const val APK_NAME = "30namaTV.apk"
-    private const val DAY = 24 * 60 * 60 * 1000L
+    /** The least time between two checks: home checks each time it comes to the front, at most this often. */
+    private const val EVERY = 6 * 60 * 60 * 1000L
     private const val MAX_APK_SIZE = 100L * 1024 * 1024
 
     sealed interface Status {
@@ -302,7 +303,14 @@ object AppUpdates {
 
     private fun ByteArray.hex() = joinToString("") { "%02x".format(it) }
 
-    internal fun checkDue(now: Long, last: Long) = last <= 0 || last > now || now - last >= DAY
+    internal fun checkDue(now: Long, last: Long) = last <= 0 || last > now || now - last >= EVERY
+
+    /** The ready version home's notice may show: none once the viewer has put that version's away (see [dismiss]). */
+    fun notice(): String? = (current.value as? Status.Ready)?.version
+        ?.takeIf { ::prefs.isInitialized && it != prefs.getString("notice_dismissed", null) }
+
+    /** Back on home's notice: that version's never shows again, though Settings and the rail still offer it. */
+    fun dismiss(version: String) = prefs.edit().putString("notice_dismissed", version).apply()
 
     internal fun newerVersion(candidate: String, installed: String): Boolean {
         val next = versionParts(candidate) ?: return false

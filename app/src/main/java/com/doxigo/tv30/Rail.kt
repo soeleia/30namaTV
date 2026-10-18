@@ -12,6 +12,10 @@ import android.widget.TextView
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.leanback.widget.BrowseFrameLayout
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /**
@@ -56,6 +60,8 @@ class Rail(private val activity: TvActivity, private val current: Section?, priv
     private var isOpen = false
     /** When Back in the rail last asked to be pressed again. */
     private var backAt = -EXIT_WINDOW
+    /** A downloaded release waits (AppUpdates' Ready): Settings wears its dot. */
+    private var updateReady = false
 
     init {
         val sections = Section.entries.filter { it != Section.LISTS || Api.loggedIn }
@@ -66,6 +72,21 @@ class Rail(private val activity: TvActivity, private val current: Section?, priv
             item.nextFocusUpId = items[maxOf(i - 1, 0)].id
             item.nextFocusDownId = items[minOf(i + 1, items.lastIndex)].id
         }
+        // While a release waits to be installed, a red dot on Settings (rail_badge), which then opens
+        // on its update row; the edge's red bar stays the page you are on.
+        val settings = items[sections.indexOf(Section.SETTINGS)]
+        activity.lifecycleScope.launch {
+            activity.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                AppUpdates.state.collect { status ->
+                    val ready = (status as? AppUpdates.Status.Ready)?.version
+                    updateReady = ready != null
+                    settings.findViewById<View>(R.id.rail_badge).visibility = if (updateReady) View.VISIBLE else View.GONE
+                    settings.contentDescription = ready?.let { activity.getString(R.string.update_rail_spoken, it.localDigits()) }
+                        ?: activity.getString(Section.SETTINGS.label)
+                }
+            }
+        }
+
         // The red mark sits at the edge beside the page's own item, wherever the list lays out.
         val mark = activity.findViewById<View>(R.id.rail_mark)
         list.addOnLayoutChangeListener { _, _, top, _, _, _, _, _, _ ->
@@ -171,6 +192,7 @@ class Rail(private val activity: TvActivity, private val current: Section?, priv
             row != null -> activity.startActivity(MainActivity.jump(activity, row)) // home comes back to the front, this page closes
             section == current -> Unit // already here
             section == Section.SEARCH -> activity.startActivity(Intent(activity, SearchActivity::class.java))
+            section == Section.SETTINGS && updateReady -> activity.startActivity(SettingsActivity.update(activity))
             section == Section.SETTINGS -> activity.startActivity(Intent(activity, SettingsActivity::class.java))
             else -> activity.startActivity(GridActivity.archive(activity, section.slug!!, activity.getString(section.label)))
         }

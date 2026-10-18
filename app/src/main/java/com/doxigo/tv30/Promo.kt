@@ -46,6 +46,8 @@ class PromoHero(
     /** The remote's Play key and OK. By default what the title page's Play does, and the title page. */
     var onWatch: (JSONObject) -> Unit = { root.context.play(it) }
     var onDetails: (JSONObject) -> Unit = { root.context.openDetails(it) }
+    /** Up from the button, where nothing of the hero's is: home's update notice, when there is one. */
+    var onUp: () -> Unit = {}
 
     /** While true the hero holds the billboard and the rows sit low, their selections kept for later. */
     var active = false
@@ -103,7 +105,10 @@ class PromoHero(
                 if (down) rows.requestFocus()
                 down
             }
-            KeyEvent.KEYCODE_DPAD_UP -> down
+            KeyEvent.KEYCODE_DPAD_UP -> {
+                if (down) onUp()
+                down
+            }
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
                 if (down) step(if (code == toEnd) 1 else -1)
                 down
@@ -131,6 +136,8 @@ class PromoHero(
                 idle()
             }
             rows.hasFocus() -> if (active) hold(false)
+            // Elsewhere on home (the update notice above it): the hero waits as it is, button and all.
+            root.hasFocus() -> timer?.cancel()
             // The rail opened over the hero, which waits as it is, its button out from under the panel's edge.
             else -> {
                 timer?.cancel()

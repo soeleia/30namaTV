@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- An update waits (Rail.kt): a red dot on the Settings icon's top end corner, cut out of the
+     glyph by a 1.5dp ring of whatever is behind it, ink on the rail and white on the pill. A dot on
+     the icon, never a bar at the edge: the edge's red bar says which page you are on. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="oval"><solid android:color="@color/brand" /><stroke android:width="1.5dp" android:color="@color/text" /></shape>
+    </item>
+    <item>
+        <shape android:shape="oval"><solid android:color="@color/brand" /><stroke android:width="1.5dp" android:color="@color/ink" /></shape>
+    </item>
+</selector>

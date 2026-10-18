@@ -1,5 +1,6 @@
 package com.doxigo.tv30
 
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Rect
@@ -570,9 +571,7 @@ class SettingsActivity : TvActivity() {
                     is AppUpdates.Status.Failed -> when (status.reason) {
                         AppUpdates.Failure.INCOMPATIBLE_SIGNATURE -> runCatching {
                             startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(AppUpdates.RELEASES_URL)))
-                        }.onFailure {
-                            android.widget.Toast.makeText(this, getString(R.string.update_browser_missing), android.widget.Toast.LENGTH_LONG).show()
-                        }
+                        }.onFailure { toast(getString(R.string.update_browser_missing)) }
                         AppUpdates.Failure.INSTALLER_UNAVAILABLE -> AppUpdates.openInstall(this)
                         else -> AppUpdates.check(force = true)
                     }
@@ -594,8 +593,8 @@ class SettingsActivity : TvActivity() {
     }
 
     private fun updateNote(): CharSequence? = when (val status = AppUpdates.state.value) {
-        is AppUpdates.Status.Ready -> getString(R.string.update_ready, status.version)
-        is AppUpdates.Status.Downloading -> getString(R.string.update_download_version, status.version)
+        is AppUpdates.Status.Ready -> getString(R.string.update_ready, status.version.localDigits())
+        is AppUpdates.Status.Downloading -> getString(R.string.update_download_version, status.version.localDigits())
         is AppUpdates.Status.Failed -> getString(when (status.reason) {
             AppUpdates.Failure.INCOMPATIBLE_SIGNATURE -> R.string.update_signature_mismatch
             AppUpdates.Failure.INVALID_APK, AppUpdates.Failure.INVALID_RELEASE -> R.string.update_invalid
@@ -903,6 +902,8 @@ class SettingsActivity : TvActivity() {
         private const val EXTRA_ROW = "row"
         private const val SUBTITLES = 1
         private const val APP = 2
+        /** App update among App's rows: language, reduce motion, the two caches, version, then it. */
+        private const val UPDATE_ROW = 5
         private const val ACCOUNT = 4
         private const val SEAM = "seam"
         /**
@@ -913,5 +914,9 @@ class SettingsActivity : TvActivity() {
         /** The film the read-ahead is told in: two hours of 1080p at about 5 Mbps, the low end of 30nama's 1080p. */
         private const val FILM_MINUTES = 120
         private const val BITRATE = 5_000_000L
+
+        /** Settings on its App update row: where the rail's dot leads while a release is ready (Rail). */
+        fun update(context: Context): Intent =
+            Intent(context, SettingsActivity::class.java).putExtra(EXTRA_SECTION, APP).putExtra(EXTRA_ROW, UPDATE_ROW)
     }
 }

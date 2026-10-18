@@ -81,6 +81,15 @@ class MainActivity : TvActivity() {
             intro = Intro(this)
             introAt = SystemClock.elapsedRealtime()
         }
+    }
+
+    /**
+     * Home coming to the front (back from the player, out of standby) looks for a new release, at
+     * most every six hours (AppUpdates.checkDue): a process the TV keeps for days still finds it the
+     * same day. Five seconds on: a launch's first seconds belong to home's own requests.
+     */
+    override fun onStart() {
+        super.onStart()
         lifecycleScope.launch {
             delay(5_000)
             AppUpdates.check()
@@ -116,7 +125,8 @@ class MainActivity : TvActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean =
-        (supportFragmentManager.backStackEntryCount == 0 && (rail?.openOnBack(event) == true || home?.upToHero(event) == true)) ||
+        (supportFragmentManager.backStackEntryCount == 0 &&
+            (home?.noticeBack(event) == true || rail?.openOnBack(event) == true || home?.upToHero(event) == true)) ||
             super.dispatchKeyEvent(event)
 
     companion object {
@@ -157,6 +167,8 @@ class HomeFragment : BrowseSupportFragment() {
     }
     /** 30nama's promoted titles over the rows. It owns the billboard; the rows reach it through [PromoHero.follow]. */
     private var hero: PromoHero? = null
+    /** A downloaded release, in the top end corner above the hero (UpdateNotice). */
+    private var notice: UpdateNotice? = null
     private var loaded = false
     /** The rows came in while the rail had another section up, home's view gone: they rise when it is back. */
     private var riseOnView = false
@@ -288,12 +300,16 @@ class HomeFragment : BrowseSupportFragment() {
     }
 
     /**
-     * Up from the first row: only the hero is above it. A key hook, because Leanback answers Up
-     * from the first row with its own empty title view and the press goes nowhere.
+     * Up from the first row: only the hero is above it, or with no hero the update notice. A key
+     * hook, because Leanback answers Up from the first row with its own empty title view and the
+     * press goes nowhere.
      */
     fun upToHero(event: KeyEvent): Boolean =
         event.keyCode == KeyEvent.KEYCODE_DPAD_UP && event.action == KeyEvent.ACTION_DOWN && rowsGrid?.selectedPosition == 0 &&
-            mainFragment?.view?.hasFocus() == true && hero?.focus() == true
+            mainFragment?.view?.hasFocus() == true && (hero?.focus() == true || notice?.focus() == true)
+
+    /** Back on the update notice puts it away rather than opening the rail. */
+    fun noticeBack(event: KeyEvent) = notice?.back(event) == true
 
     /** The rows sit on the billboard: its art and text behind, the rows' dock below it. */
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -309,7 +325,9 @@ class HomeFragment : BrowseSupportFragment() {
             }
         }
         val scope = viewLifecycleOwner.lifecycleScope
-        hero = PromoHero(root, scope, Billboard(root, scope), browse)
+        hero = PromoHero(root, scope, Billboard(root, scope), browse).apply { onUp = { notice?.focus() } }
+        // Back to the hero's button, or to the rows with no hero.
+        notice = UpdateNotice(root, requireActivity(), viewLifecycleOwner) { jumpTo(TOP) }.apply { arrived = loaded }
         return root
     }
 
@@ -320,6 +338,7 @@ class HomeFragment : BrowseSupportFragment() {
 
     override fun onDestroyView() {
         hero = null
+        notice = null
         super.onDestroyView()
     }
 
@@ -458,6 +477,7 @@ class HomeFragment : BrowseSupportFragment() {
             ?.alpha(1f)?.translationY(0f)?.setStartDelay(0)?.setInterpolator(Motion.emph)?.setDuration(Motion.PAGE)?.start()
         hero?.arrive(0)
         loaded = true
+        notice?.arrived = true
         progressBarManager.hide()
     }
 

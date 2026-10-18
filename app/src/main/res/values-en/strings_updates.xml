@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_update">App update</string>
-    <string name="app_update_help">Once a day after opening, the app checks GitHub and automatically downloads a new release. Select this row to check again or install a ready update. Android asks you to confirm installation.</string>
+    <string name="app_update_help">Each time you return to home, at most every six hours, the app checks GitHub, downloads a new release automatically and says on home when it is ready. Select this row to check again or install it. Android asks you to confirm installation.</string>
     <string name="update_check">Check</string>
     <string name="update_checking">Checking</string>
     <string name="update_current">Up to date</string>
@@ -16,4 +16,7 @@
     <string name="update_no_installer">An Android package installer is not available on this device.</string>
     <string name="update_browser_missing">Open github.com/soeleia/30namaTV/releases on your phone or computer.</string>
     <string name="update_failed">The update check or download failed. Check your connection and retry.</string>
+    <string name="update_notice">Version %1$s is ready</string>
+    <string name="update_notice_spoken">Version %1$s is ready. Press OK to install, Back to dismiss.</string>
+    <string name="update_rail_spoken">Settings, version %1$s is ready to install</string>
 </resources>

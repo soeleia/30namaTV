@@ -22,6 +22,7 @@ colors:
   hero-chip: "#33FFFFFF"
   focus-wash: "#33FFFFFF"
   scrim-mid: "#B3141414"
+  notice-glass: "#D9141414"
   progress-track: "#66808080"
   settings-danger: "#FF5C5C"
   tier-golden: "#E3B341"
@@ -190,7 +191,7 @@ components:
     rounded: "{rounded.chip}"
     height: "28dp"
   skip-pill:
-    backgroundColor: "#D9141414"
+    backgroundColor: "{colors.notice-glass}"
     textColor: "{colors.text}"
     rounded: "{rounded.skip-pill}"
     height: "48dp"
@@ -201,6 +202,19 @@ components:
     backgroundColor: "{colors.hero-chip}"
     textColor: "{colors.text}"
     typography: "{typography.meta}"
+  update-notice:
+    backgroundColor: "{colors.notice-glass}"
+    textColor: "{colors.text}"
+    typography: "{typography.label}"
+    rounded: "{rounded.pill}"
+    padding: "0 22dp 0 16dp"
+    height: "44dp"
+  update-notice-focus:
+    backgroundColor: "{colors.text}"
+    textColor: "{colors.ink}"
+  rail-update-dot:
+    backgroundColor: "{colors.brand-red}"
+    size: "6dp"
 ---
 
 # Design System: 30namaTV
@@ -228,7 +242,7 @@ Motion is the second craft bar. One set of curves (a strong ease-out that moves 
 A near-black neutral ladder, white glass controls, and three borrowed marks (30nama red, "free" green, IMDb yellow), each confined to one meaning.
 
 ### Primary
-- **30nama Red** (brand-red): the one accent. Watched progress (playback and card progress bars), the rail's current-page mark (a 3 × 16dp bar), 30nama's own marks, sign-in steps, the status light, the done check and the player's loading indicator. As a fill it carries white text (4.8:1). Never a large area, never body text.
+- **30nama Red** (brand-red): the one accent. Watched progress (playback and card progress bars), the rail's current-page mark (a 3 × 16dp bar), 30nama's own marks, sign-in steps, the status light, the update dot (a dot, never a bar: on home's update notice and on the rail's Settings icon), the done check and the player's loading indicator. As a fill it carries white text (4.8:1). Never a large area, never body text.
 
 ### Secondary
 - **Free Green** (free-green): the «رایگان» badge on artwork and the Free plan's mark. Ink on it. It means "free" and nothing else.
@@ -247,6 +261,7 @@ A near-black neutral ladder, white glass controls, and three borrowed marks (30n
 - **White** (text): titles, and every focused fill and ring.
 - **Body / Dim / Faint** (text-body, text-dim, text-faint): reading text, meta lines and unfocused row titles, then rail icons at rest and disabled labels. Meta Origin (meta-origin) is the one step between dim and faint, kept for the title page's origin line because it holds 4.5:1 over white art under the side scrim where faint does not.
 - **White Glass** (glass-primary 25%, glass-secondary 14%, glass-disabled 7%, hero-chip 20%): control fills at rest, white laid over whatever is behind so a button over art takes its tone instead of sitting on it as a grey slab.
+- **Notice Glass** (notice-glass, ink at 85%): the other way round, for a control over art with no scrim behind it (the player's skip pill, home's update notice): white glass would vanish over bright art there, dark glass keeps white labels above 10:1.
 - **Scrims** (ink at 100% / 70% / 0%): the billboard's side gradient (ink, scrim-mid, clear, clear, from the start edge) and bottom gradient (ink, ink, clear, clear); the open rail dims the page with ink at 45%.
 
 ### Named Rules
@@ -291,7 +306,7 @@ A near-black neutral ladder, white glass controls, and three borrowed marks (30n
 
 A 960 × 540dp canvas read from a sofa. A 64dp navigation rail sits at the start edge (right in Persian, left in English) on solid ink with a feather; content starts at 96dp from that edge, and the billboard's text, row titles and the first poster all align there. Both browse paddings stay equal at 96dp because Leanback resolves row padding before RTL. Persian sets about 10% larger than Latin and needs more leading, so sizes run above Leanback's defaults.
 
-Home: the billboard holds the top 252dp; rows start beneath with a 36dp title band. The ranked rows (most-popular movies, then series) sit under Suggested, before the long catalogues. Poster rows use 108 × 162dp posters (124 × 186dp elsewhere) with 16dp between neighbours (room for the 1.08 focus lift) and 20dp between rows; unfocused rows are never dimmed. While the promoted hero is up, the rows drop 172dp so posters peek in under it; its pill sits 142dp from the foot and the words stack upward from 212dp. The title page keeps its reading measure to 500dp and parks its rows at 431dp, raising them to 186dp when the remote moves down. Settings runs three columns on a 4dp scale between the content start and a 48dp safe edge: sections 176dp, a 24dp gap, a 320dp panel, a 40dp gap, the explanation. A section taller than the screen scrolls its panel with the remote, the panel fading over 48dp at an edge with more past it.
+Home: the billboard holds the top 252dp; rows start beneath with a 36dp title band. The top end corner stays clear for the update notice, its centre level with the rail's brand mark (60dp down) and 48dp in from the safe edge. The ranked rows (most-popular movies, then series) sit under Suggested, before the long catalogues. Poster rows use 108 × 162dp posters (124 × 186dp elsewhere) with 16dp between neighbours (room for the 1.08 focus lift) and 20dp between rows; unfocused rows are never dimmed. While the promoted hero is up, the rows drop 172dp so posters peek in under it; its pill sits 142dp from the foot and the words stack upward from 212dp. The title page keeps its reading measure to 500dp and parks its rows at 431dp, raising them to 186dp when the remote moves down. Settings runs three columns on a 4dp scale between the content start and a 48dp safe edge: sections 176dp, a 24dp gap, a 320dp panel, a 40dp gap, the explanation. A section taller than the screen scrolls its panel with the remote, the panel fading over 48dp at an edge with more past it.
 
 Controls: 48dp is the remote's target everywhere (buttons, settings rows, the skip pill), 12dp between buttons in a row, 8dp between an icon and its label.
 
@@ -335,7 +350,7 @@ White glass that turns solid white under the remote: quiet and sure under a 38sp
 - **Toggle:** an 18dp knob 3dp inside a 40 × 24dp track; on the focused white row the off track steps down to #BDBDBD.
 
 ### Navigation
-- **Rail:** a 64dp column of stroked icons at the start edge under the brand mark. At rest icons are text-faint, the current page white with a 3 × 16dp red mark at the edge. Opening: a 320dp panel slides 24dp in from the edge as ink at 45% dims the page (240ms), labels follow 20ms apart, and one white pill (200dp × 44dp) glides item to item on a 52dp pitch over 200ms. Focused item: ink icon and label on the white pill.
+- **Rail:** a 64dp column of stroked icons at the start edge under the brand mark. At rest icons are text-faint, the current page white with a 3 × 16dp red mark at the edge. While a downloaded update waits, Settings wears a 6dp red dot on its icon's top end corner, cut out of the glyph by a 1.5dp ring of what is behind it (ink on the rail, white on the pill), and then opens on its App update row: the bar says where you are, the dot says something waits there. Opening: a 320dp panel slides 24dp in from the edge as ink at 45% dims the page (240ms), labels follow 20ms apart, and one white pill (200dp × 44dp) glides item to item on a 52dp pitch over 200ms. Focused item: ink icon and label on the white pill.
 - **Settings rows:** transparent at rest, a white 12dp-cornered card under the remote, lifted 4dp a side.
 
 ### Billboard and Promoted Hero (signature)
@@ -343,6 +358,9 @@ The full-bleed art behind home. Browsing rows, the words change at once (out 120
 
 ### Player Controls
 The billboard's grammar over video. At the start edge, the title's poster (120dp tall, artwork's 6dp corners) with its names beside it: the English name in Inter Bold, the Persian name in Peyda SemiBold, then the billboard's fact line (Meta.playerMeta): what plays in white («فصل ۲، قسمت ۱۰»), IMDb's badge and score, the year; no age rating. The block's foot sits level with the poster's, and nothing else sits above the bar. Time facts live on the timeline, not under the title: elapsed under the bar's left end, the length under its right end with «پایان ساعت ۲۲:۴۵» / "Ends at 10:45 PM" beside it, the same clock style. Under the clock every button shares one row, YouTube's, left to right in either language as the bar is: the play cluster from the bar's left end, the panels' buttons (subtitles, quality, speed, episodes) to its right end. The remote opens the controls on play/pause; Up reaches the bar. The seek bar's dot is 20dp while the bar has the remote (YouTube's, over three times the 6dp bar), the bar's thinner rest state otherwise.
+
+### Update Notice (home)
+A downloaded, verified release said where every viewer passes, not only in Settings: one pill in home's top end corner, «● نسخهٔ ۱.۵.۰ آماده است | نصب» / "● Version 1.5.0 is ready | Install". Notice glass with a 1dp 20% white hairline at rest (a white rim would read as focus among home's controls); an 8dp red status dot, the message in the label face, a 1 × 20dp hairline, then the action in Yekan Bakh Bold (Inter Bold in English); 16dp on the dot side, 22dp on the action side, 10dp after the dot and 14dp either side of the hairline. It never takes the remote: Up from the hero's button (or from the first row with no hero) reaches it, and only Down leaves. Focus is the button's: solid white, ink words, a 12% ink hairline so it keeps its edge over white art, the 1.05 lift. OK installs, Back puts it away for that version (remembered; a newer one shows again, and the rail's dot stays until it is installed). It lives in home's own layout, so it is never over the player, and changes only while home is in front: it comes down 12dp as it fades in, over 420ms on the emphasized curve, 800ms after home's rows have risen, and leaves up 8dp in 150ms. Under Reduce Motion both are fades.
 
 ### Skip / Next Pill (player)
 Dark glass (ink at 85%) with a 2dp white rim over video, solid white under the remote. A countdown fill wipes from the start edge as the next episode or auto-skip comes due: light on the glass, a shade of ink on the white. A title picked up past its first minute offers «پخش از ابتدا» / "Start from the beginning" on the same pill for 10 seconds of playing time, its fill draining as the offer runs out; auto-skip never takes it.
@@ -361,6 +379,7 @@ Dark glass (ink at 85%) with a 2dp white rim over video, solid white under the r
 ### Don't:
 - **Don't** fill a resting control with solid white; white is focus.
 - **Don't** use 30nama red, green or IMDb yellow as a surface or for body text.
+- **Don't** reach for the system's grey toast or a stock dialog to tell the viewer something; the app's own surfaces do it, and a standing notice never takes the remote.
 - **Don't** add shadows, blur, animated backgrounds or video beyond the launch motion.
 - **Don't** letter-space Persian.
 - **Don't** dim unfocused rows; artwork keeps its own colour.

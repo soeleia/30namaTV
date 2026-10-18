@@ -49,11 +49,11 @@ class AppUpdatesTest {
     }
 
     @Test
-    fun startupChecksAtMostDailyAndRecoversFromClockChanges() {
-        val day = 24 * 60 * 60 * 1000L
-        assertTrue(AppUpdates.checkDue(day * 2, 0))
-        assertFalse(AppUpdates.checkDue(day * 2 - 1, day))
-        assertTrue(AppUpdates.checkDue(day * 2, day))
-        assertTrue(AppUpdates.checkDue(day - 1, day))
+    fun checksAtMostEverySixHoursAndRecoversFromClockChanges() {
+        val hours = 6 * 60 * 60 * 1000L
+        assertTrue(AppUpdates.checkDue(hours * 2, 0))
+        assertFalse(AppUpdates.checkDue(hours * 2 - 1, hours))
+        assertTrue(AppUpdates.checkDue(hours * 2, hours))
+        assertTrue(AppUpdates.checkDue(hours - 1, hours))
     }
 }

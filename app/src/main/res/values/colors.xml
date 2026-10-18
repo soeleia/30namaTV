@@ -22,6 +22,8 @@
     <color name="red">#E50914</color>
     <color name="green">#46D369</color>
     <color name="focus_wash">#33FFFFFF</color>
+    <!-- Dark glass for a control over art with no scrim behind it: the skip pill's, home's update notice. -->
+    <color name="notice_glass">#D9141414</color>
     <color name="progress_track">#66808080</color>
     <!-- The player's loaded band, past the red and Leanback's white knob, over its #888888 track
          (its SeekBar takes a colour for these two bands only): dim white, 2.1:1 under the knob and

@@ -13,13 +13,30 @@
     android:paddingStart="13dp"
     android:paddingEnd="16dp">
 
-    <android.widget.ImageView
-        android:id="@+id/rail_icon"
+    <FrameLayout
         android:layout_width="22dp"
         android:layout_height="22dp"
-        android:duplicateParentState="true"
-        android:importantForAccessibility="no"
-        android:tint="@color/rail_ink" />
+        android:duplicateParentState="true">
+
+        <android.widget.ImageView
+            android:id="@+id/rail_icon"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:duplicateParentState="true"
+            android:importantForAccessibility="no"
+            android:tint="@color/rail_ink" />
+
+        <!-- Settings only, while an update is ready (Rail): a 6dp red dot in a 1.5dp cut-out ring. -->
+        <View
+            android:id="@+id/rail_badge"
+            android:layout_width="9dp"
+            android:layout_height="9dp"
+            android:layout_gravity="top|end"
+            android:background="@drawable/rail_badge"
+            android:duplicateParentState="true"
+            android:importantForAccessibility="no"
+            android:visibility="gone" />
+    </FrameLayout>
 
     <TextView
         android:id="@+id/rail_label"
