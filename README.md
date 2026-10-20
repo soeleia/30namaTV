@@ -1,56 +1,64 @@
-# 30namaTV
+<div dir="rtl">
 
-**English** · [فارسی](README.fa.md)
+# برنامهٔ 30namaTV
 
-An **unofficial, independent** native Kotlin app for browsing and watching 30nama on Android TV. **This is not the official 30nama app and is not affiliated with or endorsed by 30nama.** Built with Android Views, Leanback and Media3, with Persian and English interfaces and D-pad navigation. A 30nama account/subscription is required for subscription content.
+[English](README.en.md) · **فارسی**
+
+برنامه‌ای **غیررسمی و مستقل** برای گشتن و تماشای ۳۰نما روی تلویزیون‌های اندرویدی، نوشته‌شده با کاتلین و ابزارهای خود اندروید (Leanback و Media3). **این برنامهٔ رسمی ۳۰نما نیست و ۳۰نما آن را نساخته یا تأیید نکرده است.** رابطش فارسی و انگلیسی است و همه‌چیز با دکمه‌های جهت‌نمای کنترل تلویزیون کار می‌کند. برای تماشای محتوای اشتراکی، حساب و اشتراک ۳۰نما لازم است.
 
 [![Android TV build](https://github.com/soeleia/30namaTV/actions/workflows/android.yml/badge.svg)](https://github.com/soeleia/30namaTV/actions/workflows/android.yml)
 
-Android 6.0+ (API 23). Universal APK; no React Native runtime. Release builds use R8 optimization and resource shrinking. Browsing stays available while account/menu extras load, posters are decoded to display size, and search requests are cancelled when replaced.
+برنامه روی اندروید 6.0 به بالا (API 23) نصب می‌شود. یک فایل نصبی برای همهٔ دستگاه‌هاست و برای اجرا به React Native نیازی ندارد. نسخه‌های انتشار با R8 بهینه و کوچک می‌شوند. تا اطلاعات حساب و منو برسد، گشتن در برنامه منتظر نمی‌ماند، پوسترها در همان اندازه‌ای که دیده می‌شوند بارگذاری می‌شوند و هر جست‌وجوی تازه، درخواست جست‌وجوی قبلی را لغو می‌کند.
 
-Search uses a six-column vertical grid, with its own Persian keyboard for TVs whose keyboard has no Persian layout. Home shows every genre in its row, ending in a link to the dedicated four-column genre page. Movies, Series and Anime can be narrowed by genre, country, a minimum IMDb score and decade, alone or together, under any of the six sort orders.
+نتیجه‌های جست‌وجو در شبکه‌ای شش‌ستونه می‌آیند و برای تلویزیونی که صفحه‌کلیدش فارسی ندارد، صفحه‌کلید فارسی خود برنامه آماده است. ردیف ژانرها در خانه همهٔ ژانرها را نشان می‌دهد و آخرش به صفحهٔ چهارستونهٔ ژانرها می‌رسد. فهرست فیلم‌ها، سریال‌ها و انیمه‌ها را می‌شود بر اساس ژانر، کشور، حداقل امتیاز IMDb و دهه محدود کرد، هر کدام به‌تنهایی یا با هم، و با هر کدام از شش ترتیب.
 
-## Features
+## امکانات
 
-- **Home.** 30nama's promoted titles page left and right on a hero with one **More info** button; the remote's play key starts the title. Home draws at once from the last saved copy, then refreshes in place. The artwork of the titles next to the one in focus is fetched ahead, so moving along a row rarely waits.
-- **Posters.** Hold OK on any poster for quick actions: More info, add or remove it from your three lists, and the trailer when one exists. On Continue Watching, holding OK offers to remove the title or open its page; a removed title leaves the row at once.
-- **Trailers.** The title page's **Trailer** plays in the app's own player: Aparat's upload in Iran, with no VPN and often with Persian subtitles, and the studio's YouTube trailer elsewhere, each falling back to the other. YouTube's mark on the button says when it plays from YouTube; hold OK on it to choose. YouTube needs youtube.com within reach and a WebView from 2019 on.
-- **Search.** Recent searches return when the box is empty, above 30nama's suggestions. **Persian keyboard**, beside the box, opens the app's own Persian keys (with ZWNJ, Persian digits, ی and ک), driven by the remote.
-- **Player.** Above the seek bar sits only the title: its poster, the English name, the Persian one, then what plays, its IMDb score and year. Under the bar are the elapsed time, the length with when it ends, and one row of buttons, as on YouTube. The controls open on play/pause. Left and right scrub in five-second steps that speed up while held, and the seek lands a second after the last press. The light part of the seek bar shows what is ready, including the disk read-ahead (Settings > Playback > Preload), and the next episode's opening is fetched during the credits.
-- **Resume.** Play and Continue Watching pick up where you left off. The TV keeps its own exact point for each title, because 30nama's saved point can lag behind; it uses whichever of the two is further on. A title picked up part-way offers **Start from the beginning** for its first ten seconds.
-- **Subtitles.** **Find subtitles** searches SubDL and OpenSubtitles for the film or exact episode, Persian first, and loads the chosen file without stopping playback, converting old Windows-1256 Persian files. **Make Persian subtitles** has Claude, OpenAI or Gemini translate the English subtitle (30nama's, or one from the subtitle sites) into natural, spoken Persian in a few minutes while the film plays, then switches it on. **Subtitle timing** shifts any subtitle earlier or later in quarter-second steps. Persian subtitles show Persian ی, ک and digits, and a file typed for left-to-right players (its full stops first) is laid out the way it was written.
-- **Episodes.** Watched episodes carry a check, partly watched ones a progress bar and the minutes left, and Play resumes where you are. The history is kept on the TV (30nama keeps one position per title) and cleared on sign-out.
+- **خانه:** عنوان‌های ویژهٔ ۳۰نما بالای صفحه با چپ و راست ورق می‌خورند و یک دکمهٔ «اطلاعات بیشتر» دارند؛ دکمهٔ پخش کنترل، خود عنوان را پخش می‌کند. خانه بلافاصله از آخرین نسخهٔ ذخیره‌شده نمایش داده می‌شود و بعد سر جای خودش تازه می‌شود. تصویر عنوان‌های کناری از قبل گرفته می‌شود، برای همین حرکت در ردیف‌ها به‌ندرت معطل می‌ماند.
+- **پوسترها:** با نگه داشتن OK روی هر پوستر، کارهای سریع باز می‌شود: اطلاعات بیشتر، افزودن یا برداشتن از سه فهرست شما، و تریلر اگر باشد. در «ادامهٔ تماشا»، نگه داشتن OK امکان حذف عنوان از ردیف یا باز کردن صفحه‌اش را می‌دهد و عنوان حذف‌شده همان لحظه از ردیف برداشته می‌شود.
+- **تریلر:** دکمهٔ «تریلر» در صفحهٔ هر عنوان، تریلر را در پخش‌کنندهٔ خود برنامه پخش می‌کند. در ایران نسخهٔ آپارات پخش می‌شود که فیلترشکن نمی‌خواهد و اغلب زیرنویس فارسی دارد، و بیرون از ایران تریلر یوتیوب استودیو؛ اگر یکی در دسترس نباشد، دیگری پخش می‌شود. نشان یوتیوب روی دکمه یعنی تریلر از یوتیوب می‌آید و با نگه داشتن OK روی دکمه می‌شود منبع را انتخاب کرد. پخش از یوتیوب به دسترسی به youtube.com و یک WebView از سال ۲۰۱۹ به بعد نیاز دارد.
+- **جست‌وجو:** وقتی کادر خالی است، جست‌وجوهای اخیر بالای پیشنهادهای ۳۰نما برمی‌گردند. دکمهٔ «صفحه‌کلید فارسی» کنار کادر، صفحه‌کلید فارسی خود برنامه را باز می‌کند که با کنترل کار می‌کند و نیم‌فاصله، اعداد فارسی و «ی» و «ک» فارسی دارد.
+- **پخش‌کننده:** بالای نوار زمان فقط اطلاعات عنوان می‌آید: پوستر، نام انگلیسی و نام فارسی، و زیرشان آنچه در حال پخش است با امتیاز IMDb و سال. زیر نوار، زمان سپری‌شده، طول فیلم و ساعت تمام شدنش، و یک ردیف دکمه مثل یوتیوب قرار دارد. کنترل‌ها روی دکمهٔ پخش و توقف باز می‌شوند. چپ و راست، فیلم را پنج ثانیه پنج ثانیه جلو و عقب می‌برند و اگر نگهشان دارید تندتر می‌شوند؛ یک ثانیه بعد از آخرین فشار، پخش از همان‌جا ادامه پیدا می‌کند. بخش روشن نوار نشان می‌دهد چه مقدار از فیلم آماده است، از جمله آنچه از قبل روی حافظه ذخیره شده («تنظیمات ← پخش ← پیش‌بارگذاری»)، و ابتدای قسمت بعد هم هنگام تیتراژ پایانی گرفته می‌شود.
+- **ادامهٔ تماشا:** دکمهٔ پخش و ردیف «ادامهٔ تماشا» از همان جایی ادامه می‌دهند که فیلم را رها کرده‌اید. تلویزیون برای هر عنوان، نقطهٔ دقیق خودش را نگه می‌دارد، چون نقطه‌ای که ۳۰نما ذخیره می‌کند گاهی عقب‌تر می‌ماند؛ از این دو، هر کدام جلوتر باشد ملاک است. عنوانی که از وسط ادامه پیدا می‌کند، تا ده ثانیه دکمهٔ «پخش از ابتدا» را نشان می‌دهد.
+- **زیرنویس:** «یافتن زیرنویس» در SubDL و OpenSubtitles زیرنویس همان فیلم یا همان قسمت را پیدا می‌کند، اول فارسی، و فایل انتخاب‌شده را بدون توقف پخش بار می‌کند؛ فایل‌های قدیمی فارسی با کدگذاری Windows-1256 هم درست خوانده می‌شوند. «ساخت زیرنویس فارسی» زیرنویس انگلیسی را (زیرنویس خود ۳۰نما یا یکی از سایت‌های زیرنویس) با Claude، OpenAI یا Gemini به فارسی روان و گفتاری ترجمه می‌کند. این کار چند دقیقه طول می‌کشد، فیلم در این مدت پخش می‌شود و زیرنویس که آماده شد خودش روشن می‌شود. «زمان‌بندی زیرنویس» هر زیرنویسی را ربع ثانیه ربع ثانیه جلو یا عقب می‌برد. زیرنویس فارسی با «ی»، «ک» و اعداد فارسی نمایش داده می‌شود و فایلی که برای پخش‌کننده‌های چپ‌به‌راست نوشته شده (یعنی نقطه را اول خط گذاشته) همان‌طور که نوشته شده چیده می‌شود.
+- **قسمت‌ها:** قسمت‌های دیده‌شده تیک می‌خورند، قسمت‌های نیمه‌کاره نوار پیشرفت و دقیقه‌های باقی‌مانده دارند و دکمهٔ پخش از همان‌جایی که هستید ادامه می‌دهد. این سابقه روی خود تلویزیون نگه داشته می‌شود (۳۰نما برای هر عنوان فقط یک نقطه نگه می‌دارد) و با خروج از حساب پاک می‌شود.
 
-## Install
+## نصب
 
-Download `30namaTV.apk` from [Releases](https://github.com/soeleia/30namaTV/releases), or the `optimized-apk` artifact of a successful [Actions run](https://github.com/soeleia/30namaTV/actions).
+فایل `30namaTV.apk` را از [صفحهٔ Releases](https://github.com/soeleia/30namaTV/releases) بگیرید، یا بستهٔ `optimized-apk` را از یک [اجرای موفق Actions](https://github.com/soeleia/30namaTV/actions).
 
-Enable installation from your chosen file manager on the TV and open the APK, or use ADB:
+در تلویزیون، نصب از مدیر فایلی را که استفاده می‌کنید مجاز کنید و فایل APK را باز کنید، یا با ADB نصبش کنید:
+
+<div dir="ltr">
 
 ```sh
 adb connect YOUR_TV_IP:5555
 adb -s YOUR_TV_IP:5555 install -r 30namaTV.apk
 ```
 
-The application ID is `com.doxigo.tv30`. Public builds use one dedicated release key so subsequent public APKs install as updates. Earlier personal test APKs used a different local debug key: moving from those to the public release requires uninstalling the old build, which removes its local settings/login. The separately supplied TV test APK retains the original test key for an in-place update.
+</div>
 
-## Updates
+شناسهٔ برنامه `com.doxigo.tv30` است. نسخه‌های عمومی همه با یک کلید انتشار امضا می‌شوند تا هر نسخهٔ تازه روی قبلی به‌روزرسانی شود. نسخه‌های آزمایشی شخصی قبلی کلید دیگری داشتند: برای رفتن از آن‌ها به نسخهٔ عمومی باید نسخهٔ قدیمی را پاک کنید، که تنظیمات و ورود ذخیره‌شده‌اش را هم پاک می‌کند. فایل آزمایشی جداگانه‌ای که برای تلویزیون فرستاده شده، همان کلید آزمایشی اصلی را دارد و روی نسخهٔ قبلی نصب می‌شود.
 
-Each time home comes to the front (at launch, back from the player, out of standby), the app checks the latest stable GitHub release, at most once every six hours, and automatically downloads a newer APK using Android's Download Manager. Downloads continue in the background. Once a new version is downloaded and verified, home says so in its top corner, "Version 1.5.0 is ready" with **Install**: press Up from the featured title to reach it and OK to install. Back puts that version's notice away for good, and a red dot stays on the rail's **Settings** icon until it is installed. That dot leads to **Settings > App > App update**, where you can also follow a download, check again or install. Android requires installation confirmation and may ask you to allow updates from this app.
+## به‌روزرسانی
 
-Before installation, the app verifies the package name, newer version code and signing certificate. It rejects incompatible or invalid APKs. The first migration from an older personal test key to the public release key still requires the manual installation described above.
+هر بار که صفحهٔ اصلی جلو می‌آید (موقع باز شدن برنامه، برگشتن از پخش یا روشن شدن تلویزیون)، برنامه آخرین نسخهٔ پایدار گیت‌هاب را بررسی می‌کند، حداکثر هر شش ساعت یک بار، و اگر نسخهٔ تازه‌تری باشد آن را با Download Manager اندروید خودکار دانلود می‌کند. دانلود در پس‌زمینه ادامه پیدا می‌کند. وقتی نسخهٔ تازه دانلود و بررسی شد، صفحهٔ اصلی در گوشهٔ بالایش خبر می‌دهد: «نسخهٔ ۱.۵.۰ آماده است» با «نصب». روی عنوان ویژه دکمهٔ بالا را بزنید تا به آن برسید و با تأیید نصبش کنید. دکمهٔ بازگشت این خبر را می‌بندد و برای همان نسخه دیگر نشانش نمی‌دهد، ولی نقطه‌ای قرمز روی نماد «تنظیمات» در نوار کناری می‌ماند تا نسخه نصب شود. این نقطه شما را مستقیم به «تنظیمات ← برنامه ← به‌روزرسانی» می‌برد؛ آن‌جا هم پیشرفت دانلود را می‌بینید، دوباره بررسی می‌کنید یا نسخهٔ آماده را نصب می‌کنید. اندروید برای نصب تأیید می‌خواهد و شاید لازم باشد اجازهٔ نصب از این برنامه را بدهید.
 
-## Service keys
+برنامه پیش از نصب، نام بسته، بالاتر بودن شمارهٔ نسخه و گواهی امضا را بررسی می‌کند و فایل ناسازگار یا نامعتبر را نصب نمی‌کند. اولین جابه‌جایی از کلید آزمایشی شخصی به کلید انتشار عمومی همچنان همان نصب دستی بالا را لازم دارد.
 
-TMDB, the player's subtitle search and its Persian subtitle maker use API keys that each viewer supplies. Open **Settings > Services** and select a service. Scan the QR code with a phone on the same Wi-Fi: it opens a page served by the TV that links to where the key is made and sends the pasted key straight to the TV. You can also type the key with the TV's keyboard or the Google TV app, or use **Paste**. The sheet checks the key, says whether it works, and keeps it in the app's private storage on that TV. Without a key that feature stays off; browsing and 30nama playback need none.
+## کلیدهای سرویس
 
-- **TMDB** adds the trending row, Persian names 30nama lacks, More Like This, trailers and episode stills. Its API page offers an API key and an API read access token; either works.
-- **SubDL** and **OpenSubtitles** power **Find subtitles** in the player (Audio & Subtitles → Subtitles), which appears once either has a key. A free OpenSubtitles key downloads five subtitles a day.
-- **Claude**, **OpenAI** and **Gemini** power **Make Persian subtitles** in the same column. **Translation model**, above their keys, picks the model and with it the service: Claude Opus 5.5 (the most faithful Persian, about $0.92 a two-hour film), Claude Sonnet 5.5 or GPT-6.1 Sol (about $0.46), GPT-6 Astra (about $2.30), or Gemini 3.8 Flash (free within Gemini's free tier, but it slips more often). Until you pick one, the best model of the first service with a key, in that order, translates; the paid ones charge your own account. The result is kept on the TV, so watching again costs nothing. These providers refuse connections from Iran without a VPN.
+سرویس TMDB، جست‌وجوی زیرنویس در پخش‌کننده و ساخت زیرنویس فارسی با کلید API کار می‌کنند و هر بیننده کلید خودش را وارد می‌کند. در «تنظیمات ← سرویس‌ها» یک سرویس را انتخاب کنید. کد QR را با گوشی‌ای که به همان وای‌فای وصل است اسکن کنید: صفحه‌ای باز می‌شود که خود تلویزیون آن را می‌سازد، جایی را که کلید ساخته می‌شود نشانتان می‌دهد و کلیدی را که در آن بچسبانید مستقیم به تلویزیون می‌فرستد. کلید را با صفحه‌کلید تلویزیون یا برنامهٔ Google TV هم می‌شود تایپ کرد، یا «جای‌گذاری» را زد. برنامه کلید را آزمایش می‌کند، می‌گوید کار می‌کند یا نه، و آن را در حافظهٔ خصوصی خودش روی همان تلویزیون نگه می‌دارد. بدون کلید، آن امکان خاموش می‌ماند؛ گشتن در برنامه و پخش ۳۰نما به هیچ کلیدی نیاز ندارد.
 
-## Build locally
+- **سرویس TMDB:** ردیف «ترندهای هفته»، نام فارسی عنوان‌هایی که ۳۰نما ندارد، «عناوین مشابه»، تریلرها و تصویر قسمت‌ها را اضافه می‌کند. صفحهٔ API آن هم API key می‌دهد و هم API read access token؛ هر کدام کار می‌کند.
+- **سایت‌های SubDL و OpenSubtitles:** «یافتن زیرنویس» را در پخش‌کننده («صدا و زیرنویس» ← «زیرنویس») راه می‌اندازند و با کلید هر کدام ظاهر می‌شود. کلید رایگان OpenSubtitles روزی پنج زیرنویس دانلود می‌کند.
+- **مدل‌های Claude، OpenAI و Gemini:** «ساخت زیرنویس فارسی» را در همان ستون راه می‌اندازند. «مدل ترجمه» بالای کلیدهایشان، مدل و همراهش سرویس را انتخاب می‌کند: Claude Opus 5.5 (وفادارترین ترجمهٔ فارسی، حدود ۰٫۹۲ دلار برای یک فیلم دوساعته)، Claude Sonnet 5.5 یا GPT-6.1 Sol (حدود ۰٫۴۶ دلار)، GPT-6 Astra (حدود ۲٫۳۰ دلار) یا Gemini 3.8 Flash (در سهمیهٔ رایگان Gemini مجانی است، ولی بیشتر اشتباه می‌کند). تا مدلی انتخاب نکرده باشید، بهترین مدل اولین سرویسی که کلید دارد، به همین ترتیب، ترجمه می‌کند؛ هزینهٔ مدل‌های پولی از حساب خود شما کم می‌شود. نتیجه روی تلویزیون می‌ماند و دوباره دیدن فیلم هزینه‌ای ندارد. این سرویس‌ها از ایران بدون فیلترشکن وصل نمی‌شوند.
 
-Install Android Studio, JDK 21 and these SDK packages:
+## ساخت از روی کد
+
+برنامهٔ Android Studio، نسخهٔ 21 از JDK و این بسته‌های SDK را نصب کنید:
+
+<div dir="ltr">
 
 ```sh
 sdkmanager 'platforms;android-37.0' 'build-tools;36.0.0' 'build-tools;37.0.0' 'platform-tools'
@@ -60,34 +68,42 @@ printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
 ./gradlew :app:assembleRelease
 ```
 
-The APK is `app/build/outputs/apk/release/app-release.apk`. Android Studio's bundled JDK 21 also works. The Gradle wrapper verifies its distribution checksum. A local build uses your Android debug key unless all four `RELEASE_*` variables described below are supplied.
+</div>
 
-The public checkout includes OFL-licensed Inter and Vazirmatn, so it builds without private font files. Maintainer APKs retain the requested Peyda headings and Yekan Bakh body text; see [fonts and build inputs](docs/setup.md#fonts). English text uses Inter throughout.
+فایل نصبی در `app/build/outputs/apk/release/app-release.apk` ساخته می‌شود. نسخهٔ 21 از JDK که همراه Android Studio می‌آید هم کار می‌کند و Gradle Wrapper چک‌سام توزیع خودش را بررسی می‌کند. ساخت محلی با کلید debug اندروید شما امضا می‌شود، مگر اینکه هر چهار متغیر `RELEASE_*` را بدهید ([راهنمای راه‌اندازی و انتشار](docs/setup.md)).
 
-Public APKs carry no API keys (see [service keys](#service-keys)). For your own builds, ignored `local.properties` can hold fallbacks used while no key is saved in Settings: `tmdb.token=`, `subdl.key=`, `opensubtitles.key=`, `gemini.key=`, `anthropic.key=` and `openai.key=` ([details](docs/setup.md#service-keys)). Keys compiled into an APK can be extracted, so don't share an APK built with yours, and never put an account password there.
+مخزن عمومی فونت‌های Inter و Vazirmatn را با مجوز OFL همراه دارد و بدون فایل‌های فونت خصوصی ساخته می‌شود. نسخه‌هایی که نگهدارنده منتشر می‌کند تیترهای Peyda و متن Yekan Bakh را دارند؛ [فونت‌ها و ورودی‌های ساخت](docs/setup.md#fonts) را ببینید. متن انگلیسی همه‌جا با Inter است.
 
-## Checks and screenshots
+نسخه‌های عمومی هیچ کلید API ندارند ([کلیدهای سرویس](#کلیدهای-سرویس) را ببینید). برای ساخت‌های خودتان، فایل `local.properties` که گیت آن را نادیده می‌گیرد می‌تواند کلیدهای جایگزین را نگه دارد تا وقتی کلیدی در تنظیمات ذخیره نشده، از آن‌ها استفاده شود: `tmdb.token=`، `subdl.key=`، `opensubtitles.key=`، `gemini.key=`، `anthropic.key=` و `openai.key=` ([جزئیات](docs/setup.md#service-keys)). کلیدی که داخل APK ساخته شود قابل استخراج است، پس فایلی را که با کلیدهای خودتان ساخته‌اید به کسی ندهید و هیچ‌وقت رمز حسابی را آنجا نگذارید.
+
+## بررسی‌ها و تصویرها
+
+<div dir="ltr">
 
 ```sh
 ./gradlew :app:testDebugUnitTest :app:lintRelease :app:assembleDebug :app:assembleDebugAndroidTest
 python3 scripts/tv-checks.py --serial emulator-5554
 ```
 
-Use a disposable emulator. Fixture checks replace local preferences and use mocked account data; the runner rejects physical devices. They cover startup/cancellation, logo playback and cleanup, five-second control hiding, play/pause focus, accelerating and self-landing seeks, cancelled/backward seeks, column alignment, Persian lines fitting their width, subtitle direction and centering, making Persian subtitles (part by part, with a refused key), title clipping, intro/recap countdown, watched episodes, removing from Continue Watching, whole score and year under English posters, My Lists, vertical search and recent searches, the complete genre page, catalogue filters (D-pad, parameters, stale pages, paging, clear and empty results), update validation/status, home's update notice and the rail's Settings dot, and trailer playback/lifecycle.
+</div>
 
-The trailer check attempts the public Animals trailer. If its CDN is unreachable, logs state `PUBLIC_UNAVAILABLE` and use a silence fixture for interaction/lifecycle checks. That result does not certify live CDN playback.
+این بررسی‌ها را روی یک شبیه‌ساز یک‌بارمصرف اجرا کنید. آن‌ها تنظیمات محلی را عوض می‌کنند و با داده‌های ساختگی حساب کار می‌کنند و اجراکننده‌شان دستگاه واقعی را نمی‌پذیرد. این بررسی‌ها شروع برنامه و لغو درخواست‌ها، لوگوی متحرک، پنهان شدن کنترل‌ها، جلو و عقب رفتن، چیدمان و جهت زیرنویس، ساخت زیرنویس فارسی، ادامهٔ تماشا و دکمهٔ «پخش از ابتدا»، قسمت‌های دیده‌شده، حذف از «ادامهٔ تماشا»، کامل ماندن امتیاز و سال زیر پوسترها با رابط انگلیسی، فهرست‌ها، جست‌وجو و صفحه‌کلید فارسی، صفحهٔ ژانرها، فیلترهای فهرست‌ها، به‌روزرسانی (با خبر صفحهٔ اصلی و نقطهٔ قرمز «تنظیمات») و تریلر را پوشش می‌دهند.
 
-GitHub Actions runs the instrumented debug APK on an Android 11 TV emulator with two cores and 1.5 GB RAM. The optimized release APK also passes build, full lint, signature and ZIP alignment checks. Each run uploads APKs, lint/unit-test reports, instrumentation logs and screenshots. See [setup and release instructions](docs/setup.md) and [manual Sony TV checks](docs/testing.md) and [performance evidence](docs/performance.md). Emulator timing does not establish performance on a 2017 Sony TV.
+بررسی تریلر، تریلر عمومی Animals را امتحان می‌کند. اگر CDN آن در دسترس نباشد، لاگ‌ها `PUBLIC_UNAVAILABLE` را نشان می‌دهند و بررسی تعامل و چرخهٔ عمر با یک فایل بی‌صدا انجام می‌شود. چنین نتیجه‌ای پخش زنده از CDN را تأیید نمی‌کند.
 
-## Interface
+در GitHub Actions، نسخهٔ debug ابزارگذاری‌شده روی شبیه‌ساز تلویزیون اندروید 11 با دو هسته و ۱٫۵ گیگابایت رم اجرا می‌شود. فایل نصبی بهینه‌شده هم بررسی کامل lint، امضا و ترازبندی ZIP را می‌گذراند. هر اجرا فایل‌های نصبی، گزارش‌های lint و آزمون‌ها، لاگ‌ها و تصویرها را نگه می‌دارد. [راهنمای راه‌اندازی و انتشار](docs/setup.md)، [بررسی دستی روی تلویزیون سونی](docs/testing.md) و [شواهد کارایی](docs/performance.md) را ببینید. زمان‌بندی روی شبیه‌ساز چیزی دربارهٔ کارایی روی تلویزیون سونی ۲۰۱۷ ثابت نمی‌کند.
+
+## تصویرها
 
 | | |
 |:-:|:-:|
-| ![Home: the billboard of 30nama's promoted titles](docs/screenshots/home-fa.png)<br>Home | ![Home rows: each poster with its title, year and IMDb score](docs/screenshots/home-rows-fa.png)<br>Home rows |
-| ![Interstellar's title page with Play and Trailer](docs/screenshots/title-fa.png)<br>Title page | ![Interstellar's trailer from Aparat, paused in the app's trailer player](docs/screenshots/trailer-fa.png)<br>Trailer, played in the app |
-| ![The player resumed five minutes into Tears of Steel, its poster, names and year above the bar and Start from the beginning on offer](docs/screenshots/player-fa.png)<br>Player, resumed | ![The same player in English, laid out left to right](docs/screenshots/player-en.png)<br>Player in English |
-| ![Audio & Subtitles with Make Persian subtitles, by Gemini 3.8 Flash](docs/screenshots/subtitles-ai-fa.png)<br>Make Persian subtitles | ![Make Persian subtitles under way while the film plays](docs/screenshots/subtitles-ai-progress-fa.png)<br>Translation under way |
-| ![Search for جوکر typed on the app's Persian keyboard](docs/screenshots/search-keyboard-fa.png)<br>Search with the Persian keyboard | ![Movies narrowed to the 2010s and IMDb 8+](docs/screenshots/catalogue-filters-fa.png)<br>Movies, filtered |
-| ![Categories and genres](docs/screenshots/genres-fa.png)<br>Categories and genres | ![Settings, Services: TMDB, the subtitle sites and the models that make Persian subtitles](docs/screenshots/settings-services-fa.png)<br>Settings: services |
+| ![خانه: عنوان‌های ویژهٔ ۳۰نما](docs/screenshots/home-fa.png)<br>خانه | ![ردیف‌های خانه: هر پوستر با نام، سال و امتیاز IMDb](docs/screenshots/home-rows-fa.png)<br>ردیف‌های خانه |
+| ![صفحهٔ فیلم Interstellar با دکمه‌های تماشا و تریلر](docs/screenshots/title-fa.png)<br>صفحهٔ عنوان | ![تریلر Interstellar از آپارات، متوقف‌شده در پخش‌کنندهٔ تریلر برنامه](docs/screenshots/trailer-fa.png)<br>تریلر در خود برنامه |
+| ![پخش‌کننده پس از ادامهٔ فیلم Tears of Steel از دقیقهٔ پنج، با پوستر، نام‌ها و سال بالای نوار و دکمهٔ پخش از ابتدا](docs/screenshots/player-fa.png)<br>پخش‌کننده، ادامهٔ تماشا | ![همان پخش‌کننده با رابط انگلیسی، از چپ به راست](docs/screenshots/player-en.png)<br>پخش‌کننده با رابط انگلیسی |
+| ![صدا و زیرنویس، با گزینهٔ ساخت زیرنویس فارسی با Gemini 3.8 Flash](docs/screenshots/subtitles-ai-fa.png)<br>ساخت زیرنویس فارسی | ![ساخت زیرنویس فارسی در حال انجام، هم‌زمان با پخش فیلم](docs/screenshots/subtitles-ai-progress-fa.png)<br>ترجمه در حال انجام |
+| ![جست‌وجوی «جوکر» با صفحه‌کلید فارسی برنامه](docs/screenshots/search-keyboard-fa.png)<br>جست‌وجو با صفحه‌کلید فارسی | ![فیلم‌های دههٔ ۲۰۱۰ با امتیاز IMDb بالای ۸](docs/screenshots/catalogue-filters-fa.png)<br>فیلم‌ها، با فیلتر |
+| ![دسته‌ها و ژانرها](docs/screenshots/genres-fa.png)<br>دسته‌ها و ژانرها | ![تنظیمات، سرویس‌ها: TMDB، سایت‌های زیرنویس و مدل‌هایی که زیرنویس فارسی می‌سازند](docs/screenshots/settings-services-fa.png)<br>تنظیمات: سرویس‌ها |
 
-The browsing screenshots show the optimized release on the live catalogue as a guest, on a disposable Android 16 emulator, after artwork loaded. The trailer is Aparat's re-upload, with its uploader's watermark. Guests can't play 30nama titles, so the player and **Make Persian subtitles** screenshots play Blender's open film [Tears of Steel](https://mango.blender.org/) (CC BY 3.0, Blender Foundation; poster from [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Tos-poster.png)) from a public test stream, through an instrumented debug build that stands in for 30nama's answer with the film's name, year and saved point; its Persian name is ours. The translation shown has only just started, against a stand-in model that never answers, so no translated text appears. The screenshots contain no private account data. The emulator's status bar is visible; these are unmodified captures, not photos of a physical TV. The original logo and loading animation are documented in [branding provenance](docs/branding.md). 30nama branding and third-party font licenses retain their respective owners' rights; publishing this client does not imply affiliation or a license to reuse those assets separately.
+تصویرهای گشتن در برنامه، نسخهٔ بهینه‌شدهٔ انتشار را روی فهرست زندهٔ ۳۰نما و با ورود مهمان نشان می‌دهند، روی یک شبیه‌ساز یک‌بارمصرف اندروید 16 و پس از بارگذاری تصویرها. تریلر بازنشر آپارات است و واترمارک بارگذارکننده‌اش را دارد. مهمان نمی‌تواند عنوان‌های ۳۰نما را پخش کند، برای همین تصویرهای پخش‌کننده و «ساخت زیرنویس فارسی» فیلم آزاد [Tears of Steel](https://mango.blender.org/) از بنیاد بلندر را (با مجوز CC BY 3.0؛ پوستر از [ویکی‌مدیا کامانز](https://commons.wikimedia.org/wiki/File:Tos-poster.png)) از یک جریان آزمایشی عمومی پخش می‌کنند. در این تصویرها یک نسخهٔ debug ابزارگذاری‌شده به جای پاسخ ۳۰نما، نام فیلم، سال و نقطهٔ ذخیره‌شده را می‌دهد و نام فارسی فیلم را ما گذاشته‌ایم. ترجمهٔ نشان‌داده‌شده تازه شروع شده و مدلی که جای سرویس واقعی گذاشته شده هیچ‌وقت جواب نمی‌دهد، برای همین هیچ متن ترجمه‌شده‌ای در تصویرها نیست. در تصویرها هیچ اطلاعات خصوصی حسابی نیست. نوار وضعیت شبیه‌ساز پیداست؛ این‌ها تصویربرداری مستقیم و بی‌دستکاری‌اند، نه عکس از تلویزیون واقعی. لوگو و انیمیشن بارگذاری اصلی در [سند منشأ نشان تجاری](docs/branding.md) آمده‌اند. حقوق نشان تجاری ۳۰نما و مجوز فونت‌های دیگران برای صاحبانشان محفوظ است؛ انتشار این برنامه به معنای وابستگی به آن‌ها یا اجازهٔ استفادهٔ جداگانه از این دارایی‌ها نیست.
+
+</div>
