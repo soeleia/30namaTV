@@ -236,7 +236,7 @@ A near-black neutral ladder, white glass controls, and three borrowed marks (30n
 
 ### Secondary
 - **Free Green** (free-green): the «رایگان» badge on artwork and the Free plan's mark. Ink on it. It means "free" and nothing else.
-- **IMDb Yellow** (imdb-yellow): IMDb's own badge beside a score, and only there.
+- **IMDb Yellow** (imdb-yellow): IMDb's own mark beside a score, and only there: a filled badge on the billboard, title page and player, the bare word in poster captions.
 
 ### Tertiary
 - **Lifted Alarm Red** (settings-danger): Settings' sign out and a lapsing plan on the dark panel, where brand red falls to 3.4:1 (this reaches 5.4:1). On the white focus card the brand red itself carries it.
@@ -330,7 +330,7 @@ White glass that turns solid white under the remote: quiet and sure under a 38sp
 - **Value chip (Settings):** a 28dp pill, surface-high at rest, ink at 12% on the focused white row.
 
 ### Cards / Containers
-- **Poster card:** artwork with its caption always shown beneath (title, then IMDb score and year); no plate, no background. 6dp corners. In English the score and year run tight so the year fits a 108dp poster whole: IMDb's badge keeps 0.2em of padding a side (0.35 elsewhere), the score 0.25em after it, the year 0.4em after that; Persian, with narrower digits, keeps 0.35, 0.3 and 0.6em. Focus: a 3dp white ring drawn inside the art's edge, fading in over 150ms, plus a 1.08 lift. Art fades in over 240ms only when it arrives off network or disk.
+- **Poster card:** artwork with its caption always shown beneath (title, then IMDb score and year); no plate, no background. 6dp corners. The caption's score mark is bare: the word «IMDb» alone in IMDb yellow at the badge's word size (0.8em), no box, the score 0.25em after it and the year 0.6em after that, in both languages. A filled badge under every card of a row read louder than the titles above it; the box stays for the billboard, the title page and the player, where one mark leads the line. MAL and MDL marks, whose blues are too dark to read bare on ink, are lifted 45% toward white. Focus: a 3dp white ring drawn inside the art's edge, fading in over 150ms, plus a 1.08 lift. Art fades in over 240ms only when it arrives off network or disk.
 - **Panel / sheet:** surface (#1F1F1F) at 20dp radius, 12dp inner pad, no border, no shadow.
 
 ### Inputs / Fields

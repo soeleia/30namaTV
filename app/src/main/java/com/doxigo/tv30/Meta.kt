@@ -18,6 +18,7 @@ import android.text.style.ReplacementSpan
 import androidx.annotation.FontRes
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
+import androidx.core.graphics.ColorUtils
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -87,10 +88,11 @@ private fun chip(context: Context, word: String, ink: Int, fill: Int = 0, line: 
 
 /**
  * The one score a poster or home's billboard has room for: IMDb's, else MyAnimeList's or
- * MyDramaList's. 30nama's own members' score is never shown (the user's call).
+ * MyDramaList's. 30nama's own members' score is never shown (the user's call). A [bare] one is a
+ * poster's, see [facts].
  */
-fun JSONObject.rating(context: Context, tight: Boolean = false): CharSequence? =
-    imdbScore(context, tight = tight) ?: fanScore(context, tight = tight)
+fun JSONObject.rating(context: Context, bare: Boolean = false): CharSequence? =
+    imdbScore(context, bare = bare) ?: fanScore(context, bare = bare)
 
 /**
  * Every score the title has, for its own page: the one [rating] picks in its source's badge, the
@@ -102,26 +104,30 @@ private fun JSONObject.scores(context: Context): List<CharSequence> {
         .mapNotNull { score -> score(quiet)?.also { quiet = true } }
 }
 
-private fun JSONObject.imdbScore(context: Context, quiet: Boolean = false, tight: Boolean = false) =
-    imdb?.let { scored(context, "IMDb", ContextCompat.getColor(context, R.color.imdb), Color.BLACK, it, quiet, tight) }
+private fun JSONObject.imdbScore(context: Context, quiet: Boolean = false, bare: Boolean = false) =
+    imdb?.let { scored(context, "IMDb", ContextCompat.getColor(context, R.color.imdb), Color.BLACK, it, quiet, bare) }
 
 /** Anime carry MyAnimeList's score and Asian dramas MyDramaList's, each in its site's blue. */
-private fun JSONObject.fanScore(context: Context, quiet: Boolean = false, tight: Boolean = false) =
-    score("myanimelist")?.let { scored(context, "MAL", MAL_BLUE, Color.WHITE, it, quiet, tight) }
-        ?: score("mydramalist")?.let { scored(context, "MDL", MDL_BLUE, Color.WHITE, it, quiet, tight) }
+private fun JSONObject.fanScore(context: Context, quiet: Boolean = false, bare: Boolean = false) =
+    score("myanimelist")?.let { scored(context, "MAL", MAL_BLUE, Color.WHITE, it, quiet, bare) }
+        ?: score("mydramalist")?.let { scored(context, "MDL", MDL_BLUE, Color.WHITE, it, quiet, bare) }
 
 /**
  * A source's [mark] in its own colours, the score beside it in white bold: «[IMDb] ۷٫۷». A [Gap]
  * between them rather than a word space, whose width is whichever face the space falls to. A
- * [quiet] one is plain words in the line's own grey, «MAL ۸٫۷», as the year is. A [tight] one (an
- * English poster's, see [facts]) closes the mark round its word and the score up to it.
+ * [quiet] one is plain words in the line's own grey, «MAL ۸٫۷», as the year is. A [bare] one is
+ * the mark's word alone in its colour, no box, at the badge's word size: a poster's, where a
+ * filled badge under every card of a row read louder than the titles above them. A blue too dark
+ * to read on ink is lifted toward white; IMDb's yellow reads as it is.
  */
-private fun scored(context: Context, mark: String, fill: Int, ink: Int, value: Double, quiet: Boolean = false, tight: Boolean = false): CharSequence {
+private fun scored(context: Context, mark: String, fill: Int, ink: Int, value: Double, quiet: Boolean = false, bare: Boolean = false): CharSequence {
     val number = "%.1f".format(Locale.getDefault(), value)
     if (quiet) return SpannableStringBuilder(mark).append(" ", Gap(0.3f), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE).append(number)
     val face = context.font(if (number.isLatin) R.font.inter_bold else R.font.vazirmatn_bold)
-    return SpannableStringBuilder(chip(context, mark, ink, fill = fill, pad = if (tight) 0.2f else 0.35f))
-        .append(" ", Gap(if (tight) 0.25f else 0.3f), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+    val badge = if (!bare) chip(context, mark, ink, fill = fill)
+        else chip(context, mark, if (ColorUtils.calculateLuminance(fill) < 0.3) ColorUtils.blendARGB(fill, Color.WHITE, 0.45f) else fill, pad = 0f)
+    return SpannableStringBuilder(badge)
+        .append(" ", Gap(if (bare) 0.25f else 0.3f), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         .append(SpannableString(number).spanned(Face(face)).spanned(ForegroundColorSpan(Color.WHITE)))
 }
 
@@ -130,14 +136,11 @@ private const val MAL_BLUE = 0xFF2E51A2.toInt()
 private const val MDL_BLUE = 0xFF1675B6.toInt()
 
 /**
- * What every poster says under its art, by the user's rule: the score, then the year. English sets
- * it tight: Inter's digits run wider than Persian's, and at the line's own spacing «IMDb 7.6 2005»
- * ran past a 108dp poster's 104dp caption and lost its year. Tight, it takes 97dp.
+ * What every poster says under its art, by the user's rule: the score, then the year. The score's
+ * mark is [bare], which also gives an English caption the room a filled badge took: «IMDb 7.6
+ * 2005» fits a 108dp poster's 104dp caption whole, as Persian's narrower digits already did.
  */
-fun JSONObject.facts(context: Context): CharSequence {
-    val tight = Api.language != "fa"
-    return metaLine(context, rating(context, tight), year, gap = if (tight) 0.4f else 0.6f)
-}
+fun JSONObject.facts(context: Context): CharSequence = metaLine(context, rating(context, bare = true), year, gap = 0.6f)
 
 /**
  * When an airing series' next episode comes, while that is still ahead: «قسمت بعد: شنبه ۲۵ مهر»,
@@ -419,7 +422,7 @@ private class Leading(private val digits: Digits) : LineHeightSpan.WithDensity {
  * A word in a box on the line, drawn over the word itself: IMDb's yellow mark, the age rating's
  * outline, the category's quiet fill. The word stays in the text for screen readers. One spec for
  * every chip, in ems of the line's text: 1.25 tall, its word at 0.8, [pad] at either side (0.35;
- * an English poster's score takes 0.2, see [facts]), corners a fifth of the height, the box on
+ * a poster's bare score mark takes none, see [scored]), corners a fifth of the height, the box on
  * whole pixels and centred on the line's [Digits], so every chip and the score or year beside it
  * share one middle. The word centres in the box by
  * its own glyphs, not its font box (Yekan Bakh's would set a Persian word 0.15 em high): a Latin
