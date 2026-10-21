@@ -383,15 +383,13 @@ internal data class Filter(
     /**
      * advanced_search's `parameters` for [type]'s streamable titles. In the shapes the server reads
      * (tried against it): `type` and `genre` as lists, which it ignores as strings; `country` as a
-     * string, which as a list finds nothing; the score and years as numbers. `language` is not yet
-     * tried: it goes as a list, the one guess that fails safe, since a list the server wants as a
-     * string finds nothing (country), where a string it wants as a list is ignored and every
-     * title comes back as if filtered (genre).
+     * string, which as a list finds nothing; the score and years as numbers. `language` goes as a
+     * string: as a list, Japanese found nothing, the way a country list does.
      */
     fun parameters(type: String): JSONObject = JSONObject().put("stream", "true").put("type", JSONArray().put(type)).apply {
         genre?.let { put("genre", JSONArray().put(it)) }
         country?.let { put("country", it) }
-        language?.let { put("language", JSONArray().put(it)) }
+        language?.let { put("language", it) }
         score?.let { put("imdb_rate", it) }
         decade?.let { put("min_year", it).put("max_year", it + 9) }
     }

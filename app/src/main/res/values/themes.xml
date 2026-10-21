@@ -106,7 +106,7 @@
     </style>
 
     <!-- A catalogue filter (grid_header): the label, then a small chevron for the list it opens; the
-         chevron side sits tighter, as an icon side does. A long choice ellipsizes, so four at their
+         chevron side sits tighter, as an icon side does. A long choice ellipsizes, so five at their
          widest and clear still fit the 768dp between the browse paddings. A chosen filter is
          activated, the brighter glass (button_filter). -->
     <style name="Widget.App.Button.Filter">
@@ -114,7 +114,7 @@
         <item name="android:paddingEnd">@dimen/button_pad_icon</item>
         <item name="android:drawableEnd">@drawable/ic_chevron_down</item>
         <item name="android:drawablePadding">4dp</item>
-        <item name="android:maxWidth">168dp</item>
+        <item name="android:maxWidth">132dp</item>
     </style>
 
     <!-- Icon only: the pill closed to a 44dp circle. Give it a contentDescription. -->

@@ -8,14 +8,14 @@ import org.junit.Test
 class FilterTest {
     @Test
     fun parametersInTheShapesTheServerReads() {
-        // type, genre and language as lists, country as a string, score and years as numbers (see Filter.parameters).
+        // type and genre as lists, country and language as strings, score and years as numbers (see Filter.parameters).
         val all = Filter(genre = "comedy", country = "FR", language = "fa", score = 7.5, decade = 2010).parameters("movie")
         assertEquals(setOf("stream", "type", "genre", "country", "language", "imdb_rate", "min_year", "max_year"), all.keys().asSequence().toSet())
         assertEquals("true", all.getString("stream"))
         assertEquals("""["movie"]""", all.getJSONArray("type").toString())
         assertEquals("""["comedy"]""", all.getJSONArray("genre").toString())
         assertEquals("FR", all.get("country"))
-        assertEquals("""["fa"]""", all.getJSONArray("language").toString())
+        assertEquals("fa", all.get("language"))
         assertEquals(7.5, all.get("imdb_rate"))
         assertEquals(2010, all.get("min_year"))
         assertEquals(2019, all.get("max_year"))
