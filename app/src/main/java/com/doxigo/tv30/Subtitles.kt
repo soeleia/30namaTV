@@ -13,6 +13,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
@@ -116,7 +117,8 @@ object Subtitles {
      */
     suspend fun search(wanted: Wanted): List<Found> = coroutineScope {
         val sources = listOfNotNull<suspend (Wanted) -> List<Found>>(
-            ::subSource,
+            // Up to four calls in a row: cut short, so a slow or blocked SubSource (from Iran) doesn't hold back the others.
+            { w -> withTimeoutOrNull(8_000) { subSource(w) } ?: throw IOException("$SUBSOURCE timed out") },
             ::subdl.takeIf { subdlKey.isNotEmpty() },
             ::openSubtitles.takeIf { openSubtitlesKey.isNotEmpty() },
         )
@@ -130,8 +132,27 @@ object Subtitles {
     /** Words of a release that say where the copy came from, which decides its timing most. */
     private val SOURCES = setOf("bluray", "web", "webrip", "hdtv", "dvdrip", "hdrip")
 
-    /** An episode a release names: "S02E08", "S01E01-E10", "2x08", "Eps 07", "E08"; not the 265 of "x265". */
-    private val EPISODE = Regex("(?i)(?<![a-z0-9])(?:s(\\d{1,2})[ ._-]?e|(\\d{1,2})x|(?:episode|eps|ep|e)[ ._-]*)(\\d{1,3})(?:-e?(\\d{1,3}))?(?!\\d)")
+    /** An episode a release names: "S02E08", "S01EP08", "S01E01-E10", "S01E01E02", "2x08", "Eps 07", "E08"; not the 265 of "x265". */
+    private val EPISODE = Regex("(?i)(?<![a-z0-9])(?:s(\\d{1,2})[ ._-]?ep?|(\\d{1,2})x|(?:episode|eps|ep|e)[ ._-]*)(\\d{1,3})(?:(?:-e?|e)(\\d{1,3}))?(?!\\d)")
+
+    /** The scene's bare episode, "213" for S02E13 ([episodes]); not the number of "H.264", "x265", "720p" or a year. */
+    private val SCENE = Regex("(?i)(?<![a-z0-9])(?<![hx][ ._-])([1-9])(\\d{2})(?![a-z0-9])")
+
+    /**
+     * The episodes [name] says, from and to, with the season when it says one; null when it names
+     * none. Where it says nothing else, the scene's "213" (S02E13) counts in [season] (any, when 0)
+     * and when it is no number of [title]'s own ("Room 104").
+     */
+    // ponytail: three digits, so seasons 1 to 9 alone; a season 10's "1013" would read like a year.
+    private fun episodes(name: String, season: Int, title: String = ""): Pair<Int?, IntRange>? {
+        EPISODE.find(name)?.destructured?.let { (s, otherSeason, from, to) ->
+            return s.ifEmpty { otherSeason }.toIntOrNull() to from.toInt()..(to.toIntOrNull() ?: from.toInt())
+        }
+        val own = words(title)
+        return SCENE.findAll(name).map { it.destructured }
+            .firstOrNull { (s, e) -> (season == 0 || s.toInt() == season) && e.toInt() > 0 && "$s$e" !in own }
+            ?.let { (s, e) -> s.toInt() to e.toInt()..e.toInt() }
+    }
 
     /** A name's words, a source's spellings as one ("WEB-DL" is "web", "BRRip" "bluray"): "1080p", "s02e08", "cakes". */
     internal fun words(name: String) = name.lowercase().replace("web-dl", "webdl").replace("blu-ray", "bluray")
@@ -154,13 +175,10 @@ object Subtitles {
     internal fun score(release: String, wanted: Wanted): Int? {
         var score = 0
         if (wanted.isEpisode) {
-            val named = EPISODE.find(release)?.destructured
+            val named = episodes(release, wanted.season, wanted.name)
             score += when {
                 named == null -> 20
-                named.let { (season, otherSeason, from, to) ->
-                    (season.ifEmpty { otherSeason }.toIntOrNull() ?: wanted.season) == wanted.season &&
-                        wanted.episode in from.toInt()..(to.toIntOrNull() ?: from.toInt())
-                } -> 100
+                (named.first ?: wanted.season) == wanted.season && wanted.episode in named.second -> 100
                 else -> return null
             }
         }
@@ -173,10 +191,13 @@ object Subtitles {
         found.mapNotNull { f -> score(f.release, wanted)?.let { f to it } }.sortedByDescending { it.second }.map { it.first }
 
     private suspend fun subSource(wanted: Wanted): List<Found> {
-        val path = subSourcePage(wanted.pages, wanted) ?: subSourceSearch(wanted) ?: return emptyList()
-        val url = "$SUBSOURCE_API/subtitles/$path".toHttpUrl().newBuilder().addEncodedQueryParameter("language", "farsi_persian,english").build()
-        // ponytail: a stale 30nama link (SubSource's 404) reads as SubSource down; search when one turns up.
-        return subSourceFound(json(SUBSOURCE, Request.Builder().url(url).build()), wanted)
+        suspend fun listing(path: String): JSONObject {
+            val url = "$SUBSOURCE_API/subtitles/$path".toHttpUrl().newBuilder().addEncodedQueryParameter("language", "farsi_persian,english").build()
+            return json(SUBSOURCE, Request.Builder().url(url).build())
+        }
+        // A stale 30nama link is SubSource's 404 ({"error":true,"message":"Media not found"}): its own search may still know the title.
+        val linked = subSourcePage(wanted.pages, wanted)?.let { page -> try { listing(page) } catch (e: Refused) { if (e.quota) throw e else null } }
+        return subSourceFound(linked ?: listing(subSourceSearch(wanted) ?: return emptyList()), wanted)
     }
 
     /** The listing's path ("dark-matter-2024/season-2") in 30nama's own link for what plays, any language's; "season=2" is how the site once wrote it. */
@@ -384,23 +405,31 @@ object Subtitles {
 
     /**
      * A download's subtitle file and its text: the file itself, or out of a zip the one whose name
-     * says [episode] (a season's zip holds them all), else its first. Mac zips' `__MACOSX` shadows
-     * of each file are no subtitles.
+     * says [episode] (a season's zip holds them all), else its first unless that names another
+     * episode. Mac zips' `__MACOSX` shadows of each file are no subtitles. Only the file used (and
+     * the first, in case) is read, each up to [LIMIT]: a crafted zip's many files can't fill the memory.
      */
     internal fun open(bytes: ByteArray, name: String, episode: Int, language: String): Pair<String, String> {
         val isZip = bytes.size > 3 && bytes[0] == 'P'.code.toByte() && bytes[1] == 'K'.code.toByte()
+        if (!isZip) return name to decode(bytes, language)
+        // "S01E05", "1x05", "E05", "Episode 5", «قسمت ۵» spelt with Latin digits, the scene's "105"; not the 5 in "x265" or "Release 5".
+        val names = Regex("(?i)(?<![a-z])(?:e|ep|episode|x|قسمت)[ ._-]*0*$episode(?!\\d)")
+        var first: Pair<String, ByteArray>? = null
         // Latin-1 names (7.0 and later take a charset): an old zip's Persian file name in some code
         // page must not fail the whole zip, as strict UTF-8 would.
         val stream = bytes.inputStream()
-        val files = if (!isZip) listOf(name to bytes) else (if (Build.VERSION.SDK_INT >= 24) ZipInputStream(stream, Charsets.ISO_8859_1) else ZipInputStream(stream)).use { zip ->
-            generateSequence { zip.nextEntry }
-                .filter { !it.isDirectory && "__MACOSX" !in it.name && it.name.substringAfterLast('.').lowercase() in TYPES }
-                .map { it.name to zip.readAtMost(LIMIT) }
-                .toList()
+        (if (Build.VERSION.SDK_INT >= 24) ZipInputStream(stream, Charsets.ISO_8859_1) else ZipInputStream(stream)).use { zip ->
+            for (entry in generateSequence { zip.nextEntry }) {
+                val file = entry.name.substringAfterLast('/')
+                if (entry.isDirectory || "__MACOSX" in entry.name || file.substringAfterLast('.').lowercase() !in TYPES) continue
+                if (episode > 0 && (names.containsMatchIn(file) || episodes(file, 0)?.second == episode..episode)) {
+                    return entry.name to decode(zip.readAtMost(LIMIT), language)
+                }
+                if (first == null) first = entry.name to zip.readAtMost(LIMIT)
+            }
         }
-        // "S01E05", "1x05", "E05", "Episode 5", «قسمت ۵» spelt with Latin digits; not the 5 in "x265" or "Release 5".
-        val names = Regex("(?i)(?<![a-z])(?:e|ep|episode|x|قسمت)[ ._-]*0*$episode(?!\\d)")
-        val (file, data) = files.firstOrNull { episode > 0 && names.containsMatchIn(it.first.substringAfterLast('/')) } ?: files.firstOrNull() ?: throw Unreadable()
+        // A first file for another episode would load that one's lines: none, rather.
+        val (file, data) = first?.takeIf { episode == 0 || episodes(it.first.substringAfterLast('/'), 0)?.second?.contains(episode) != false } ?: throw Unreadable()
         return file to decode(data, language)
     }
 

@@ -4,6 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 import java.io.ByteArrayOutputStream
 import java.util.zip.ZipEntry
@@ -95,25 +96,36 @@ class SubtitlesTest {
         assertEquals(listOf("الساعة ٤:٥٦"), Subtitles.cleaned(listOf("الساعة ٤:٥٦")))
     }
 
+    private fun zip(vararg files: Pair<String, String>) = ByteArrayOutputStream().also { out ->
+        ZipOutputStream(out).use { z ->
+            for ((name, text) in files) {
+                z.putNextEntry(ZipEntry(name))
+                z.write(text.toByteArray())
+            }
+        }
+    }.toByteArray()
+
     @Test
     fun seasonZip() {
-        val zip = ByteArrayOutputStream().also { out ->
-            ZipOutputStream(out).use { z ->
-                for ((name, text) in listOf(
-                    "Show.S01E04.720p.x265.srt" to "four",
-                    "__MACOSX/._Show.S01E05.720p.x265.srt" to "mac shadow",
-                    "Show.S01E05.720p.x265.srt" to "five",
-                    "Show.S01E05.nfo" to "not a subtitle",
-                )) {
-                    z.putNextEntry(ZipEntry(name))
-                    z.write(text.toByteArray())
-                }
-            }
-        }.toByteArray()
+        val zip = zip(
+            "Show.S01E04.720p.x265.srt" to "four",
+            "__MACOSX/._Show.S01E05.720p.x265.srt" to "mac shadow",
+            "Show.S01E05.720p.x265.srt" to "five",
+            "Show.S01E05.nfo" to "not a subtitle",
+        )
         assertEquals("Show.S01E05.720p.x265.srt" to "five", Subtitles.open(zip, "/subtitle/1-2.zip", 5, "en"))
         assertEquals("Show.S01E04.720p.x265.srt" to "four", Subtitles.open(zip, "/subtitle/1-2.zip", 4, "en"))
-        // A film's zip, or an episode the names don't say: its first subtitle.
+        // A film's zip: its first subtitle.
         assertEquals("Show.S01E04.720p.x265.srt" to "four", Subtitles.open(zip, "/subtitle/1-2.zip", 0, "en"))
+        // An episode none names, and the first another's: not that one's lines.
+        assertThrows(Subtitles.Unreadable::class.java) { Subtitles.open(zip, "/subtitle/1-2.zip", 6, "en") }
+        // A first that names no episode, or a range with this one in it, is taken.
+        assertEquals("Show.Season1.H.264.srt" to "all", Subtitles.open(zip("Show.Season1.H.264.srt" to "all"), "z", 6, "en"))
+        assertEquals("Show.S01E01-E10.srt" to "ten", Subtitles.open(zip("Show.S01E01-E10.srt" to "ten"), "z", 6, "en"))
+        // The scene's bare "213" (S02E13): the episode's file, codec numbers aside.
+        val scene = zip("the.office.us.212.h.264-lol.srt" to "twelve", "the.office.us.213.hdtv-loki.srt" to "thirteen")
+        assertEquals("the.office.us.213.hdtv-loki.srt" to "thirteen", Subtitles.open(scene, "z", 13, "en"))
+        assertThrows(Subtitles.Unreadable::class.java) { Subtitles.open(scene, "z", 5, "en") }
         // Sent bare rather than zipped.
         assertEquals("film.srt" to "one", Subtitles.open("one".toByteArray(), "film.srt", 0, "en"))
     }
@@ -191,10 +203,25 @@ class SubtitlesTest {
         for (other in listOf("Show.S02E04.720p", "Show.S01E05.720p", "Show - Season 2 ~ Eps 07. The Pyramid", "Show.S02E06-E10")) {
             assertNull(other, Subtitles.score(other, fifth))
         }
-        // A season's pack, or a codec's number: nothing said of the episode.
-        for (pack in listOf("Show.Season2.WEB", "Show.S02.1080p.x265-PSA", "Show.S02 720p.10bit.WEBRip.2CH.X265", "Show.H.264-NTb")) {
+        // Two episodes in one ("E04E05"), "EP" for "E", and the scene's bare "205" (S02E05), as SubSource lists The Office.
+        for (fits in listOf("Show.S02E04E05.WEB", "Show.S02E05E06", "Show.S02EP05.720p", "Show_U S.VO.205.hdtv-loki", "Show - 205")) {
+            assertEquals(fits, 100, Subtitles.score(fits, fifth))
+        }
+        for (other in listOf("Show.S02E01E02", "Show.S02EP04", "The_Office_U S.VO.213.hdtv-loki", "The Office - 222")) {
+            assertNull(other, Subtitles.score(other, fifth))
+        }
+        // A season's pack, or a codec's, a resolution's or another season's number: nothing said of the episode.
+        for (pack in listOf(
+            "Show.Season2.WEB", "Show.S02.1080p.x265-PSA", "Show.S02 720p.10bit.WEBRip.2CH.X265", "Show.H.264-NTb", "Show.S02.1080p.x264",
+            "The.Office.US.S02.720p.WEB-DL.DD5.1.H.264-CtrlHD", "Show.S02.H.265.2160p", "Show.S02.h 264", "Show.S02.x.265", "Show.2016.S02.1080p", "Show.105.hdtv",
+        )) {
             assertEquals(pack, 20, Subtitles.score(pack, fifth))
         }
+        // A title's own number is no episode ("Room 104", season 1).
+        val room = Subtitles.Wanted(null, "Room 104", null, 1, 5)
+        assertEquals(20, Subtitles.score("Room.104.Season.1.WEB", room))
+        assertEquals(100, Subtitles.score("Room.104.S01E05", room))
+        assertNull(Subtitles.score("Room 104 - 106", room))
     }
 
     @Test

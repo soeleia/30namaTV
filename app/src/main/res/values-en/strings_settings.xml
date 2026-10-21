@@ -65,7 +65,7 @@
     <string name="settings_sign_in_help">Sign in with your phone to watch.</string>
 
     <string name="settings_services">Services</string>
-    <string name="settings_services_about">Keys of your own for what 30nama doesn\'t carry: TMDB for Persian names, trending and trailers; SubDL and OpenSubtitles for finding subtitles; Claude, OpenAI or Gemini for making Persian subtitles in the player. Keys stay on this TV only.</string>
+    <string name="settings_services_about">Keys of your own for what 30nama doesn\'t carry: TMDB for Persian names, trending and trailers; SubDL and OpenSubtitles for more results in Find subtitles, which searches SubSource without one; Claude, OpenAI or Gemini for making Persian subtitles in the player. Keys stay on this TV only.</string>
     <string name="settings_translators">Make Persian subtitles</string>
     <string name="settings_translator_unlocks">Translate subtitles in one click</string>
     <string name="settings_translator_model">Translation model</string>

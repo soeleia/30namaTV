@@ -76,7 +76,7 @@
     <!-- Services: each viewer's own API keys (Tmdb.kt, Subtitles.kt). A service's name is its own,
          in Latin; a line that names one opens on a Persian word so it keeps its direction. -->
     <string name="settings_services">سرویس‌ها</string>
-    <string name="settings_services_about">کلیدهای خودتان برای آنچه ۳۰نما ندارد: TMDB برای نام فارسی، پرطرفدارها و تریلرها، SubDL و OpenSubtitles برای یافتن زیرنویس، و یکی از Claude یا OpenAI یا Gemini برای ساخت زیرنویس فارسی در پخش. کلیدها فقط روی همین تلویزیون می‌مانند.</string>
+    <string name="settings_services_about">کلیدهای خودتان برای آنچه ۳۰نما ندارد: TMDB برای نام فارسی، پرطرفدارها و تریلرها، SubDL و OpenSubtitles برای نتیجه‌های بیشتر در «یافتن زیرنویس» (که بدون کلید هم از SubSource زیرنویس پیدا می‌کند)، و یکی از Claude یا OpenAI یا Gemini برای ساخت زیرنویس فارسی در پخش. کلیدها فقط روی همین تلویزیون می‌مانند.</string>
     <string name="service_tmdb" translatable="false">TMDB</string>
     <string name="service_subdl" translatable="false">SubDL</string>
     <string name="service_opensubtitles" translatable="false">OpenSubtitles</string>
