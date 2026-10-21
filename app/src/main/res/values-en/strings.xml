@@ -64,6 +64,12 @@
     <string name="cast">Cast</string>
     <string name="director">Director: %s</string>
     <string name="creator">Creator: %s</string>
+    <string name="status_returning">Returning Series</string>
+    <string name="status_ended">Ended</string>
+    <string name="status_canceled">Canceled</string>
+    <string name="status_in_production">In Production</string>
+    <string name="status_planned">Planned</string>
+    <string name="status_pilot">Pilot</string>
     <string name="free">Free</string>
 
     <string name="sort_by">Sort by</string>

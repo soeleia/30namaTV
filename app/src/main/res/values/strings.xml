@@ -73,6 +73,13 @@
     <string name="cast">بازیگران</string>
     <string name="director">کارگردان: %s</string>
     <string name="creator">سازنده: %s</string>
+    <!-- A series' state, as TMDB has it, on the title page's credit line. -->
+    <string name="status_returning">در حال پخش</string>
+    <string name="status_ended">پایان‌یافته</string>
+    <string name="status_canceled">لغوشده</string>
+    <string name="status_in_production">در دست ساخت</string>
+    <string name="status_planned">برنامه‌ریزی‌شده</string>
+    <string name="status_pilot">قسمت آزمایشی</string>
     <string name="free">رایگان</string>
 
     <string name="sort_by">مرتب‌سازی</string>

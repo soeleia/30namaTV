@@ -204,6 +204,18 @@ fun JSONObject.genresLine(context: Context, genres: String): CharSequence? {
     return metaLine(context, *between(genres.ifEmpty { null }, where, rule).toTypedArray(), gap = 0.75f).ifEmpty { null }
 }
 
+/**
+ * The title page's credit line: who made it ([credit]), then what TMDB adds ([about]), after the
+ * genres line's rule. Without [about], [credit] as it always was.
+ */
+fun creditLine(context: Context, credit: String?, about: String?): CharSequence? {
+    if (about == null) return credit
+    val rule = SpannableString("|").spanned(Rule(context))
+    // Each in Inter Regular before metaLine's Medium, which then leaves it be, as the credit always was.
+    val parts = between(credit?.let { latin(context, it, R.font.inter_regular) }, latin(context, about, R.font.inter_regular), rule)
+    return metaLine(context, *parts.toTypedArray(), gap = 0.75f)
+}
+
 /** [what] and [where], with [divider] between them only when both are there: never one at an end. */
 internal fun <T : Any> between(what: T?, where: T?, divider: T): List<T> =
     if (what != null && where != null) listOf(what, divider, where) else listOfNotNull(what, where)

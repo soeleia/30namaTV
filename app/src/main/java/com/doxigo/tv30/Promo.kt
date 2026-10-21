@@ -342,14 +342,18 @@ class PromoHero(
 
     /**
      * The art of the promos either side, fetched while this one shows. Same size and scale as
-     * Billboard's request (1280x720, centre-crop), so a page either way comes out of the memory cache.
+     * Billboard's request (1280x720, centre-crop), so a page either way comes out of the memory
+     * cache, and so does its logo (Logos.request).
      */
     private fun preload() {
         for (at in intArrayOf(index + 1, index - 1).map { it.mod(cards.size) }.distinct()) {
             val url = cards[at].backdrop ?: continue
             if (!preloaded.add(url)) continue
-            // Its Persian name too, when TMDB has to supply it, so that page is written whole.
-            titles.getOrNull(at)?.takeIf(PersianNames::pending)?.let { scope.launch { PersianNames.lookup(context, it) } }
+            // Its Persian name and logo too, when TMDB has to supply them, so that page is written whole.
+            titles.getOrNull(at)?.let { title ->
+                if (PersianNames.pending(title)) scope.launch { PersianNames.lookup(context, title) }
+                scope.launch { Logos.prefetch(context, title) }
+            }
             context.imageLoader.enqueue(ImageRequest.Builder(context).data(url).size(1280, 720).scale(Scale.FILL).build())
         }
     }

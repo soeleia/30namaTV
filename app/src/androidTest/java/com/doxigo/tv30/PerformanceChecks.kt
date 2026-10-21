@@ -71,6 +71,7 @@ class PerformanceChecks : Instrumentation() {
             "captions" -> return CaptionChecks.run(this)
             "dismiss" -> return DismissChecks.run(this)
             "preview" -> return SeekPreviewChecks.run(this)
+            "logos" -> return LogoChecks.run(this)
         }
         val result = Bundle()
         try {

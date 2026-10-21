@@ -8,6 +8,7 @@ import coil3.annotation.ExperimentalCoilApi
 import coil3.disk.DiskCache
 import coil3.network.DeDupeConcurrentRequestStrategy
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import kotlinx.coroutines.launch
 import okhttp3.Dispatcher
 import okio.Path.Companion.toOkioPath
 
@@ -17,6 +18,8 @@ class App : Application(), SingletonImageLoader.Factory {
         Api.init(this)
         Settings.init(this)
         AppUpdates.init(this)
+        // The kept logos, read behind the launch motion: the billboard's first title is written with its logo, not its words first.
+        if (Tmdb.enabled) Api.scope.launch { Logos.warm(this@App) }
     }
 
     // Posters share the API's connection pool (the disk cache keeps rows instant on the next launch)

@@ -1,5 +1,6 @@
 package com.doxigo.tv30
 
+import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -91,8 +92,10 @@ object Tmdb {
 
     /**
      * A 30nama title's TMDB entry with what its page wants appended in the same call: recommendations,
-     * similar titles and videos (Persian and English). Only the last one is kept, which is enough
-     * for the More Like This row and the trailer to share one call; null when TMDB doesn't know it.
+     * similar titles, videos (Persian and English), logos ([logo]) and translations (the Persian
+     * synopsis and tagline, [translated]). Only the last one is kept, which is enough for the More
+     * Like This row, the trailer, the logo and the credit line to share one call; null when TMDB
+     * doesn't know it.
      */
     suspend fun title(title: JSONObject): JSONObject? {
         val imdb = title.imdbId ?: return null
@@ -100,11 +103,23 @@ object Tmdb {
             last?.takeIf { it.first == imdb }?.let { return@withLock it.second }
             val entry = find(imdb, !title.isMovie)?.let { hit ->
                 val kind = hit.optString("media_type")
-                get("$kind/${hit.optInt("id")}?language=en-US&append_to_response=recommendations,similar,videos&include_video_language=fa,en")
+                get("$kind/${hit.optInt("id")}?language=en-US&append_to_response=recommendations,similar,videos,images,translations&include_video_language=fa,en&include_image_language=fa,en,null")
                     .put("media_type", kind)
             }
             entry.also { last = imdb to it }
         }
+    }
+
+    /**
+     * The title logo among [images] (an entry's `images`, or `/images` itself): in the interface's
+     * [language], else English, else one without words; of those the best voted, then the widest.
+     * TMDB serves each at w500 as PNG, an SVG one included.
+     */
+    fun logo(images: JSONObject?, language: String = Api.language): String? {
+        val logos = images?.optJSONArray("logos").objects()
+        return ((if (language == "fa") listOf("fa", "en") else listOf("en")) + "").firstNotNullOfOrNull { code ->
+            logos.filter { (it.str("iso_639_1") ?: "") == code }.maxWithOrNull(compareBy({ it.optDouble("vote_average", 0.0) }, { it.optInt("width") }))
+        }?.str("file_path")?.let { "https://image.tmdb.org/t/p/w500" + it.replace(Regex("\\.svg$"), ".png") }
     }
 
     /**
@@ -140,6 +155,49 @@ object Tmdb {
             englishName.normalized() == name.normalized() &&
             (year == null || own == 0 || abs(own - year) <= 1)
     }
+}
+
+/** The entry's [field] ("overview", "tagline") in [language] ("fa"), from its appended translations; blank is none. */
+fun JSONObject.translated(field: String, language: String): String? =
+    obj("translations")?.optJSONArray("translations").objects().firstNotNullOfOrNull { t -> t.str("data", field)?.takeIf { t.str("iso_639_1") == language } }
+
+/**
+ * TMDB's answers about titles by key, "" for none, least recently shown first: kept in memory
+ * and in a small file in the cache, so no title is asked about twice. Read on the main thread;
+ * the file is read once, off it, before the first question.
+ */
+class Answers(private val file: String, private val keep: Int = 4000) {
+    private val disk = Mutex()
+    private val map = object : LinkedHashMap<String, String>(256, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?) = size > keep
+    }
+    private var loaded = false
+
+    operator fun get(key: String): String? = synchronized(map) { map[key] }
+    operator fun contains(key: String) = synchronized(map) { key in map }
+
+    suspend fun put(context: Context, key: String, answer: String) {
+        synchronized(map) { map[key] = answer }
+        save(context)
+    }
+
+    suspend fun load(context: Context) = disk.withLock {
+        if (loaded) return@withLock
+        val saved = withContext(Dispatchers.IO) { runCatching { JSONObject(path(context).readText()) }.getOrNull() }
+        // In the file's order, eldest first, so the least recently shown go first again.
+        synchronized(map) { saved?.keys()?.forEach { if (it !in map) map[it] = saved.optString(it) } }
+        loaded = true
+    }
+
+    // ponytail: the whole file per new answer (a few hundred KB at most), one per settled title; debounce if that ever shows.
+    private suspend fun save(context: Context) = disk.withLock {
+        withContext(Dispatchers.IO) {
+            val json = synchronized(map) { JSONObject(map).toString() }
+            runCatching { path(context).writeText(json) }
+        }
+    }
+
+    private fun path(context: Context) = context.cacheDir.resolve(file)
 }
 
 /** The title's IMDb id ("tt0903747"), from the link 30nama gives its IMDb score. */

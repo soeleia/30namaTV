@@ -1,0 +1,552 @@
+{
+ "_source": "Recorded from themoviedb.org's public pages on 2026-10-20, in the API's shape (no API key on hand). Logo votes follow the site's rating order.",
+ "find/tt12590266": {
+  "movie_results": [],
+  "tv_results": [
+   {
+    "id": 105248,
+    "name": "Cyberpunk: Edgerunners",
+    "media_type": "tv"
+   }
+  ],
+  "person_results": [],
+  "tv_episode_results": [],
+  "tv_season_results": []
+ },
+ "tv/105248": {
+  "id": 105248,
+  "name": "Cyberpunk: Edgerunners",
+  "tagline": "New legends. Same Night City.",
+  "overview": "In a dystopia riddled with corruption and cybernetic implants, a talented but reckless street kid strives to become a mercenary outlaw — an edgerunner.",
+  "status": "Returning Series",
+  "images": {
+   "backdrops": [],
+   "posters": [],
+   "logos": [
+    {
+     "aspect_ratio": 4.09,
+     "height": 2235,
+     "width": 9142,
+     "iso_639_1": "en",
+     "file_path": "/zeR1hMVMyooYGtAxK13HOkUOysD.png",
+     "vote_average": 5.5,
+     "vote_count": 5
+    },
+    {
+     "aspect_ratio": 4.066,
+     "height": 2250,
+     "width": 9148,
+     "iso_639_1": "en",
+     "file_path": "/sNhrCQwDbvu6hGm8yKNQAh3njKf.png",
+     "vote_average": 5.4,
+     "vote_count": 4
+    },
+    {
+     "aspect_ratio": 3.605,
+     "height": 223,
+     "width": 804,
+     "iso_639_1": "en",
+     "file_path": "/2wgUnrYEGtbcpZCl83ta2hS8d6J.png",
+     "vote_average": 5.3,
+     "vote_count": 3
+    },
+    {
+     "aspect_ratio": 4.066,
+     "height": 2250,
+     "width": 9148,
+     "iso_639_1": "en",
+     "file_path": "/ikdPQtux4mfLwc0aw5nuFPyqm2p.png",
+     "vote_average": 5.2,
+     "vote_count": 2
+    },
+    {
+     "aspect_ratio": 3.96,
+     "height": 404,
+     "width": 1600,
+     "iso_639_1": "en",
+     "file_path": "/qdV9slevfyPHonHYBRGbPrsGfxp.png",
+     "vote_average": 5.1,
+     "vote_count": 1
+    }
+   ]
+  },
+  "translations": {
+   "translations": [
+    {
+     "iso_3166_1": "IR",
+     "iso_639_1": "fa",
+     "name": "فارسی",
+     "english_name": "Persian",
+     "data": {
+      "name": "سایبرپانک: اج رانرز",
+      "overview": "",
+      "tagline": ""
+     }
+    }
+   ]
+  },
+  "recommendations": {
+   "results": []
+  },
+  "similar": {
+   "results": []
+  },
+  "videos": {
+   "results": []
+  },
+  "networks": [
+   {
+    "name": "Netflix"
+   }
+  ]
+ },
+ "tv/105248/images": {
+  "id": 105248,
+  "logos": [
+   {
+    "aspect_ratio": 4.09,
+    "height": 2235,
+    "width": 9142,
+    "iso_639_1": "en",
+    "file_path": "/zeR1hMVMyooYGtAxK13HOkUOysD.png",
+    "vote_average": 5.5,
+    "vote_count": 5
+   },
+   {
+    "aspect_ratio": 4.066,
+    "height": 2250,
+    "width": 9148,
+    "iso_639_1": "en",
+    "file_path": "/sNhrCQwDbvu6hGm8yKNQAh3njKf.png",
+    "vote_average": 5.4,
+    "vote_count": 4
+   },
+   {
+    "aspect_ratio": 3.605,
+    "height": 223,
+    "width": 804,
+    "iso_639_1": "en",
+    "file_path": "/2wgUnrYEGtbcpZCl83ta2hS8d6J.png",
+    "vote_average": 5.3,
+    "vote_count": 3
+   },
+   {
+    "aspect_ratio": 4.066,
+    "height": 2250,
+    "width": 9148,
+    "iso_639_1": "en",
+    "file_path": "/ikdPQtux4mfLwc0aw5nuFPyqm2p.png",
+    "vote_average": 5.2,
+    "vote_count": 2
+   },
+   {
+    "aspect_ratio": 3.96,
+    "height": 404,
+    "width": 1600,
+    "iso_639_1": "en",
+    "file_path": "/qdV9slevfyPHonHYBRGbPrsGfxp.png",
+    "vote_average": 5.1,
+    "vote_count": 1
+   }
+  ],
+  "backdrops": [],
+  "posters": []
+ },
+ "find/tt33764258": {
+  "movie_results": [
+   {
+    "id": 1368337,
+    "title": "The Odyssey",
+    "media_type": "movie"
+   }
+  ],
+  "tv_results": [],
+  "person_results": [],
+  "tv_episode_results": [],
+  "tv_season_results": []
+ },
+ "movie/1368337": {
+  "id": 1368337,
+  "title": "The Odyssey",
+  "tagline": "Defy the gods.",
+  "overview": "Odysseus, the legendary King of Ithaca, embarks on a long and perilous journey home following the Trojan War. Throughout his voyage, he is forced to confront the whims of gods, mythological monsters, and trials that stretch both his cunning and his humanity to the breaking point.",
+  "status": "Released",
+  "images": {
+   "backdrops": [],
+   "posters": [],
+   "logos": [
+    {
+     "aspect_ratio": 3.317,
+     "height": 419,
+     "width": 1390,
+     "iso_639_1": "en",
+     "file_path": "/kX6ZX4GL7km04332caiOVapR2lb.png",
+     "vote_average": 5.5,
+     "vote_count": 5
+    },
+    {
+     "aspect_ratio": 13.211,
+     "height": 76,
+     "width": 1004,
+     "iso_639_1": "en",
+     "file_path": "/nKjmavzR9ESsFtsvHuOoR3SGIwk.png",
+     "vote_average": 5.4,
+     "vote_count": 4
+    },
+    {
+     "aspect_ratio": 3.315,
+     "height": 543,
+     "width": 1800,
+     "iso_639_1": "en",
+     "file_path": "/hhi6ms5bftN2fxHwcDS7GTVySxi.png",
+     "vote_average": 5.3,
+     "vote_count": 3
+    },
+    {
+     "aspect_ratio": 11.65,
+     "height": 206,
+     "width": 2400,
+     "iso_639_1": "en",
+     "file_path": "/n1BRe2kKJmeArvSYSR3sg4RMRiQ.png",
+     "vote_average": 5.2,
+     "vote_count": 2
+    },
+    {
+     "aspect_ratio": 3.772,
+     "height": 136,
+     "width": 513,
+     "iso_639_1": "en",
+     "file_path": "/v8FYcLl8UEfq9BKTn4KHgXTCKaX.png",
+     "vote_average": 5.1,
+     "vote_count": 1
+    }
+   ]
+  },
+  "translations": {
+   "translations": [
+    {
+     "iso_3166_1": "IR",
+     "iso_639_1": "fa",
+     "name": "فارسی",
+     "english_name": "Persian",
+     "data": {
+      "title": "اودیسه",
+      "overview": "این فیلم یک اقتباس حماسی و اکشن از شعر حماسی معروف هومر (Odyssey) به حساب می‌آید که داستان سفر طولانی و پرماجرای اودیسئوس (پادشاه ایتاکا) رو بعد از جنگ تروآ روایت می‌کند. او با موجودات اساطیری مثل سایکلوپس (پولیفموس)، سیرن‌ها و سیرسه روبرو شده و سعی می‌کند به خانه و همسرش پنه‌لوپه برگردد.",
+      "tagline": ""
+     }
+    }
+   ]
+  },
+  "recommendations": {
+   "results": []
+  },
+  "similar": {
+   "results": []
+  },
+  "videos": {
+   "results": []
+  }
+ },
+ "movie/1368337/images": {
+  "id": 1368337,
+  "logos": [
+   {
+    "aspect_ratio": 3.317,
+    "height": 419,
+    "width": 1390,
+    "iso_639_1": "en",
+    "file_path": "/kX6ZX4GL7km04332caiOVapR2lb.png",
+    "vote_average": 5.5,
+    "vote_count": 5
+   },
+   {
+    "aspect_ratio": 13.211,
+    "height": 76,
+    "width": 1004,
+    "iso_639_1": "en",
+    "file_path": "/nKjmavzR9ESsFtsvHuOoR3SGIwk.png",
+    "vote_average": 5.4,
+    "vote_count": 4
+   },
+   {
+    "aspect_ratio": 3.315,
+    "height": 543,
+    "width": 1800,
+    "iso_639_1": "en",
+    "file_path": "/hhi6ms5bftN2fxHwcDS7GTVySxi.png",
+    "vote_average": 5.3,
+    "vote_count": 3
+   },
+   {
+    "aspect_ratio": 11.65,
+    "height": 206,
+    "width": 2400,
+    "iso_639_1": "en",
+    "file_path": "/n1BRe2kKJmeArvSYSR3sg4RMRiQ.png",
+    "vote_average": 5.2,
+    "vote_count": 2
+   },
+   {
+    "aspect_ratio": 3.772,
+    "height": 136,
+    "width": 513,
+    "iso_639_1": "en",
+    "file_path": "/v8FYcLl8UEfq9BKTn4KHgXTCKaX.png",
+    "vote_average": 5.1,
+    "vote_count": 1
+   }
+  ],
+  "backdrops": [],
+  "posters": []
+ },
+ "find/tt23112594": {
+  "movie_results": [],
+  "tv_results": [
+   {
+    "id": 213375,
+    "name": "VisionQuest",
+    "media_type": "tv"
+   }
+  ],
+  "person_results": [],
+  "tv_episode_results": [],
+  "tv_season_results": []
+ },
+ "tv/213375": {
+  "id": 213375,
+  "name": "VisionQuest",
+  "tagline": "",
+  "overview": "With a bounty on his head, Vision must confront his nature and resist Ultron's influence to survive.",
+  "status": "Returning Series",
+  "images": {
+   "backdrops": [],
+   "posters": [],
+   "logos": [
+    {
+     "aspect_ratio": 6.175,
+     "height": 699,
+     "width": 4316,
+     "iso_639_1": "en",
+     "file_path": "/mQwaoWvWJGiuVY6CT1V6AiuSIqi.png",
+     "vote_average": 5.5,
+     "vote_count": 5
+    },
+    {
+     "aspect_ratio": 10.524,
+     "height": 532,
+     "width": 5599,
+     "iso_639_1": "en",
+     "file_path": "/1SEW33fQb4RfXQ6hWeuo7j2d5sR.png",
+     "vote_average": 5.4,
+     "vote_count": 4
+    },
+    {
+     "aspect_ratio": 6.255,
+     "height": 690,
+     "width": 4316,
+     "iso_639_1": "en",
+     "file_path": "/dvxVbWIGUvItXgAuR99ArgVfcrS.png",
+     "vote_average": 5.3,
+     "vote_count": 3
+    }
+   ]
+  },
+  "translations": {
+   "translations": [
+    {
+     "iso_3166_1": "IR",
+     "iso_639_1": "fa",
+     "name": "فارسی",
+     "english_name": "Persian",
+     "data": {
+      "name": "ویژن‌ کوئست",
+      "overview": "ویژن با جایزه‌ای که برای سرش تعیین شده، باید با طبیعت خود روبرو شود و برای زنده ماندن در برابر نفوذ اولتران مقاومت کند.",
+      "tagline": ""
+     }
+    }
+   ]
+  },
+  "recommendations": {
+   "results": []
+  },
+  "similar": {
+   "results": []
+  },
+  "videos": {
+   "results": []
+  },
+  "networks": [
+   {
+    "name": "Disney+"
+   }
+  ]
+ },
+ "tv/213375/images": {
+  "id": 213375,
+  "logos": [
+   {
+    "aspect_ratio": 6.175,
+    "height": 699,
+    "width": 4316,
+    "iso_639_1": "en",
+    "file_path": "/mQwaoWvWJGiuVY6CT1V6AiuSIqi.png",
+    "vote_average": 5.5,
+    "vote_count": 5
+   },
+   {
+    "aspect_ratio": 10.524,
+    "height": 532,
+    "width": 5599,
+    "iso_639_1": "en",
+    "file_path": "/1SEW33fQb4RfXQ6hWeuo7j2d5sR.png",
+    "vote_average": 5.4,
+    "vote_count": 4
+   },
+   {
+    "aspect_ratio": 6.255,
+    "height": 690,
+    "width": 4316,
+    "iso_639_1": "en",
+    "file_path": "/dvxVbWIGUvItXgAuR99ArgVfcrS.png",
+    "vote_average": 5.3,
+    "vote_count": 3
+   }
+  ],
+  "backdrops": [],
+  "posters": []
+ },
+ "find/tt14976292": {
+  "movie_results": [],
+  "tv_results": [
+   {
+    "id": 123542,
+    "name": "LINK CLICK",
+    "media_type": "tv"
+   }
+  ],
+  "person_results": [],
+  "tv_episode_results": [],
+  "tv_season_results": []
+ },
+ "tv/123542": {
+  "id": 123542,
+  "name": "LINK CLICK",
+  "tagline": "Past or future, just let them be.",
+  "overview": "Using superpowers to enter their clientele’s photos one by one, Cheng Xiaoshi and Lu Guang take their work seriously at “Time Photo Studio,” a small photography shop set in the backdrop of a modern metropolis. Each job can be full of danger, but nothing is more important than fulfilling every order, no matter the scale…or peril involved!",
+  "status": "Returning Series",
+  "images": {
+   "backdrops": [],
+   "posters": [],
+   "logos": [
+    {
+     "aspect_ratio": 4.805,
+     "height": 164,
+     "width": 788,
+     "iso_639_1": "en",
+     "file_path": "/afS3wRroucg2Tku3tH0NNmyurST.png",
+     "vote_average": 5.5,
+     "vote_count": 5
+    },
+    {
+     "aspect_ratio": 3.57,
+     "height": 172,
+     "width": 614,
+     "iso_639_1": "en",
+     "file_path": "/pXwyExHtlE6xc1ZOzbkIoGGodbO.png",
+     "vote_average": 5.4,
+     "vote_count": 4
+    },
+    {
+     "aspect_ratio": 3.57,
+     "height": 172,
+     "width": 614,
+     "iso_639_1": "en",
+     "file_path": "/mSzUBXt0GiRTBRcqbfPFTLTQQU9.png",
+     "vote_average": 5.3,
+     "vote_count": 3
+    },
+    {
+     "aspect_ratio": 3.57,
+     "height": 172,
+     "width": 614,
+     "iso_639_1": "en",
+     "file_path": "/5kOQiMUCjCG0XF9yhhQd5BRrvlg.png",
+     "vote_average": 5.2,
+     "vote_count": 2
+    }
+   ]
+  },
+  "translations": {
+   "translations": [
+    {
+     "iso_3166_1": "IR",
+     "iso_639_1": "fa",
+     "name": "فارسی",
+     "english_name": "Persian",
+     "data": {
+      "name": "کلیک لینک",
+      "overview": "چنگ شیائوشی و لو گوانگ با استفاده از ابرقدرت‌ها برای وارد کردن عکس‌های مشتریان خود به صورت یک به یک، کار خود را در \"استودیوی عکس زمان\"، یک کارگاه عکاسی کوچک در پس‌زمینه یک کلان‌شهر مدرن، جدی می‌گیرند. هر کار می‌تواند پر از خطر باشد، اما هیچ چیز مهم‌تر از انجام هر سفارش، صرف نظر از مقیاس یا خطر مربوطه، نیست!",
+      "tagline": ""
+     }
+    }
+   ]
+  },
+  "recommendations": {
+   "results": []
+  },
+  "similar": {
+   "results": []
+  },
+  "videos": {
+   "results": []
+  },
+  "networks": [
+   {
+    "name": "bilibili"
+   }
+  ]
+ },
+ "tv/123542/images": {
+  "id": 123542,
+  "logos": [
+   {
+    "aspect_ratio": 4.805,
+    "height": 164,
+    "width": 788,
+    "iso_639_1": "en",
+    "file_path": "/afS3wRroucg2Tku3tH0NNmyurST.png",
+    "vote_average": 5.5,
+    "vote_count": 5
+   },
+   {
+    "aspect_ratio": 3.57,
+    "height": 172,
+    "width": 614,
+    "iso_639_1": "en",
+    "file_path": "/pXwyExHtlE6xc1ZOzbkIoGGodbO.png",
+    "vote_average": 5.4,
+    "vote_count": 4
+   },
+   {
+    "aspect_ratio": 3.57,
+    "height": 172,
+    "width": 614,
+    "iso_639_1": "en",
+    "file_path": "/mSzUBXt0GiRTBRcqbfPFTLTQQU9.png",
+    "vote_average": 5.3,
+    "vote_count": 3
+   },
+   {
+    "aspect_ratio": 3.57,
+    "height": 172,
+    "width": 614,
+    "iso_639_1": "en",
+    "file_path": "/5kOQiMUCjCG0XF9yhhQd5BRrvlg.png",
+    "vote_average": 5.2,
+    "vote_count": 2
+   }
+  ],
+  "backdrops": [],
+  "posters": []
+ }
+}

@@ -51,12 +51,15 @@ class DetailsActivity : TvActivity() {
     private var landing: Pair<Int, Int>? = null
     /** The seasons' rows of tiles, in order; coming back to the page their tiles catch up in place (see [onRestart]). */
     private val episodeRows = mutableListOf<ArrayObjectAdapter>()
+    /** TMDB's entry for the title, once it lands: the logo, the tagline, a series' state and network, a synopsis where 30nama has none. */
+    private var tmdb: JSONObject? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_details)
         title = JSONObject(intent.getStringExtra(EXTRA_TITLE)!!)
-        billboard = Billboard(findViewById(android.R.id.content), lifecycleScope)
+        // The logo comes with the page's one TMDB call, which the trailer and More Like This share.
+        billboard = Billboard(findViewById(android.R.id.content), lifecycleScope) { Tmdb.title(it) }
         shadeText()
 
         val fragment = supportFragmentManager.findFragmentById(R.id.rows) as? RowsSupportFragment
@@ -99,8 +102,13 @@ class DetailsActivity : TvActivity() {
         bind()
         watch.requestFocus()
 
-        // Neither one waits on the other, or holds up the page; both stop when the page closes.
+        // None of them waits on another, or holds up the page; all stop when the page closes.
+        // TMDB's entry (the call the trailer and More Like This share) adds to the credit line.
         lifecycleScope.launch { showTrailer() }
+        lifecycleScope.launch {
+            tmdb = runCatching { Tmdb.title(title) }.getOrNull() ?: return@launch
+            bind()
+        }
         lifecycleScope.launch {
             // TMDB plus up to twelve 30nama searches take seconds, so the row is fetched from the
             // start but added last, under the cast.
@@ -159,7 +167,7 @@ class DetailsActivity : TvActivity() {
         val room = findViewById<View>(R.id.billboard).layoutParams.width
         val facts = title.meta(this, page = true).takeIf { Layout.getDesiredWidth(it, findViewById<TextView>(R.id.bb_meta).paint) <= room }
             ?: title.meta(this, page = true, critics = false)
-        billboard.show(Card(title.englishName, facts, plot = title.plot, backdrop = title.cover, localTitle = title.localName, source = title) {})
+        billboard.show(Card(title.englishName, facts, plot = plot(), backdrop = title.cover, localTitle = title.localName, source = title) {})
         // The genres get their own quieter line under the facts, where the countries and the
         // language follow once `single` brings them; the cast has its own row below.
         val genres = dotted(*title.optJSONArray("genre").objects().mapNotNull { it.str("name") }.take(3).toTypedArray())
@@ -169,12 +177,39 @@ class DetailsActivity : TvActivity() {
         val credit = if (title.isMovie) names("director")?.let { getString(R.string.director, it) }
         else names("creator")?.let { getString(R.string.creator, it) } ?: names("director")?.let { getString(R.string.director, it) }
         line(R.id.genres, title.genresLine(this, genres))
-        line(R.id.credits, credit)
+        line(R.id.credits, creditLine(this, credit, tmdb?.let(::about)))
         // An airing series' next episode takes the synopsis' third line, so the actions never
         // move down into the waiting rows (see details_rows_top).
         val next = title.nextEpisode(this)
         line(R.id.next_air, next)
         findViewById<TextView>(R.id.bb_plot).maxLines = if (next == null) 3 else 2
+    }
+
+    /**
+     * 30nama's synopsis; in Persian, TMDB's Persian one where 30nama has none at all (none of 92
+     * titles on home in October 2026: its own fills in nearly always).
+     */
+    private fun plot(): String? =
+        if (Api.language == "fa" && title.str("plot", "local") == null) tmdb?.translated("overview", "fa")?.inPersian()?.trim() ?: title.plot
+        else title.plot
+
+    /**
+     * What TMDB adds to the credit line: a series' state and network («در حال پخش، HBO»), else the
+     * tagline in the interface's language. Persian has only TMDB's Persian tagline, never an English one.
+     */
+    private fun about(entry: JSONObject): String? {
+        val tagline = if (Api.language == "fa") entry.translated("tagline", "fa")?.inPersian() else entry.str("tagline")
+        if (entry.optString("media_type") != "tv") return tagline
+        val state = when (entry.str("status")) {
+            "Returning Series" -> R.string.status_returning
+            "Ended" -> R.string.status_ended
+            "Canceled" -> R.string.status_canceled
+            "In Production" -> R.string.status_in_production
+            "Planned" -> R.string.status_planned
+            "Pilot" -> R.string.status_pilot
+            else -> null
+        }?.let(::getString)
+        return dotted(state, entry.optJSONArray("networks").objects().firstOrNull()?.str("name")).ifEmpty { null } ?: tagline
     }
 
     /** One of the quiet lines under the facts, its Latin names in Inter, gone when empty. */

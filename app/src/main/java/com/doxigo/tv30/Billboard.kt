@@ -1,14 +1,22 @@
 package com.doxigo.tv30
 
+import android.animation.ValueAnimator
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.ColorFilter
+import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.text.TextPaint
 import android.util.TypedValue
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.graphics.ColorUtils
 import androidx.core.widget.TextViewCompat
+import coil3.BitmapImage
 import coil3.asDrawable
 import coil3.imageLoader
 import coil3.request.Disposable
@@ -19,14 +27,23 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 import kotlin.math.roundToInt
 
 /**
  * The billboard behind home and details: the focused title's art, darkened toward the text side
  * and the foot, under its name, meta line and synopsis. A new title's words swap as the Tizen
  * client's do: the old ones fade out, then the new ones rise into place one after another.
+ * With a TMDB key the English name gives way to the title's logo, once TMDB has one (Logos).
+ *
+ * [entry]: where the title page's TMDB entry comes from, which it fetches anyway; its logo is read
+ * from it rather than asked for again.
  */
-class Billboard(private val root: View, private val scope: CoroutineScope) {
+class Billboard(
+    private val root: View,
+    private val scope: CoroutineScope,
+    private val entry: (suspend (JSONObject) -> JSONObject?)? = null,
+) {
     private val backdrop: ImageView = root.findViewById(R.id.backdrop)
     /** Home's only (billboard.xml): what a page turn of the promoted hero carries off, see [turn]. */
     private val leaving: ImageView? = root.findViewById(R.id.backdrop_leaving)
@@ -44,6 +61,8 @@ class Billboard(private val root: View, private val scope: CoroutineScope) {
     /** The name's box as the layout gives it, one line high (see [fit]). */
     private val oneLine = title.layoutParams.height
     private val twoLines = (60 * root.resources.displayMetrics.density).toInt()
+    private val logoRise = root.resources.getDimensionPixelSize(R.dimen.billboard_logo_rise)
+    private val logoWidth = root.resources.getDimensionPixelSize(R.dimen.billboard_logo_width)
     /** The art last asked for, and how strongly it shows: whole under a title, dim under a tile's own picture, not at all under a tile without one. */
     private var art: String? = null
     private var strength = 1f
@@ -55,6 +74,18 @@ class Billboard(private val root: View, private val scope: CoroutineScope) {
     /** The title whose words are written, and the card waiting for them to finish fading out. */
     private var shown: String? = null
     private var next: Card? = null
+    /** The name's own white: its words fade under a logo by their colour, as the swap moves the view itself. */
+    private val ink = title.currentTextColor
+    /** The logo the name wears or is fetching ([wear]), that fetch, and TMDB's answer for the title on screen ([askLogo]). */
+    private var logo: String? = null
+    private var logoLoad: Disposable? = null
+    private var logoAsk: Job? = null
+    /** How much of its words and of its logo the name shows, 0..1, and the fade between them ([mix]). */
+    private var nameWords = 1f
+    private var nameLogo = 0f
+    private var mixing: ValueAnimator? = null
+    /** A known logo slow to come: the words stand in until it lands. */
+    private val logoLate = Runnable { mix(1f, 0f) }
     private val swap = Runnable {
         next?.let {
             next = null
@@ -65,6 +96,8 @@ class Billboard(private val root: View, private val scope: CoroutineScope) {
 
     init {
         plot.ellipsizeAtWords()
+        // A logo stands taller than the words, rising out of the name's box (LogoArt).
+        (text as ViewGroup).clipChildren = false
         val c = root.context
         val solid = c.getColor(R.color.scrim)
         val clear = c.getColor(R.color.scrim_clear)
@@ -95,6 +128,7 @@ class Billboard(private val root: View, private val scope: CoroutineScope) {
         if (text.alpha < 1f) text.animate().alpha(1f).setInterpolator(Motion.easeOut).setDuration(Motion.ENTER).start()
         swapWords(card, hidden)
         askName(card)
+        askLogo(card)
         // A title without art leaves bare ink, never the last title's.
         stage(card.backdrop, if (card.backdrop == null) 0f else 1f, turn)
     }
@@ -260,6 +294,83 @@ class Billboard(private val root: View, private val scope: CoroutineScope) {
         }
     }
 
+    /**
+     * TMDB's logo for the title on screen, when it isn't known yet: once found it fades in over
+     * the words, if its title is still the one written. Mid-swap, the write that follows finds it
+     * in the cache instead.
+     */
+    private fun askLogo(card: Card) {
+        logoAsk?.cancel()
+        val source = card.source?.takeIf(Logos::pending) ?: return
+        logoAsk = scope.launch {
+            val url = Logos.lookup(root.context, source, entry) ?: return@launch
+            if (card.title == shown && next == null) wear(url, source, fresh = false)
+        }
+    }
+
+    /**
+     * Puts the logo at [url] on the name in place of its words, or (null) takes one off. A
+     * [fresh] title's logo already in memory is there at once, rising with the words; one still
+     * coming leaves the name bare for [LOGO_WAIT], then shows the words, and fades in over them
+     * when it lands. A logo that fails, or would not read over the ink, leaves the words.
+     */
+    private fun wear(url: String?, source: JSONObject?, fresh: Boolean) {
+        if (url == logo) return
+        logo = url
+        logoLoad?.dispose()
+        title.removeCallbacks(logoLate)
+        title.foreground = null
+        if (url == null) return mix(1f, 0f, fade = false)
+        val c = root.context
+        // A memory hit lands inside enqueue.
+        var enqueuing = true
+        var landed = false
+        val words = { _: Any? ->
+            landed = true
+            title.removeCallbacks(logoLate)
+            mix(1f, 0f, fade = nameWords < 1f)
+        }
+        logoLoad = c.imageLoader.enqueue(Logos.request(c, url).target(onError = words, onSuccess = { image ->
+            val art = (image as? BitmapImage)?.bitmap
+            if (art == null || !Logos.legible(art)) {
+                source?.let { scope.launch { Logos.refuse(c, it) } }
+                return@target words(null)
+            }
+            landed = true
+            title.removeCallbacks(logoLate)
+            title.foreground = LogoArt(image.asDrawable(c.resources), logoRise, logoWidth)
+            mix(0f, 1f, fade = !(fresh && enqueuing))
+        }).build())
+        enqueuing = false
+        if (fresh && !landed) {
+            mix(0f, 0f, fade = false)
+            title.postDelayed(logoLate, LOGO_WAIT)
+        }
+    }
+
+    /** Takes the name to [words] of its words and [logo] of its logo, fading from wherever they are, or at once. */
+    private fun mix(words: Float, logo: Float, fade: Boolean = true) {
+        mixing?.cancel()
+        if (!fade) return paint(words, logo)
+        val (fromWords, fromLogo) = nameWords to nameLogo
+        mixing = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = Motion.IMAGE.toLong()
+            interpolator = Motion.easeOut
+            addUpdateListener {
+                val f = it.animatedValue as Float
+                paint(fromWords + (words - fromWords) * f, fromLogo + (logo - fromLogo) * f)
+            }
+            start()
+        }
+    }
+
+    private fun paint(words: Float, logo: Float) {
+        nameWords = words
+        nameLogo = logo
+        title.setTextColor(ColorUtils.setAlphaComponent(ink, (Color.alpha(ink) * words).roundToInt()))
+        title.foreground?.alpha = (255 * logo).roundToInt()
+    }
+
     private fun write(card: Card) {
         shown = card.title
         val c = root.context
@@ -270,6 +381,8 @@ class Billboard(private val root: View, private val scope: CoroutineScope) {
         title.letterSpacing = if (latinName) -0.01f else 0f
         fit(card.title, latinName)
         title.text = card.title
+        // TMDB's logo in place of the words once known; the words stay under it, unseen, for TalkBack and to fall back to.
+        wear(card.source?.let(Logos::cached), card.source, fresh = true)
         // 30nama's Persian name, else TMDB's once known. While TMDB may still have one its line is
         // kept, so nothing below moves when the name rises in (see askName).
         val persian = card.source?.let(PersianNames::cached) ?: card.localTitle
@@ -308,6 +421,34 @@ class Billboard(private val root: View, private val scope: CoroutineScope) {
         if (title.layoutParams.height != box) title.layoutParams = title.layoutParams.apply { height = box }
     }
 
+    /**
+     * A logo as the name's foreground: fit to the name's box and [rise] px above it, at most
+     * [widest] px wide, standing on the box's foot at its start edge, as the words do.
+     */
+    private class LogoArt(private val art: Drawable, private val rise: Int, private val widest: Int) : Drawable() {
+        override fun draw(canvas: Canvas) {
+            val box = bounds
+            val w = art.intrinsicWidth.toFloat()
+            val h = art.intrinsicHeight.toFloat()
+            if (w <= 0f || h <= 0f) return
+            val scale = minOf(minOf(box.width(), widest) / w, (box.height() + rise) / h)
+            val width = (w * scale).roundToInt()
+            val left = if (layoutDirection == View.LAYOUT_DIRECTION_RTL) box.right - width else box.left
+            art.setBounds(left, box.bottom - (h * scale).roundToInt(), left + width, box.bottom)
+            art.draw(canvas)
+        }
+
+        override fun setAlpha(alpha: Int) {
+            art.alpha = alpha
+            invalidateSelf()
+        }
+
+        override fun getAlpha() = art.alpha
+        override fun setColorFilter(filter: ColorFilter?) { art.colorFilter = filter }
+        @Deprecated("Unused since API 29", ReplaceWith("PixelFormat.TRANSLUCENT"))
+        override fun getOpacity() = PixelFormat.TRANSLUCENT
+    }
+
     private companion object {
         /** How strongly a category's or genre's own picture shows behind its row: ambient, never a title's art. */
         const val TILE_ART = 0.3f
@@ -317,5 +458,7 @@ class Billboard(private val root: View, private val scope: CoroutineScope) {
         const val OUT = 120L
         const val IN = 260L
         const val STEP = 40L
+        /** How long a known logo may take before the words stand in for it: a disk hit is well within it. */
+        const val LOGO_WAIT = 600L
     }
 }

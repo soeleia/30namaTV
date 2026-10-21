@@ -37,6 +37,11 @@
          captioned posters (162 + 48 dp) end inside the 540dp screen even lifted. -->
     <dimen name="billboard_height">252dp</dimen>
     <dimen name="rows_title_room">36dp</dimen>
+    <!-- A title's TMDB logo, worn in place of its English name: it stands on the name's foot and
+         rises this far above its box (62dp over a one-line name; on the title page its top stays
+         inside the 27dp title-safe edge), at most this wide (Billboard.LogoArt). -->
+    <dimen name="billboard_logo_rise">12dp</dimen>
+    <dimen name="billboard_logo_width">320dp</dimen>
     <!-- The title page: where the first row's artwork sits under the actions, and where it
          rises to once the remote moves into the rows (below the names, which stay). The text
          (names, facts, genres, three synopsis lines, credits) and the actions end near 383dp,
