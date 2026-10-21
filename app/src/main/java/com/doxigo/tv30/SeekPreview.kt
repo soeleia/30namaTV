@@ -14,12 +14,12 @@ import androidx.core.content.ContextCompat
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.Presentation
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SeekParameters
-import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import androidx.media3.inspector.frame.FrameExtractor
@@ -36,7 +36,7 @@ import java.util.Locale
  * before the remote asks. Only the newest position waits for its turn, the ones scrubbed past are
  * never asked, and the last [FRAMES] stay in memory for the file.
  *
- * The extractor decodes in software only ([SOFTWARE]): a second hardware decoder beside the film's
+ * The extractor decodes in software only ([EpisodeFrames.SOFTWARE]): a second hardware decoder beside the film's
  * can fail or stall it on an older TV, and a keyframe of the lowest quality is a few milliseconds of
  * CPU. Whatever goes wrong (no software decoder for the codec, the CDN) ends the previews for that
  * file and nothing else: the bar scrubs on without them.
@@ -69,6 +69,9 @@ class SeekPreview(private val root: ViewGroup, private val player: ExoPlayer, pr
     /** The lowest quality's URL the extractor reads, and one whose frames failed: none from it again. */
     private var url: String? = null
     private var broken: String? = null
+    /** Network failures on [missed] since its last frame: a 403 from the wrong exit is routine here, three in a row is not. */
+    private var misses = 0
+    private var missed: String? = null
     private var extractor: FrameExtractor? = null
     private val frames = LruCache<Long, Bitmap>(FRAMES)
     /** The frame on its way (null: none) and the newest one scrubbed to since, asked next. */
@@ -130,13 +133,17 @@ class SeekPreview(private val root: ViewGroup, private val player: ExoPlayer, pr
     private fun open() {
         if (extractor != null) return
         val url = file()?.let(EpisodeFrames::lowest)?.takeIf { it != broken } ?: return
+        if (url != missed) { // close() forgets [url]; this outlives it
+            misses = 0
+            missed = url
+        }
         this.url = url
         val item = MediaItem.Builder().setUri(url).setMimeType(MimeTypes.APPLICATION_M3U8).build()
         extractor = FrameExtractor.Builder(context.applicationContext, item)
             .setMediaSourceFactory(DefaultMediaSourceFactory(Buffering.dataSource(context))
                 .setLoadErrorHandlingPolicy(DefaultLoadErrorHandlingPolicy(1))) // a preview is worth one retry, not ten
             .setSeekParameters(SeekParameters.CLOSEST_SYNC) // the keyframe nearest: no decoding up to an exact one
-            .setMediaCodecSelector(SOFTWARE)
+            .setMediaCodecSelector(EpisodeFrames.SOFTWARE)
             .setEffects(listOf(Presentation.createForHeight(HEIGHT_PX)))
             .build()
         ask(player.currentPosition / STEP_MS) // where the scrub will start from
@@ -164,10 +171,14 @@ class SeekPreview(private val root: ViewGroup, private val player: ExoPlayer, pr
             val frame = try {
                 future.get().bitmap
             } catch (e: Exception) {
-                broken = url
+                // A network failure closes the extractor and the next scrub opens a fresh one on a new
+                // connection; a third in a row, or a frame that won't decode, ends previews for this file.
+                val network = (e.cause as? PlaybackException)?.errorCode in 2000..2999
+                if (!network || ++misses >= 3) broken = url
                 close()
                 return@addListener
             }
+            misses = 0
             frames.put(key, frame)
             val now = at
             if (now != null && now / STEP_MS == key) {
@@ -217,10 +228,6 @@ class SeekPreview(private val root: ViewGroup, private val player: ExoPlayer, pr
     }
 
     private companion object {
-        /** Software decoders only, by Media3's own reckoning (c2.android.*, OMX.google.*): the hardware ones are the film's. */
-        val SOFTWARE = MediaCodecSelector { mime, secure, tunneling ->
-            MediaCodecSelector.DEFAULT.getDecoderInfos(mime, secure, tunneling).filter { it.softwareOnly }
-        }
         /** The card's width (dp), a quarter of the screen; its height is the film's shape. */
         const val WIDTH = 224
         /** The frames' height in pixels: the lowest quality's own, scaled up on screen. 40 of them at 16:9 are under 6 MB. */

@@ -9,6 +9,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.PriorityDataSource
 import androidx.media3.effect.Presentation
 import androidx.media3.exoplayer.SeekParameters
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import androidx.media3.inspector.frame.FrameExtractor
@@ -75,6 +76,7 @@ object EpisodeFrames {
             val extractor = FrameExtractor.Builder(context.applicationContext, item)
                 .setMediaSourceFactory(sources)
                 .setSeekParameters(SeekParameters.CLOSEST_SYNC) // any frame near the point: no decoding up to an exact one
+                .setMediaCodecSelector(SOFTWARE) // the episodes panel opens over a playing film
                 .setEffects(listOf(Presentation.createForWidthAndHeight(width, height, Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP)))
                 .build()
             var pending: ListenableFuture<FrameExtractor.Frame>? = null
@@ -135,6 +137,11 @@ object EpisodeFrames {
     }
 
     /** Below the player's read-ahead too (C.PRIORITY_DOWNLOAD), so nothing here reads while a player screen is up. */
+    /** Software decoders only, by Media3's own reckoning (c2.android.*, OMX.google.*): the hardware ones are the film's. */
+    val SOFTWARE = MediaCodecSelector { mime, secure, tunneling ->
+        MediaCodecSelector.DEFAULT.getDecoderInfos(mime, secure, tunneling).filter { it.softwareOnly }
+    }
+
     private const val PRIORITY = C.PRIORITY_DOWNLOAD - 1
     /** Mean brightness (of 255) under which a frame counts as black. */
     private const val DARK = 24
