@@ -2,6 +2,8 @@ package com.doxigo.tv30
 
 import android.graphics.Bitmap
 import android.graphics.Rect
+import android.media.MediaCodecList
+import android.os.Build
 import android.util.LruCache
 import android.view.Gravity
 import android.view.View
@@ -20,6 +22,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.Presentation
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SeekParameters
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import androidx.media3.inspector.frame.FrameExtractor
@@ -80,6 +83,11 @@ class SeekPreview(private val root: ViewGroup, private val player: ExoPlayer, pr
     /** Where the bar is scrubbed to, null while it isn't. */
     private var at: Long? = null
     private val opener = Runnable { open() }
+    /**
+     * The film itself decodes in software, a device or emulator with no hardware decoder for it: a
+     * preview's decoder would then take the film's CPU, so there are none (see [softwareOnly]).
+     */
+    private var filmInSoftware = false
 
     init {
         // Above everything, at the foot's left: [place] moves it over the dot, the bar running left to right in either language.
@@ -92,6 +100,12 @@ class SeekPreview(private val root: ViewGroup, private val player: ExoPlayer, pr
             // Another file; a change of quality or audio keeps the same lowest quality, and its frames.
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 if (file()?.let(EpisodeFrames::lowest) != url) close()
+            }
+        })
+        player.addAnalyticsListener(object : AnalyticsListener {
+            override fun onVideoDecoderInitialized(eventTime: AnalyticsListener.EventTime, decoderName: String, initializedTimestampMs: Long, initializationDurationMs: Long) {
+                filmInSoftware = softwareOnly(decoderName)
+                if (filmInSoftware) close()
             }
         })
     }
@@ -131,7 +145,7 @@ class SeekPreview(private val root: ViewGroup, private val player: ExoPlayer, pr
     }
 
     private fun open() {
-        if (extractor != null) return
+        if (extractor != null || filmInSoftware) return
         val url = file()?.let(EpisodeFrames::lowest)?.takeIf { it != broken } ?: return
         if (url != missed) { // close() forgets [url]; this outlives it
             misses = 0
@@ -228,6 +242,11 @@ class SeekPreview(private val root: ViewGroup, private val player: ExoPlayer, pr
     }
 
     private companion object {
+        /** Whether the decoder named [name] works in software, by the platform's own list from Android 10, by its maker's prefix before. */
+        fun softwareOnly(name: String) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            MediaCodecList(MediaCodecList.ALL_CODECS).codecInfos.firstOrNull { it.name == name || it.canonicalName == name }?.isSoftwareOnly == true
+        } else name.startsWith("OMX.google.") || name.startsWith("c2.android.")
+
         /** The card's width (dp), a quarter of the screen; its height is the film's shape. */
         const val WIDTH = 224
         /** The frames' height in pixels: the lowest quality's own, scaled up on screen. 40 of them at 16:9 are under 6 MB. */

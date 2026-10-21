@@ -113,7 +113,14 @@ object SeekPreviewChecks {
                     return "dropped ${dropped1 - dropped0} of ${dropped1 - dropped0 + rendered1 - rendered0} frames, preview shown in $shown of $rounds rounds"
                 }
 
-                if (language == "fa") {
+                var soft = false
+                runOnMainSync { soft = field(preview, "filmInSoftware") as Boolean }
+                if (soft) {
+                    // No hardware decoder for the film (CI's x86 emulator): previews stay off rather than take its CPU.
+                    val rounds = scrub(1)
+                    report.append("film decoded in software ($language): $rounds\n")
+                    check(rounds.contains("shown in 0 of")) { "A preview showed beside a film decoded in software" }
+                } else if (language == "fa") {
                     // Off and on in turn, so a host's swings in load fall on both.
                     for (on in listOf(false, true, false, true)) {
                         if (on) {

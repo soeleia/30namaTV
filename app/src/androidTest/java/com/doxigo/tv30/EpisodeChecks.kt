@@ -76,11 +76,15 @@ object EpisodeChecks {
                 val host = checkNotNull(homeActivity)
                 val mark = host.getString(R.string.new_episode)
                 lateinit var row: ListRowPresenter.ViewHolder
-                await("Continue Watching did not load with its posters") {
+                var seen = "no home"
+                // A cold home on CI's two-core emulator takes longer than the other checks' 7 s.
+                await({ "Continue Watching did not load with its posters ($language): $seen" }, 20_000) {
                     val home = host.supportFragmentManager.findFragmentById(R.id.browse_host) as? HomeFragment ?: return@await false
                     val at = (0 until home.adapter.size()).indexOfFirst { (home.adapter[it] as ListRow).id == HomeFragment.CONTINUE.toLong() }
                     val found = (home.mainFragment as? RowsSupportFragment)?.getRowViewHolder(at) as? ListRowPresenter.ViewHolder
-                    if (at < 0 || found == null || found.gridView.childCount < 2 || home.view?.findViewById<View>(androidx.leanback.R.id.browse_container_dock)?.alpha != 1f) false
+                    val dock = home.view?.findViewById<View>(androidx.leanback.R.id.browse_container_dock)?.alpha
+                    seen = "rows ${home.adapter.size()}, continue at $at, posters ${found?.gridView?.childCount}, dock $dock"
+                    if (at < 0 || found == null || found.gridView.childCount < 2 || dock != 1f) false
                     else true.also { row = found }
                 }
                 runOnMainSync {
@@ -117,14 +121,16 @@ object EpisodeChecks {
         finish(resultCode, result)
     }
 
-    private fun Instrumentation.await(message: String, condition: () -> Boolean) {
-        val deadline = SystemClock.elapsedRealtime() + 7_000
+    private fun Instrumentation.await(message: String, condition: () -> Boolean) = await({ message }, 7_000, condition)
+
+    private fun Instrumentation.await(message: () -> String, timeoutMs: Long, condition: () -> Boolean) {
+        val deadline = SystemClock.elapsedRealtime() + timeoutMs
         do {
             var passed = false
             runOnMainSync { passed = condition() }
             if (passed) return
             SystemClock.sleep(50)
         } while (SystemClock.elapsedRealtime() < deadline)
-        error(message)
+        error(message())
     }
 }
