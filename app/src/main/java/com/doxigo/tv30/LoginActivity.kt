@@ -36,6 +36,11 @@ class LoginActivity : TvActivity() {
     private var code: String? = null
     /** When [code] came, on the uptime clock. */
     private var issued = 0L
+    /**
+     * The code [code] took the place of, still asked about (see [QrCode.asked]): our [QrCode.LIFETIME]
+     * is a guess, and a phone that scanned it late may approve it after it left the plate.
+     */
+    private var previous: String? = null
     /** The white plate is up, with a code on it, live or not. */
     private var shown = false
     private var backdrop: Job? = null
@@ -140,6 +145,7 @@ class LoginActivity : TvActivity() {
      * and leaves it to the button; its codes then die under a TV that still shows them.
      */
     private fun poll(now: Boolean) {
+        if (Api.loggedIn) return // a press during the welcome would cancel the way home
         polling?.cancel()
         slow = false
         polling = lifecycleScope.launch {
@@ -148,7 +154,7 @@ class LoginActivity : TvActivity() {
                 if (wait) {
                     val pause = QrCode.pause(SystemClock.elapsedRealtime() - heard) ?: return@launch rest()
                     slow = pause > QrCode.FAST
-                    delay(pause)
+                    delay(QrCode.within(pause, code, issued, SystemClock.elapsedRealtime()))
                     slow = false
                 }
                 wait = true
@@ -165,6 +171,7 @@ class LoginActivity : TvActivity() {
      * is asked for and the new one rising in.
      */
     private suspend fun loadCode(): Boolean {
+        previous = code // a dead one is null already
         code = null
         if (retry.hasFocus()) check.requestFocus() // the retry is about to go
         failure.visibility = View.GONE
@@ -239,9 +246,15 @@ class LoginActivity : TvActivity() {
     }
 
     private suspend fun signIn(): Boolean {
-        val response = runCatching { Api.qrLogin(code!!) }.getOrNull() ?: return false
-        if (QrCode.expired(response)) code = null // the next turn asks for a fresh one
-        val token = response.takeIf { it.optBoolean("success") }?.str("result", "token") ?: return false
+        // The code on the plate, then the one it replaced: an approval of either signs in.
+        val token = QrCode.asked(code, previous, issued, SystemClock.elapsedRealtime()).firstNotNullOfOrNull { asked ->
+            val response = runCatching { Api.qrLogin(asked) }.getOrNull() ?: return@firstNotNullOfOrNull null
+            if (QrCode.expired(response)) {
+                if (asked == code) code = null // the next turn asks for a fresh one
+                else previous = null // it has had its say
+            }
+            response.takeIf { it.optBoolean("success") }?.str("result", "token")
+        } ?: return false
         Api.token = token
         runCatching { Api.user() }.getOrNull()?.takeIf { it.optBoolean("success") }?.let { Api.user = it.optJSONObject("result") }
         // The code turns into a check where the phone was pointed, held a moment, then home.
@@ -317,6 +330,17 @@ internal object QrCode {
 
     /** Whether [code], given at [issued], can still be asked about at [now] (both on the uptime clock). */
     fun alive(code: String?, issued: Long, now: Long) = code != null && now - issued < LIFETIME
+
+    /**
+     * The codes to ask about at [now]: [code], then [previous], the one it replaced at [issued],
+     * for one more [LIFETIME] after it left the plate (or until 30nama calls it [expired]).
+     */
+    fun asked(code: String?, previous: String?, issued: Long, now: Long) =
+        listOfNotNull(code, previous.takeIf { alive(it, issued, now) })
+
+    /** [pause], cut short where [code], given at [issued], dies first: a dead code goes when it dies, not a slow pause later. */
+    fun within(pause: Long, code: String?, issued: Long, now: Long) =
+        if (code == null) pause else minOf(pause, (issued + LIFETIME - now).coerceAtLeast(0))
 
     /** 30nama's answer to a code it no longer knows. Unverified: a guess at its wording, never yet seen. */
     fun expired(answer: JSONObject) = !answer.optBoolean("success") && answer.str("msg")?.contains("expire", ignoreCase = true) == true

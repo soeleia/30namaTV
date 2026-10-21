@@ -101,6 +101,16 @@ class ApiTest {
     }
 
     @Test
+    fun onlyWhatNeverReachedThirtyNamaGoesAgain() {
+        assertTrue(Api.unsent(Api.Challenged("https://h")))
+        assertTrue(Api.unsent(java.net.ConnectException()))
+        assertTrue(Api.unsent(java.net.UnknownHostException()))
+        assertFalse(Api.unsent(SocketTimeoutException())) // a read timeout may come after it landed
+        assertFalse(Api.unsent(IOException("unexpected end of stream")))
+        assertTrue(Api.movesHost(Api.Challenged("https://h")))
+    }
+
+    @Test
     fun screenCallsGoFirstTwoAtATimeAndSpacedOut() = runTest {
         val gate = Gate(slots = 2, backgroundSlots = 2, spacing = 100, now = { testScheduler.currentTime }, context = EmptyCoroutineContext)
         val started = mutableListOf<Pair<String, Long>>()
@@ -207,5 +217,22 @@ class ApiTest {
             asks++
         }
         assertTrue("asked $asks times", asks in 30..60)
+    }
+
+    @Test
+    fun aReplacedCodeIsStillAskedAboutForOneMoreLife() {
+        assertEquals(listOf("new", "old"), QrCode.asked("new", "old", 1_000, 1_000)) // the plate's first
+        assertEquals(listOf("new", "old"), QrCode.asked("new", "old", 1_000, 1_000 + QrCode.LIFETIME - 1))
+        assertEquals(listOf("new"), QrCode.asked("new", "old", 1_000, 1_000 + QrCode.LIFETIME))
+        assertEquals(listOf("new"), QrCode.asked("new", null, 1_000, 1_000)) // the first code, or the last expired
+        assertEquals(listOf("old"), QrCode.asked(null, "old", 1_000, 1_000)) // the new one called expired
+    }
+
+    @Test
+    fun aCodeNeverOutstaysItsLifeInAPause() {
+        assertEquals(QrCode.SLOW, QrCode.within(QrCode.SLOW, "abc", 1_000, 1_000))
+        assertEquals(3_000L, QrCode.within(QrCode.SLOW, "abc", 1_000, 1_000 + QrCode.LIFETIME - 3_000))
+        assertEquals(0L, QrCode.within(QrCode.SLOW, "abc", 1_000, 1_000 + QrCode.LIFETIME + 5_000)) // already dead
+        assertEquals(QrCode.SLOW, QrCode.within(QrCode.SLOW, null, 1_000, 1_000 + QrCode.LIFETIME)) // none to outstay
     }
 }

@@ -122,6 +122,12 @@ object Api {
     /** Failures that say the host itself is gone: the network, a challenge, a 5xx, a page that isn't an answer. */
     internal fun movesHost(e: IOException) = e !is ApiError && e !is Throttled
 
+    /** Cloudflare answered for 30nama: the request went no further. */
+    class Challenged(host: String) : IOException("Cloudflare challenged $host")
+
+    /** Failures that never reached 30nama, so even a write may go again: a challenge, or no connection at all. */
+    internal fun unsent(e: IOException) = e is Challenged || e is java.net.ConnectException || e is java.net.UnknownHostException
+
     /** The waits after a first and second rate limit, unless Retry-After asks for longer. */
     private val BACKOFF = longArrayOf(1000, 3000)
 
@@ -185,24 +191,27 @@ object Api {
         // build pretend every account write succeeded; release builds always write.
         if (isWrite(action, params) && BuildConfig.DEBUG && readOnly()) return JSONObject().put("success", true)
         val once = sendsOnce(action, params)
-        val host = endpoint
+        var host = endpoint
         return try {
-            post(host, action, params, background, retries = if (once) 1 else 2)
+            post(action, params, background, retries = 2, once) { host = it }
         } catch (e: IOException) {
             // What the official app does when a request gives up: find a host that answers. A write
-            // moves the calls after it but is not sent again.
-            if (movesHost(e) && rediscover(host) && !once) post(endpoint, action, params, background, retries = 1) else throw e
+            // that may have landed moves the calls after it but is not sent again.
+            if (movesHost(e) && rediscover(host) && (!once || unsent(e))) post(action, params, background, retries = 1, once) else throw e
         }
     }
 
+    /** Each turn asks [endpoint] afresh: a call that queued while another moved host follows it. */
     private suspend fun post(
-        host: String, action: String, params: Array<out Pair<String, Any?>>, background: Boolean, retries: Int,
+        action: String, params: Array<out Pair<String, Any?>>, background: Boolean, retries: Int, once: Boolean,
+        sentTo: (String) -> Unit = {},
     ): JSONObject {
         var failures = 0
         var throttles = 0
         while (true) {
             try {
                 return gate.pass(background) {
+                    val host = endpoint.also(sentTo)
                     try {
                         postOnce(host, action, params)
                     } catch (e: Throttled) {
@@ -216,7 +225,7 @@ object Api {
                 // Turned away before 30nama saw it, so a write may go again too.
                 if (++throttles > BACKOFF.size) throw e
             } catch (e: IOException) {
-                if (e is ApiError || ++failures >= retries) throw e
+                if (e is ApiError || ++failures >= retries || once && !unsent(e)) throw e
                 delay(1000)
             }
         }
@@ -236,7 +245,7 @@ object Api {
             .apply { token?.takeIf { it.isNotEmpty() }?.let { header("c-token", it) } }
             .build()
         return http.newCall(request).await().use { response ->
-            if (response.header("cf-mitigated") != null) throw IOException("Cloudflare challenged $host")
+            if (response.header("cf-mitigated") != null) throw Challenged(host)
             // home_stream alone is ~300 KB of JSON: parse it off the main thread.
             withContext(Dispatchers.IO) {
                 val text = response.body?.string().orEmpty()
