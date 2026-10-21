@@ -146,6 +146,8 @@ class PlayerFragment : VideoSupportFragment() {
     /** Leanback is scrubbing the seek bar; [seekHeld]: how long the left or right key has been held. */
     private var seeking = false
     private var seekHeld = 0L
+    /** The frame the bar is scrubbed to, over it (SeekPreview.kt). */
+    private lateinit var preview: SeekPreview
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -225,6 +227,7 @@ class PlayerFragment : VideoSupportFragment() {
         })
         progressBarManager.setProgressBarView(spinner)
         panel = PlayerPanel(root, cues, ::uncover)
+        preview = SeekPreview(root, player) { file }
         // The overlay shows and hides from many places (keys, auto-hide, pause), and so does the
         // panel; the overlay's flag flips as its fade starts, and the fade draws, so a pre-draw
         // check catches every change on time.
@@ -273,9 +276,11 @@ class PlayerFragment : VideoSupportFragment() {
                 override fun onSeekPositionChanged(positionMs: Long) {
                     requestedAt = positionMs
                     delegate.onSeekPositionChanged(positionMs)
+                    preview.show(positionMs)
                 }
                 override fun onSeekFinished(cancelled: Boolean) {
                     seeking = false
+                    preview.hide()
                     delegate.onSeekFinished(cancelled)
                     if (!cancelled && requestedAt > startedAt) player.play()
                 }
@@ -294,6 +299,7 @@ class PlayerFragment : VideoSupportFragment() {
     override fun onStop() {
         super.onStop()
         player.stop()
+        preview.close()
     }
 
     override fun onStart() {
@@ -390,8 +396,9 @@ class PlayerFragment : VideoSupportFragment() {
         glue = Glue(context, LeanbackPlayerAdapter(context, player, 500), series = files.size > 1).apply {
             host = VideoSupportFragmentGlueHost(this@PlayerFragment)
             isSeekEnabled = true
-            // No thumbnails: with a provider the bar and clock move while scrubbing and the player
-            // seeks once, where it lands, instead of loading every step on the way.
+            // No Leanback thumbnails (SeekPreview has its own frame): with a provider the bar and clock
+            // move while scrubbing and the player seeks once, where it lands, instead of loading every
+            // step on the way.
             seekProvider = PlaybackSeekDataProvider()
         }
         progressBarManager.hide()

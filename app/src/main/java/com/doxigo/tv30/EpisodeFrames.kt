@@ -101,7 +101,7 @@ object EpisodeFrames {
     }
 
     /** The lowest quality's URL (the playlist's own if it lists only one), as the player picks its labels. */
-    private fun lowest(episode: JSONObject): String? {
+    fun lowest(episode: JSONObject): String? {
         val qualities = episode.obj("file")?.optJSONArray("m3u8").objects()
         val quality = qualities.getOrNull(Settings.pickQuality(qualities.map { it.str("label") }, "144p"))
         return quality?.str("default") ?: episode.str("file", "m3u8")
