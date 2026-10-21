@@ -83,6 +83,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 class PlayerActivity : TvActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -116,6 +117,8 @@ class PlayerActivity : TvActivity() {
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
 class PlayerFragment : VideoSupportFragment() {
     private lateinit var player: ExoPlayer
+    /** The shape the video surface was last fitted to (see [onVideoSizeChanged]); null before the first picture. */
+    private var shape: Pair<Int, Int>? = null
     private lateinit var cues: CueView
     /** Where the subtitles sit now: [REST], [LIFTED] over the controls, or [BESIDE] the panel. */
     private var spot = REST
@@ -220,6 +223,11 @@ class PlayerFragment : VideoSupportFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         val root = view as ViewGroup
+        // Leanback fits the surface to the screen as it is when the picture comes; a TV that switches
+        // mode for the film can change the screen's size after, so it is fitted again then.
+        root.addOnLayoutChangeListener { v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+            if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) v.post { shape?.let { (w, h) -> onVideoSizeChanged(w, h) } }
+        }
         val context = requireContext()
         // Over the dimming scrim (index 1, after the video surface) and under the controls dock, so
         // subtitles stay bright while the controls show. At most 80% of the width, centred.
@@ -307,6 +315,14 @@ class PlayerFragment : VideoSupportFragment() {
     override fun onPause() {
         super.onPause()
         report()
+    }
+
+    /** Leanback fits the surface to the size the decoder reports; [filmShape] may put the stream's in its place. */
+    override fun onVideoSizeChanged(width: Int, height: Int) {
+        val stream = player.videoFormat?.let { f -> (f.width * f.pixelWidthHeightRatio).roundToInt() to f.height }
+        val fitted = filmShape(width to height, stream)
+        shape = fitted
+        super.onVideoSizeChanged(fitted.first, fitted.second)
     }
 
     // A paused ExoPlayer keeps buffering; off screen it must not hold a connection to the CDN.
@@ -1859,6 +1875,18 @@ private object PersianDigits : ReplacementTransformationMethod() {
 }
 
 /** The next episode's number, a step back from «قسمت بعد» in whatever colour the pill's label has. */
+/**
+ * The shape to fit the video surface to, from the [decoder]'s picture and the [stream]'s own (HLS
+ * takes it from the playlist). Some TV decoders report a padded or their largest picture, so a
+ * 2.39:1 film comes as 16:9 and fills the screen stretched (issue #2, a Hisense): where the decoder
+ * says 16:9 and the stream another shape, the stream's wins. Otherwise the decoder's, as before: a
+ * playlist that says 16:9 for every film is the likelier mistake the other way.
+ */
+internal fun filmShape(decoder: Pair<Int, Int>, stream: Pair<Int, Int>?): Pair<Int, Int> {
+    fun sixteenNine(s: Pair<Int, Int>) = abs(s.first * 9 - s.second * 16) <= s.second * 16 / 50 // within 2%
+    return if (stream != null && stream.first > 0 && stream.second > 0 && sixteenNine(decoder) && !sixteenNine(stream)) stream else decoder
+}
+
 private object Quiet : CharacterStyle() {
     override fun updateDrawState(paint: TextPaint) {
         paint.alpha = paint.alpha * 7 / 10
