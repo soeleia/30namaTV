@@ -4,9 +4,11 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fa">
     <string name="filter_genre">ژانر</string>
     <string name="filter_country">کشور</string>
+    <string name="filter_language">زبان</string>
     <string name="filter_decade">دهه</string>
     <string name="filter_all_genres">همهٔ ژانرها</string>
     <string name="filter_all_countries">همهٔ کشورها</string>
+    <string name="filter_all_languages">همهٔ زبان‌ها</string>
     <string name="filter_any_score">همهٔ امتیازها</string>
     <string name="filter_any_decade">همهٔ دهه‌ها</string>
     <!-- %s is the decade's first year in Persian digits: «دههٔ ۲۰۱۰». -->

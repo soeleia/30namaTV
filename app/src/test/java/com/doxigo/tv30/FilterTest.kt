@@ -8,13 +8,14 @@ import org.junit.Test
 class FilterTest {
     @Test
     fun parametersInTheShapesTheServerReads() {
-        // type and genre as lists, country as a string, score and years as numbers (see Filter.parameters).
-        val all = Filter(genre = "comedy", country = "FR", score = 7.5, decade = 2010).parameters("movie")
-        assertEquals(setOf("stream", "type", "genre", "country", "imdb_rate", "min_year", "max_year"), all.keys().asSequence().toSet())
+        // type, genre and language as lists, country as a string, score and years as numbers (see Filter.parameters).
+        val all = Filter(genre = "comedy", country = "FR", language = "fa", score = 7.5, decade = 2010).parameters("movie")
+        assertEquals(setOf("stream", "type", "genre", "country", "language", "imdb_rate", "min_year", "max_year"), all.keys().asSequence().toSet())
         assertEquals("true", all.getString("stream"))
         assertEquals("""["movie"]""", all.getJSONArray("type").toString())
         assertEquals("""["comedy"]""", all.getJSONArray("genre").toString())
         assertEquals("FR", all.get("country"))
+        assertEquals("""["fa"]""", all.getJSONArray("language").toString())
         assertEquals(7.5, all.get("imdb_rate"))
         assertEquals(2010, all.get("min_year"))
         assertEquals(2019, all.get("max_year"))
@@ -33,6 +34,9 @@ class FilterTest {
             "min_year":1890,"max_year":2026}"""))
         assertEquals(listOf(FilterOption("درام", "drama")), choices.genres) // a blank value is no choice
         assertEquals(listOf(FilterOption("آمریکا", "US")), choices.countries)
+        assertTrue(choices.languages.isEmpty()) // none offered: no language pill
+        val languages = FilterChoices(JSONObject("""{"language":[{"name":"فارسی","value":"fa"},{"name":"","value":"ja"}]}""")).languages
+        assertEquals(listOf(FilterOption("فارسی", "fa"), FilterOption("ja", "ja")), languages) // a nameless one goes by its value
         assertEquals(listOf(9.0, 7.5), choices.scores) // "under 5" is not a floor
         assertEquals((2020 downTo 1890 step 10).toList(), choices.decades)
     }

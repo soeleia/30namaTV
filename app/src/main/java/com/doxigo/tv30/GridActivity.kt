@@ -31,7 +31,7 @@ internal const val POSTER_GRID_ROW_SPACING_DP = 28
 /**
  * A paged grid of titles: one archive slug (a catalogue, category or genre) or one of the user's
  * lists, with the rail at its start edge lit on the section it belongs to. Movies, Series and
- * Anime can be narrowed by genre, country, IMDb score and decade.
+ * Anime can be narrowed by genre, country, language, IMDb score and decade.
  */
 class GridActivity : TvActivity() {
     var rail: Rail? = null
@@ -201,6 +201,11 @@ class GridFragment : VerticalGridSupportFragment() {
         country.show(R.string.filter_country, choices.countries.nameOf(filter.country)) {
             pick(country, R.string.filter_country, R.string.filter_all_countries, choices.countries, filter.country) { filter.copy(country = it) }
         }
+        val language = bar.findViewById<Button>(R.id.filter_language)
+        language.visibility = if (choices.languages.isEmpty()) View.GONE else View.VISIBLE
+        language.show(R.string.filter_language, choices.languages.nameOf(filter.language)) {
+            pick(language, R.string.filter_language, R.string.filter_all_languages, choices.languages, filter.language) { filter.copy(language = it) }
+        }
         val score = bar.findViewById<Button>(R.id.filter_score)
         val scores = choices.scores.map { FilterOption(Filter.scoreLabel(it, fa), it) }
         // Unset, its kind in one word in either language.
@@ -347,6 +352,8 @@ private fun <T> List<FilterOption<T>>.nameOf(value: T?): String? = value?.let { 
 internal class FilterChoices(json: JSONObject) {
     val genres = json.choices("genre")
     val countries = json.choices("country")
+    /** None offered (an older server), no language pill. */
+    val languages = json.choices("language")
     /** The floors only: "under 5" comes as -5. */
     val scores = json.optJSONArray("imdb_rate").objects().map { it.optDouble("value") }.filter { it > 0 }
     /** The first year of each decade 30nama has titles for, newest first. */
@@ -368,17 +375,23 @@ internal class FilterChoices(json: JSONObject) {
 }
 
 /** What a catalogue is narrowed to; nothing set, it is the plain archive. */
-internal data class Filter(val genre: String? = null, val country: String? = null, val score: Double? = null, val decade: Int? = null) {
+internal data class Filter(
+    val genre: String? = null, val country: String? = null, val language: String? = null, val score: Double? = null, val decade: Int? = null,
+) {
     val isEmpty get() = this == Filter()
 
     /**
      * advanced_search's `parameters` for [type]'s streamable titles. In the shapes the server reads
      * (tried against it): `type` and `genre` as lists, which it ignores as strings; `country` as a
-     * string, which as a list finds nothing; the score and years as numbers.
+     * string, which as a list finds nothing; the score and years as numbers. `language` is not yet
+     * tried: it goes as a list, the one guess that fails safe, since a list the server wants as a
+     * string finds nothing (country), where a string it wants as a list is ignored and every
+     * title comes back as if filtered (genre).
      */
     fun parameters(type: String): JSONObject = JSONObject().put("stream", "true").put("type", JSONArray().put(type)).apply {
         genre?.let { put("genre", JSONArray().put(it)) }
         country?.let { put("country", it) }
+        language?.let { put("language", JSONArray().put(it)) }
         score?.let { put("imdb_rate", it) }
         decade?.let { put("min_year", it).put("max_year", it + 9) }
     }
