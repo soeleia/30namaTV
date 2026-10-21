@@ -133,11 +133,16 @@ object LogoChecks {
                 val series = posts(home).first { it.imdbId == SERIES }
                 val film = posts(home).first { it.imdbId == FILM }
                 for ((post, label) in listOf(series to "series", film to "film")) {
+                    val seen = asked.size
                     activity = startActivitySync(DetailsActivity.intent(targetContext, post).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                     val page = checkNotNull(activity)
                     val title = page.findViewById<TextView>(R.id.bb_title)
                     val credits = page.findViewById<TextView>(R.id.credits)
+                    val actions = page.findViewById<View>(R.id.actions)
                     await("$label: the logo never replaced the words", timeoutMs = 12_000) { logoShown(title) }
+                    // Where Play stands before TMDB's entry comes, seconds off yet (the logo was kept from home).
+                    var at = 0
+                    runOnMainSync { at = actions.top }
                     val expected = when {
                         label == "series" && language == "fa" -> "در حال پخش، Netflix"
                         label == "series" -> "Returning Series, Netflix"
@@ -148,7 +153,12 @@ object LogoChecks {
                     SystemClock.sleep(400)
                     fun line() = credits.text.toString().filter { it != '‎' && it != '‏' } // fence()'s marks
                     if (expected != null) await("$label credit line lacks «$expected»: ${line()}") { credits.isShown && expected in line() }
-                    else runOnMainSync { check("Defy" !in line()) { "An English tagline in Persian: ${line()}" } }
+                    // Once the entry has landed and bound, whatever it added: the actions under Play never moved.
+                    val entry = if (label == "series") "tv/105248" else "movie/1368337"
+                    await("$label: TMDB's entry was never asked", timeoutMs = 12_000) { synchronized(asked) { entry in asked.subList(seen, asked.size) } }
+                    SystemClock.sleep(TMDB_LATE + 600)
+                    runOnMainSync { check(actions.top == at) { "$label: the actions moved when TMDB's entry landed: $at → ${actions.top}" } }
+                    if (expected == null) runOnMainSync { check("Defy" !in line()) { "An English tagline in Persian: ${line()}" } }
                     if (label == "film" && language == "fa") runOnMainSync {
                         val plot = page.findViewById<TextView>(R.id.bb_plot).text.toString()
                         check(plot.startsWith(post.str("plot", "local")!!.take(20))) { "30nama's own synopsis gave way to TMDB's: $plot" }
@@ -176,7 +186,7 @@ object LogoChecks {
                     singles.clear()
                 }
             }
-            result.putString("stream", "PASS: TMDB logos replace the English name on home's hero and the title page without moving the words, a prefetched page shows its logo at once, and the credit line takes the series' state and network and the tagline by the interface's language, in Persian and English\n")
+            result.putString("stream", "PASS: TMDB logos replace the English name on home's hero and the title page without moving the words, a prefetched page shows its logo at once, and the credit line takes the series' state and network and the tagline by the interface's language without moving Play, in Persian and English\n")
         } catch (error: Throwable) {
             code = Activity.RESULT_CANCELED
             result.putString("stream", error.stackTraceToString())

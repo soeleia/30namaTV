@@ -12,8 +12,10 @@ import java.util.TimeZone
 /**
  * 30nama says only the day a series' next episode airs (`air.next_episode_date`), and moves on to
  * the one after once it has. So each look remembers the days still ahead, and a remembered day
- * passed by the next look is an episode out since, as the Apple TV client's EpisodeAlerts has it;
- * half a day ([GRACE]) is allowed after it, for time zones and for the episode to reach 30nama.
+ * passed by the next look is an episode out since, as the Apple TV client's EpisodeAlerts has it.
+ * It counts once the day is over, and half a day ([GRACE]) after that ([outAt]), for time zones and
+ * for the episode to reach 30nama: the title page names the day as the next episode's until it has
+ * passed, and a network's own date can come a day before the file does.
  * Followed is Continue Watching and the notify list, looked at with home's own refresh.
  *
  * The news stands until the viewer goes back to the series, which moves its continue_watching
@@ -24,7 +26,11 @@ import java.util.TimeZone
 object NewEpisodes {
     const val GRACE = 12 * 3_600_000L
     const val KEEP = 7 * 86_400_000L
+    private const val DAY = 86_400_000L
     private const val KEY = "state"
+
+    /** When the episode of [day] counts as out: the day over (in UTC, as the day is kept) and [GRACE] after. */
+    fun outAt(day: Long) = day + DAY + GRACE
 
     /** An episode's [day] (UTC midnight, ms), and where the viewer was in its series before it ([watchingAt]). */
     class Alert(val day: Long, val watching: String)
@@ -37,7 +43,7 @@ object NewEpisodes {
 
     /**
      * [state] after a look at the series [followed] (the first of an id counts) at [now]. A
-     * remembered day [GRACE] past is an episode out, news as of where its series stood at the look
+     * remembered day past [outAt] is an episode out, news as of where its series stood at the look
      * before; news the viewer has gone back to, or a week old, is dropped, and so is a series no
      * longer followed. Days still ahead are remembered with where the series stands, until the day
      * itself: from then on a viewer at it may be watching the new episode. A day moved before it
@@ -50,14 +56,14 @@ object NewEpisodes {
         for ((id, alert) in state.ahead) {
             val series = byId[id] ?: continue
             when {
-                alert.day + GRACE <= now -> if (isNew(alert, series.watching, now)) out[id] = alert
+                outAt(alert.day) <= now -> if (isNew(alert, series.watching, now)) out[id] = alert
                 now < alert.day -> ahead[id] = Alert(alert.day, series.watching)
                 else -> ahead[id] = alert
             }
         }
         // A day already past its grace is one this look is too late for, or one already told: never news.
         for (series in byId.values) {
-            val day = series.day?.takeIf { it + GRACE > now } ?: continue
+            val day = series.day?.takeIf { outAt(it) > now } ?: continue
             val waiting = ahead[series.id]
             if (waiting == null || waiting.day != day && now < waiting.day) ahead[series.id] = Alert(day, series.watching)
         }

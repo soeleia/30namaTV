@@ -314,6 +314,9 @@ class PlayerFragment : VideoSupportFragment() {
         super.onStop()
         player.stop()
         preview.close()
+        // The timer is for this sitting: one left running would pause the film an hour later, on return.
+        sleep = 0
+        sleepAt = 0
     }
 
     override fun onStart() {
@@ -1617,12 +1620,15 @@ class PlayerFragment : VideoSupportFragment() {
         panel.refresh()
     }
 
-    /** The time is up: playback pauses, and says why to anyone still awake. */
+    /** The time is up: playback pauses, and says why to anyone still awake. Already paused, it just ends. */
     private fun fallAsleep() {
         sleep = 0
         sleepAt = 0
-        player.pause()
-        requireContext().toast(getString(R.string.sleep_paused))
+        if (player.playWhenReady) {
+            player.pause()
+            requireContext().toast(getString(R.string.sleep_paused))
+        }
+        panel.refresh()
     }
 
     /** Besides "label", each quality maps audio variants ("default", channel counts) to URLs. */

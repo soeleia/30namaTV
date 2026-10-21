@@ -29,6 +29,7 @@ import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import kotlin.math.roundToInt
 
 /**
  * A title, Netflix-style: its art and facts, Play, the trailer and the three list toggles, then
@@ -53,6 +54,11 @@ class DetailsActivity : TvActivity() {
     private val episodeRows = mutableListOf<ArrayObjectAdapter>()
     /** TMDB's entry for the title, once it lands: the logo, the tagline, a series' state and network, a synopsis where 30nama has none. */
     private var tmdb: JSONObject? = null
+    /**
+     * Whether TMDB is asked for it at all. What it may bring keeps its room from the first bind,
+     * whether it brings it or not, so nothing under Play moves when it lands (see [bind]).
+     */
+    private val tmdbAsked by lazy { Tmdb.enabled && !Tmdb.backingOff && title.imdbId != null }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -177,12 +183,23 @@ class DetailsActivity : TvActivity() {
         val credit = if (title.isMovie) names("director")?.let { getString(R.string.director, it) }
         else names("creator")?.let { getString(R.string.creator, it) } ?: names("director")?.let { getString(R.string.director, it) }
         line(R.id.genres, title.genresLine(this, genres))
-        line(R.id.credits, creditLine(this, credit, tmdb?.let(::about)))
+        // An empty credit line TMDB may add to keeps its place, unseen, as the Persian name's
+        // does: a stand-in of the same height.
+        val made = creditLine(this, credit, tmdb?.let(::about))
+        line(R.id.credits, made ?: creditLine(this, "·", null).takeIf { tmdbAsked })
+            .apply { if (made == null && tmdbAsked) visibility = View.INVISIBLE }
         // An airing series' next episode takes the synopsis' third line, so the actions never
         // move down into the waiting rows (see details_rows_top).
         val next = title.nextEpisode(this)
         line(R.id.next_air, next)
-        findViewById<TextView>(R.id.bb_plot).maxLines = if (next == null) 3 else 2
+        findViewById<TextView>(R.id.bb_plot).apply {
+            maxLines = if (next == null) 3 else 2
+            // Where TMDB may bring the Persian synopsis 30nama lacks (plot()), the synopsis keeps the
+            // room of all its lines from the start, Persian lines being 1.65 apart (Billboard.write):
+            // more than the English one before it takes, or a shorter Persian one, so the actions
+            // stay put when it lands.
+            minHeight = if (tmdbAsked && Api.language == "fa" && title.str("plot", "local") == null) maxLines * (textSize * 1.65f).roundToInt() else 0
+        }
     }
 
     /**

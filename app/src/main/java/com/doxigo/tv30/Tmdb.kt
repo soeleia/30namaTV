@@ -113,13 +113,16 @@ object Tmdb {
     /**
      * The title logo among [images] (an entry's `images`, or `/images` itself): in the interface's
      * [language], else English, else one without words; of those the best voted, then the widest.
-     * TMDB serves each at w500 as PNG, an SVG one included.
+     * One the billboard [refused] (Logos.refuse) gives way to the next, often the same lettering in
+     * white. TMDB serves each at w500 as PNG, an SVG one included.
      */
-    fun logo(images: JSONObject?, language: String = Api.language): String? {
+    fun logo(images: JSONObject?, language: String = Api.language, refused: (String) -> Boolean = { false }): String? {
         val logos = images?.optJSONArray("logos").objects()
         return ((if (language == "fa") listOf("fa", "en") else listOf("en")) + "").firstNotNullOfOrNull { code ->
-            logos.filter { (it.str("iso_639_1") ?: "") == code }.maxWithOrNull(compareBy({ it.optDouble("vote_average", 0.0) }, { it.optInt("width") }))
-        }?.str("file_path")?.let { "https://image.tmdb.org/t/p/w500" + it.replace(Regex("\\.svg$"), ".png") }
+            logos.filter { (it.str("iso_639_1") ?: "") == code }
+                .sortedWith(compareByDescending<JSONObject> { it.optDouble("vote_average", 0.0) }.thenByDescending { it.optInt("width") })
+                .firstNotNullOfOrNull { logo -> logo.str("file_path")?.let { "https://image.tmdb.org/t/p/w500" + it.replace(Regex("\\.svg$"), ".png") }?.takeUnless(refused) }
+        }
     }
 
     /**
@@ -178,6 +181,12 @@ class Answers(private val file: String, private val keep: Int = 4000) {
 
     suspend fun put(context: Context, key: String, answer: String) {
         synchronized(map) { map[key] = answer }
+        save(context)
+    }
+
+    /** Forgets [key]'s answer, so it is asked again. */
+    suspend fun remove(context: Context, key: String) {
+        synchronized(map) { map.remove(key) }
         save(context)
     }
 

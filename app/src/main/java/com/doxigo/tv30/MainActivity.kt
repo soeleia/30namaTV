@@ -621,8 +621,12 @@ class HomeFragment : BrowseSupportFragment() {
         return true
     }
 
-    /** The notify list's series as last fetched: with the row's, what NewEpisodes looks at, and the launcher's news of them (WatchNext). */
-    private var following = emptyList<JSONObject>()
+    /**
+     * The notify list's series as last fetched: with the row's, what NewEpisodes looks at, and the
+     * launcher's news of them (WatchNext). Null until it is in, so the launcher's news stays as it is
+     * meanwhile rather than going and coming back.
+     */
+    private var following: List<JSONObject>? = null
 
     /**
      * Whether the followed series have an episode out (NewEpisodes), at launch and with every
@@ -633,8 +637,9 @@ class HomeFragment : BrowseSupportFragment() {
     private suspend fun lookForEpisodes() {
         val list = runCatching { Api.userList("notify", 1, "add_list") }.getOrNull() ?: return
         val context = context ?: return
-        following = list.optJSONArray("posts").objects()
-        NewEpisodes.look(context, shown() + following)
+        val posts = list.optJSONArray("posts").objects()
+        following = posts
+        NewEpisodes.look(context, shown() + posts)
         showContinueWatching(watching)
         mirror(context)
     }
@@ -787,9 +792,11 @@ fun forgetSession(context: android.content.Context) {
     Api.user = null
     Library.clear()
     Api.scope.launch { WatchNext.clear(context.applicationContext) }
-    // The home kept for the next launch (HomeFragment.KEPT), the watched episodes and the followed
-    // series' news are this account's: they go with it.
+    // The home kept for the next launch (HomeFragment.KEPT), the watched episodes, the followed
+    // series' news and each title's speed and subtitle timing are this account's: they go with it.
     context.applicationContext.filesDir.resolve("home").deleteRecursively()
     Watched.clear(context.applicationContext)
     NewEpisodes.clear(context.applicationContext)
+    val player = context.getSharedPreferences("player", android.content.Context.MODE_PRIVATE)
+    player.edit().apply { player.all.keys.filter { it.startsWith("speed.") || it.startsWith("timing.") }.forEach(::remove) }.apply()
 }

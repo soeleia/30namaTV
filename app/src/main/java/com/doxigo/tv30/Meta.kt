@@ -207,7 +207,7 @@ fun JSONObject.genresLine(context: Context, genres: String): CharSequence? {
     val tone = ContextCompat.getColor(context, R.color.meta_origin)
     val where = dotted(*countries().toTypedArray(), spoken()).ifEmpty { null }?.let {
         SpannableStringBuilder()
-            .append(" ", Glyph(context, R.drawable.meta_globe), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            .append(" ", Glyph(context, R.drawable.meta_globe, tone), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             .append(" ", Gap(0.35f), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             .append(latin(context, it, R.font.inter_regular)) // before metaLine's Medium, which then leaves it be
             .tinted(tone)
@@ -219,14 +219,14 @@ fun JSONObject.genresLine(context: Context, genres: String): CharSequence? {
 
 /**
  * The title page's credit line: who made it ([credit]), then what TMDB adds ([about]), after the
- * genres line's rule. Without [about], [credit] as it always was.
+ * genres line's rule. A meta line even alone, so it keeps its height when TMDB's part joins it.
+ * Null when it has neither.
  */
 fun creditLine(context: Context, credit: String?, about: String?): CharSequence? {
-    if (about == null) return credit
     val rule = SpannableString("|").spanned(Rule(context))
     // Each in Inter Regular before metaLine's Medium, which then leaves it be, as the credit always was.
-    val parts = between(credit?.let { latin(context, it, R.font.inter_regular) }, latin(context, about, R.font.inter_regular), rule)
-    return metaLine(context, *parts.toTypedArray(), gap = 0.75f)
+    val parts = between(credit?.let { latin(context, it, R.font.inter_regular) }, about?.let { latin(context, it, R.font.inter_regular) }, rule)
+    return metaLine(context, *parts.toTypedArray(), gap = 0.75f).ifEmpty { null }
 }
 
 /** [what] and [where], with [divider] between them only when both are there: never one at an end. */
@@ -380,7 +380,8 @@ private class Gap(private val em: Float) : ReplacementSpan() {
  * It takes 0.8 em of the line, the globe's circle's 0.74 and a hair: the drawable's margin
  * overhangs, so the space either side is the line's [Gap]s. The text it stands for is what TalkBack reads.
  */
-private class Glyph(context: Context, @DrawableRes id: Int) : ReplacementSpan() {
+/** [color]: a ReplacementSpan is handed only the metric spans' paint, so a tint set around it never reaches it. */
+private class Glyph(context: Context, @DrawableRes id: Int, private val color: Int? = null) : ReplacementSpan() {
     private val icon = ContextCompat.getDrawable(context, id)!!.mutate()
     private val digits = Digits(context)
 
@@ -394,7 +395,7 @@ private class Glyph(context: Context, @DrawableRes id: Int) : ReplacementSpan() 
         val left = (x + (getSize(paint, text, start, end, null) - size) / 2f).roundToInt()
         val upper = (y + digits.middle(paint.textSize) - size / 2f).roundToInt()
         icon.setBounds(left, upper, left + size, upper + size)
-        icon.setTint(paint.color)
+        icon.setTint(color ?: paint.color)
         icon.draw(canvas)
     }
 }

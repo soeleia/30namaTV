@@ -20,7 +20,7 @@ import kotlin.math.pow
 object Logos {
     // Prefetches only, three at a time: the title on screen never queues behind its neighbours.
     private val gate = Semaphore(3)
-    /** IMDb id and language ("tt0903747/fa") to the logo's URL, "" for none. */
+    /** IMDb id and language ("tt0903747/fa") to the logo's URL, "" for none; and a refused logo's URL to "" ([refuse]). */
     private val logos = Answers("logos.json")
 
     private val JSONObject.key get() = imdbId?.let { "$it/${Api.language}" }
@@ -51,15 +51,22 @@ object Logos {
             val images = if (entry != null) entry(title)?.optJSONObject("images") else Tmdb.find(title.imdbId!!, !title.isMovie)?.let { hit ->
                 Tmdb.get("${hit.optString("media_type")}/${hit.optInt("id")}/images?include_image_language=fa,en,null")
             }
-            Tmdb.logo(images)
+            Tmdb.logo(images) { it in logos }
         }.onFailure { if (it is CancellationException) throw it }.getOrElse { return null }
         logos.put(context, key, url.orEmpty())
         return url
     }
 
-    /** A logo that would not read over the billboard's ink ([legible]): the words stand in for good. */
-    suspend fun refuse(context: Context, title: JSONObject) {
-        title.key?.let { logos.put(context, it, "") }
+    /**
+     * A logo at [url] that would not read over the billboard's ink ([legible]): kept as refused,
+     * and [title]'s next best looked up in its place (see [lookup]), often the same lettering in
+     * white. Null once there is none: the words stand in for good.
+     */
+    suspend fun refuse(context: Context, title: JSONObject, url: String, entry: (suspend (JSONObject) -> JSONObject?)? = null): String? {
+        val key = title.key ?: return null
+        logos.put(context, url, "")
+        logos.remove(context, key)
+        return lookup(context, title, entry)
     }
 
     /** [title]'s logo, looked up and fetched into memory, for the billboard to write it whole when it comes to it. */

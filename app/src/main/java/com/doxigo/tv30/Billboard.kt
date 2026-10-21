@@ -12,6 +12,7 @@ import android.text.TextPaint
 import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewPropertyAnimator
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.graphics.ColorUtils
@@ -76,10 +77,11 @@ class Billboard(
     private var next: Card? = null
     /** The name's own white: its words fade under a logo by their colour, as the swap moves the view itself. */
     private val ink = title.currentTextColor
-    /** The logo the name wears or is fetching ([wear]), that fetch, and TMDB's answer for the title on screen ([askLogo]). */
+    /** The logo the name wears or is fetching ([wear]), that fetch, and TMDB's answer for the title on screen and whose IMDb id it is ([askLogo]). */
     private var logo: String? = null
     private var logoLoad: Disposable? = null
     private var logoAsk: Job? = null
+    private var logoAsked: String? = null
     /** How much of its words and of its logo the name shows, 0..1, and the fade between them ([mix]). */
     private var nameWords = 1f
     private var nameLogo = 0f
@@ -96,8 +98,11 @@ class Billboard(
 
     init {
         plot.ellipsizeAtWords()
-        // A logo stands taller than the words, rising out of the name's box (LogoArt).
+        // A logo stands taller than the words, rising out of the name's box (LogoArt). Nor does the
+        // block's own fade (a tile, the hero's page turn) draw it offscreen, in a buffer only as big
+        // as the block: its lines never overlap, so each takes the alpha as it draws.
         (text as ViewGroup).clipChildren = false
+        if (Build.VERSION.SDK_INT >= 24) text.forceHasOverlappingRendering(false)
         val c = root.context
         val solid = c.getColor(R.color.scrim)
         val clear = c.getColor(R.color.scrim_clear)
@@ -247,7 +252,7 @@ class Billboard(
             else -> {
                 next = card
                 words.forEach {
-                    it.animate().alpha(0f).setStartDelay(0).setInterpolator(Motion.easeOut).setDuration(OUT).withLayer().start()
+                    it.animate().alpha(0f).setStartDelay(0).setInterpolator(Motion.easeOut).setDuration(OUT).layered(it).start()
                 }
                 text.postDelayed(swap, OUT)
             }
@@ -267,9 +272,16 @@ class Billboard(
                 view.translationY = Motion.travel(it)
             }
             view.animate().alpha(1f).translationY(0f).setStartDelay(if (Motion.reduced) 0L else STEP * maxOf(0, i - 1))
-                .setInterpolator(Motion.emph).setDuration(if (Motion.reduced) Motion.FADE else IN).withLayer().start()
+                .setInterpolator(Motion.emph).setDuration(if (Motion.reduced) Motion.FADE else IN).layered(view).start()
         }
     }
+
+    /**
+     * A swap's fade in a hardware layer, but never the name's: a layer is only as big as its view,
+     * and would cut off the logo rising out of the name's box until the fade ends. The name takes
+     * its alpha as it draws instead (plain text, no background: nothing overlaps to buffer).
+     */
+    private fun ViewPropertyAnimator.layered(view: View) = apply { if (view !== title) withLayer() }
 
     /**
      * The Persian name 30nama lacks, from TMDB (PersianNames): write() keeps its line, and once the
@@ -297,14 +309,20 @@ class Billboard(
     /**
      * TMDB's logo for the title on screen, when it isn't known yet: once found it fades in over
      * the words, if its title is still the one written. Mid-swap, the write that follows finds it
-     * in the cache instead.
+     * in the cache instead. The same title again (the title page filling in its facts) leaves its
+     * question running: there it is the page's one TMDB call, which the trailer, More Like This
+     * and the credit line wait on, and asking afresh would start that call over.
      */
     private fun askLogo(card: Card) {
+        val source = card.source?.takeIf(Logos::pending)
+        if (source != null && source.imdbId == logoAsked && logoAsk?.isActive == true) return
         logoAsk?.cancel()
-        val source = card.source?.takeIf(Logos::pending) ?: return
+        source ?: return
+        logoAsked = source.imdbId
         logoAsk = scope.launch {
             val url = Logos.lookup(root.context, source, entry) ?: return@launch
-            if (card.title == shown && next == null) wear(url, source, fresh = false)
+            // Another title would have cancelled this, so only a swap still under way can stand between.
+            if (next == null) wear(url, source, fresh = false)
         }
     }
 
@@ -312,7 +330,8 @@ class Billboard(
      * Puts the logo at [url] on the name in place of its words, or (null) takes one off. A
      * [fresh] title's logo already in memory is there at once, rising with the words; one still
      * coming leaves the name bare for [LOGO_WAIT], then shows the words, and fades in over them
-     * when it lands. A logo that fails, or would not read over the ink, leaves the words.
+     * when it lands. A logo that fails leaves the words; one that would not read over the ink
+     * leaves them while TMDB's next best is looked up, which fades in over them in turn.
      */
     private fun wear(url: String?, source: JSONObject?, fresh: Boolean) {
         if (url == logo) return
@@ -333,8 +352,10 @@ class Billboard(
         logoLoad = c.imageLoader.enqueue(Logos.request(c, url).target(onError = words, onSuccess = { image ->
             val art = (image as? BitmapImage)?.bitmap
             if (art == null || !Logos.legible(art)) {
-                source?.let { scope.launch { Logos.refuse(c, it) } }
-                return@target words(null)
+                words(null)
+                // TMDB's next best in its place, unless the name has moved on meanwhile.
+                source?.let { scope.launch { Logos.refuse(c, it, url, entry)?.let { next -> if (logo == url) wear(next, it, fresh = false) } } }
+                return@target
             }
             landed = true
             title.removeCallbacks(logoLate)

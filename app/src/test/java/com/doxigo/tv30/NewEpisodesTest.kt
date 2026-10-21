@@ -25,10 +25,14 @@ class NewEpisodesTest {
         val ahead = look(State(), follow(day), at = day - 48 * hour)
         assertEquals(day, ahead.ahead[7]?.day)
         assertTrue(ahead.out.isEmpty())
-        // Eleven hours into the day, still within the half day it may take to reach 30nama, or a viewer's time zone.
-        val early = look(ahead, follow(day), at = day + 11 * hour)
+        // Midday on the day, when the title page still says it is today's: not out yet.
+        val today = look(ahead, follow(day), at = day + 12 * hour)
+        assertTrue(today.out.isEmpty())
+        // The day over, but within the half day after it that a viewer's time zone or 30nama's copy may take.
+        val early = look(today, follow(day + week), at = day + 35 * hour)
         assertTrue(early.out.isEmpty())
-        val out = look(early, follow(day + week), at = day + 13 * hour)
+        assertEquals(day + 36 * hour, NewEpisodes.outAt(day))
+        val out = look(early, follow(day + week), at = day + 37 * hour)
         assertEquals(day, out.out[7]?.day)
         assertEquals(day + week, out.ahead[7]?.day) // and the next one is waited for
     }
@@ -38,7 +42,7 @@ class NewEpisodesTest {
         val ahead = look(State(), follow(day), at = day - hour)
         val moved = look(ahead, follow(day + week), at = day + 2 * hour)
         assertEquals(day, moved.ahead[7]?.day)
-        val out = look(moved, follow(day + week), at = day + 13 * hour)
+        val out = look(moved, follow(day + week), at = day + 37 * hour)
         assertEquals(day, out.out[7]?.day)
         assertEquals(day + week, out.ahead[7]?.day)
     }
@@ -48,20 +52,20 @@ class NewEpisodesTest {
         val ahead = look(State(), follow(day), at = day - 48 * hour)
         val later = look(ahead, follow(day + 48 * hour), at = day - 24 * hour)
         assertEquals(day + 48 * hour, later.ahead[7]?.day)
-        assertTrue(look(later, follow(day + 48 * hour), at = day + 13 * hour).out.isEmpty())
+        assertTrue(look(later, follow(day + 48 * hour), at = day + 37 * hour).out.isEmpty())
     }
 
     @Test
     fun aDayAlreadyPastIsNeverNews() {
         // The first look comes too late for it.
-        val late = look(State(), follow(day), at = day + 13 * hour)
+        val late = look(State(), follow(day), at = day + 37 * hour)
         assertTrue(late.ahead.isEmpty())
         assertTrue(late.out.isEmpty())
         // Told once, and 30nama still names the day: not waited for again, nor told twice once gone back to.
-        val told = look(look(State(), follow(day), at = day - hour), follow(day), at = day + 13 * hour)
+        val told = look(look(State(), follow(day), at = day - hour), follow(day), at = day + 37 * hour)
         assertEquals(setOf(7), told.out.keys)
         assertTrue(told.ahead.isEmpty())
-        val back = look(told, follow(day, watching = "1 8 600"), at = day + 20 * hour)
+        val back = look(told, follow(day, watching = "1 8 600"), at = day + 44 * hour)
         assertTrue(back.out.isEmpty())
         assertTrue(back.ahead.isEmpty())
     }
@@ -71,7 +75,7 @@ class NewEpisodesTest {
         // Last week's episode watched on Tuesday: by Thursday's look the series stands at its credits.
         var state = look(State(), follow(day, watching = "1 6 1200"), at = day - 5 * 24 * hour)
         state = look(state, follow(day, watching = "1 7 2580"), at = day - 24 * hour)
-        val now = day + 13 * hour
+        val now = day + 37 * hour
         state = look(state, follow(day + week, watching = "1 7 2580"), at = now)
         val news = state.out.getValue(7)
         assertTrue(NewEpisodes.isNew(news, "1 7 2580", now))
@@ -81,14 +85,14 @@ class NewEpisodesTest {
     @Test
     fun watchedWithinItsGraceIsNotNews() {
         var state = look(State(), follow(day, watching = "1 7 2580"), at = day - hour)
-        state = look(state, follow(day, watching = "1 8 2400"), at = day + 9 * hour) // there early, and seen
-        state = look(state, follow(day + week, watching = "1 8 2400"), at = day + 13 * hour)
+        state = look(state, follow(day, watching = "1 8 2400"), at = day + 30 * hour) // seen the day after, before it counted as out
+        state = look(state, follow(day + week, watching = "1 8 2400"), at = day + 37 * hour)
         assertTrue(state.out.isEmpty())
     }
 
     @Test
     fun aWeekAtMost() {
-        val out = look(look(State(), follow(day), at = day - hour), follow(null), at = day + 13 * hour)
+        val out = look(look(State(), follow(day), at = day - hour), follow(null), at = day + 37 * hour)
         val news = out.out.getValue(7)
         assertTrue(NewEpisodes.isNew(news, "1 7 2580", day + week - hour))
         assertFalse(NewEpisodes.isNew(news, "1 7 2580", day + week))
@@ -97,9 +101,9 @@ class NewEpisodesTest {
 
     @Test
     fun unfollowedIsForgotten() {
-        val out = look(look(State(), follow(day), follow(day, id = 8), at = day - hour), follow(null), follow(day + week, id = 8), at = day + 13 * hour)
+        val out = look(look(State(), follow(day), follow(day, id = 8), at = day - hour), follow(null), follow(day + week, id = 8), at = day + 37 * hour)
         assertEquals(setOf(7, 8), out.out.keys)
-        val left = look(out, follow(null), at = day + 14 * hour)
+        val left = look(out, follow(null), at = day + 38 * hour)
         assertEquals(setOf(7), left.out.keys)
         assertTrue(left.ahead.isEmpty())
     }
@@ -113,7 +117,7 @@ class NewEpisodesTest {
 
     @Test
     fun keptAcrossLaunches() {
-        val state = look(look(State(), follow(day), follow(day + week, id = 8, watching = ""), at = day - hour), follow(day + week), follow(day + week, id = 8, watching = ""), at = day + 13 * hour)
+        val state = look(look(State(), follow(day), follow(day + week, id = 8, watching = ""), at = day - hour), follow(day + week), follow(day + week, id = 8, watching = ""), at = day + 37 * hour)
         val back = NewEpisodes.decode(NewEpisodes.encode(state))
         assertEquals(day, back.out[7]?.day)
         assertEquals("1 7 2580", back.out[7]?.watching)

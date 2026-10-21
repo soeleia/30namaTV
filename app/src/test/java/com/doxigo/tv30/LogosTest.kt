@@ -28,6 +28,18 @@ class LogosTest {
     }
 
     @Test
+    fun refusedLogo() {
+        val w500 = "https://image.tmdb.org/t/p/w500"
+        val refused = mutableSetOf("$w500/en-wide.png")
+        assertEquals("$w500/en-narrow.png", Tmdb.logo(images, "en") { it in refused }) // the next best in the same language
+        refused += listOf("$w500/en-narrow.png", "$w500/en-low.png")
+        assertEquals("$w500/plain.png", Tmdb.logo(images, "en") { it in refused }) // then one without words
+        assertEquals("$w500/en-wide.png", Tmdb.logo(images, "fa") { it == "$w500/fa.png" }) // Persian's only one refused: English
+        refused += "$w500/plain.png"
+        assertEquals(null, Tmdb.logo(images, "en") { it in refused })
+    }
+
+    @Test
     fun legible() {
         val clear = 0x00000000
         assertTrue(Logos.legible(intArrayOf(0xFFFFFFFF.toInt(), clear, clear))) // white lettering, mostly air
