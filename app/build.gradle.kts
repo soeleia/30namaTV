@@ -99,6 +99,8 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.3")
     implementation("com.google.zxing:core:3.5.4")
     testImplementation("junit:junit:4.13.2")
+    // Virtual time for the API gate's spacing and pauses (ApiTest).
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     // The real org.json, in place of android.jar's stubs: Translator's live check talks JSON on the JVM.
     testImplementation("org.json:json:20250517")
 }

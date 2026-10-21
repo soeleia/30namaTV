@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.webkit.WebSettings
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -27,6 +28,7 @@ import org.json.JSONObject
 import java.io.IOException
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resumeWithException
 
 /**
@@ -96,9 +98,41 @@ object Api {
     /** The server said no. Its message is always words for the screen, in the app's language. */
     class ApiError(message: String) : IOException(message)
 
+    /**
+     * Cloudflare's rate limit: HTTP 429, or its "error code: 1015" page. The host is fine and we are
+     * asking too fast, so this is waited out, never a reason to look for another host. [wait] is the
+     * Retry-After in ms, at most 10 s; 0 when there was none.
+     */
+    class Throttled(val wait: Long) : IOException("rate limited")
+
+    private val RATE_LIMITED = Regex("error code: ?1015|rate limited", RegexOption.IGNORE_CASE)
+
+    /** What a response that is not an answer (not JSON, or any 429) means: Cloudflare's rate limit, or a host that failed. */
+    internal fun notJson(code: Int, retryAfter: String?, text: String, action: String): IOException =
+        if (code == 429 || RATE_LIMITED.containsMatchIn(text)) {
+            // Retry-After may also be a date; that reads as none.
+            Throttled(retryAfter?.trim()?.toLongOrNull()?.coerceIn(0, 10)?.times(1000) ?: 0)
+        } else {
+            IOException("HTTP $code: not JSON from $action")
+        }
+
+    /** Failures that say the host itself is gone: the network, a challenge, a 5xx, a page that isn't an answer. */
+    internal fun movesHost(e: IOException) = e !is ApiError && e !is Throttled
+
+    /** The waits after a first and second rate limit, unless Retry-After asks for longer. */
+    private val BACKOFF = longArrayOf(1000, 3000)
+
+    /**
+     * Every 30nama call takes its turn here (not `test`: discovery races hosts, and each is its own).
+     * Home's signed-in start is seven calls: through two slots its Continue Watching row came 1.5 s
+     * late, and 100 ms apart its seventh could not leave before 0.6 s, so a screen gets four slots
+     * and 50 ms. The trending row's dozen searches, the burst that trips the limit, get two slots.
+     */
+    private val gate = Gate(slots = 4, backgroundSlots = 2, spacing = 50)
+
     /** Runs [action] and returns its `result`, or throws [ApiError] worded by [refusal]. */
-    suspend fun result(action: String, vararg params: Pair<String, Any?>): Any? {
-        val json = call(action, *params)
+    suspend fun result(action: String, vararg params: Pair<String, Any?>, background: Boolean = false): Any? {
+        val json = call(action, *params, background = background)
         if (!json.optBoolean("success")) throw refusal(json.message())
         return json.opt("result")
     }
@@ -129,33 +163,57 @@ object Api {
     internal fun isWrite(action: String, params: Array<out Pair<String, Any?>>) =
         action in WRITES || (action == "user_list" && params.none { it.first == "action" && it.second == "list" })
 
+    /**
+     * Calls that never go out twice on a failure that may have reached 30nama: a write could have
+     * landed before its answer was lost (a list add flips membership), and a QR sign-in spends its code.
+     */
+    internal fun sendsOnce(action: String, params: Array<out Pair<String, Any?>>) =
+        isWrite(action, params) || action == "qrlogin_login"
+
     private fun readOnly(): Boolean = runCatching {
         Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
             .invoke(null, "debug.lily.readonly") == "1"
     }.getOrDefault(false)
 
-    suspend fun call(action: String, vararg params: Pair<String, Any?>): JSONObject {
+    /** A [background] call (catalogue matching for TMDB rows) waits behind every call a screen is waiting on. */
+    suspend fun call(action: String, vararg params: Pair<String, Any?>, background: Boolean = false): JSONObject {
         // Automated emulator checks press keys blind, and a stray OK on a poster once played an
         // episode and moved real progress. `adb shell setprop debug.lily.readonly 1` makes a debug
         // build pretend every account write succeeded; release builds always write.
         if (isWrite(action, params) && BuildConfig.DEBUG && readOnly()) return JSONObject().put("success", true)
+        val once = sendsOnce(action, params)
         val host = endpoint
         return try {
-            post(host, action, params, retries = 2)
+            post(host, action, params, background, retries = if (once) 1 else 2)
         } catch (e: IOException) {
-            // What the official app does when a request gives up: find a host that answers.
-            if (e !is ApiError && rediscover(host)) post(endpoint, action, params, retries = 1) else throw e
+            // What the official app does when a request gives up: find a host that answers. A write
+            // moves the calls after it but is not sent again.
+            if (movesHost(e) && rediscover(host) && !once) post(endpoint, action, params, background, retries = 1) else throw e
         }
     }
 
-    private suspend fun post(host: String, action: String, params: Array<out Pair<String, Any?>>, retries: Int): JSONObject {
-        var attempt = 1
+    private suspend fun post(
+        host: String, action: String, params: Array<out Pair<String, Any?>>, background: Boolean, retries: Int,
+    ): JSONObject {
+        var failures = 0
+        var throttles = 0
         while (true) {
             try {
-                return postOnce(host, action, params)
+                return gate.pass(background) {
+                    try {
+                        postOnce(host, action, params)
+                    } catch (e: Throttled) {
+                        // Every call waits, not just this one: the limit counts them all. Set before
+                        // this turn ends, so the next in line does not walk into the same refusal.
+                        gate.pause(maxOf(BACKOFF[minOf(throttles, BACKOFF.lastIndex)], e.wait))
+                        throw e
+                    }
+                }
+            } catch (e: Throttled) {
+                // Turned away before 30nama saw it, so a write may go again too.
+                if (++throttles > BACKOFF.size) throw e
             } catch (e: IOException) {
-                if (e is ApiError || attempt >= retries) throw e
-                attempt++
+                if (e is ApiError || ++failures >= retries) throw e
                 delay(1000)
             }
         }
@@ -182,7 +240,8 @@ object Api {
                 if (BuildConfig.DEBUG) dump(action, text)
                 // `observer` answers 200 with no body at all.
                 if (text.isBlank() && response.isSuccessful) return@withContext JSONObject().put("success", true)
-                runCatching { JSONObject(text) }.getOrNull() ?: throw IOException("HTTP ${response.code}: not JSON from $action")
+                runCatching { JSONObject(text) }.getOrNull()?.takeIf { response.code != 429 }
+                    ?: throw notJson(response.code, response.header("Retry-After"), text, action)
             }
         }
     }
@@ -206,10 +265,11 @@ object Api {
         true
     }
 
-    // The official SDK gives `test` 15 s; a host that slow is no use to a TV anyway.
+    // The official SDK gives `test` 15 s; a host that slow is no use to a TV anyway. A host that
+    // rate-limits us is up: moving would only add to the count.
     private suspend fun ping(host: String) = runCatching {
         withTimeout(10_000) { postOnce(host, "test", emptyArray()).optBoolean("success") }
-    }.getOrDefault(false)
+    }.getOrElse { it is Throttled }
 
     private suspend fun hostList(url: String): List<String>? = runCatching {
         val text = http.newCall(Request.Builder().url("$url?t=${System.currentTimeMillis()}").build()).await()
@@ -256,8 +316,8 @@ object Api {
     suspend fun home() = result("home_stream") as JSONObject
     suspend fun single(id: Int) = result("single", "post_id" to id) as JSONObject
     suspend fun menu() = result("menu") as JSONObject
-    suspend fun search(query: String, page: Int) =
-        result("search", "query" to query, "streamonly" to true, "page" to page) as JSONObject
+    suspend fun search(query: String, page: Int, background: Boolean = false) =
+        result("search", "query" to query, "streamonly" to true, "page" to page, background = background) as JSONObject
     suspend fun archive(slugs: String, page: Int, orderBy: String) =
         result("archive", "slugs" to slugs, "streamonly" to true, "page" to page, "orderby" to orderBy, "order" to "DESC") as JSONObject
     /** What advanced_search can narrow by: {genre, country, imdb_rate: [{name, value}], min_year, max_year, …}. */
@@ -318,4 +378,80 @@ object Library {
     }
 
     fun clear() = ids.clear()
+}
+
+/**
+ * How 30nama calls take turns: at most [slots] in flight, starts [spacing] ms apart, and calls a
+ * screen waits on ahead of background ones, which start only while fewer than [backgroundSlots]
+ * calls are in flight. Cloudflare counts requests over a few seconds, not per connection, so a
+ * burst (the trending row's dozen searches) is what trips it. A [pause] after a rate limit holds
+ * every start after it until it has passed.
+ */
+internal class Gate(
+    private val slots: Int,
+    private val backgroundSlots: Int,
+    private val spacing: Long,
+    private val now: () -> Long = { System.nanoTime() / 1_000_000 },
+    // Where a turn is waited for: off the main thread, or one handed over while home draws the rows
+    // that just came in would wait for the drawing (seconds on a slow TV) to start.
+    private val context: CoroutineContext = Dispatchers.IO,
+) {
+    /** Each waiting call's turn, completed with the time it may start once let in. */
+    private val screenLine = ArrayDeque<CompletableDeferred<Long>>()
+    private val backgroundLine = ArrayDeque<CompletableDeferred<Long>>()
+    private var running = 0
+    /** The earliest the next call may start. */
+    private var next = 0L
+
+    suspend fun <T> pass(background: Boolean, f: suspend () -> T): T {
+        // Let in or put in line here, on the caller's thread, so calls keep the order a screen made
+        // them in (home's own catalogue first), start times included.
+        val turn = CompletableDeferred<Long>()
+        val start = synchronized(this) {
+            if (running < if (background) backgroundSlots else slots) {
+                letIn()
+            } else {
+                (if (background) backgroundLine else screenLine).addLast(turn)
+                null
+            }
+        }
+        var holding = start != null
+        try {
+            // Nothing to wait for: straight on, with no thread to wake (they are busy as the app starts).
+            if (start != null && start <= now()) return f()
+            return withContext(context) {
+                delay((start ?: turn.await().also { holding = true }) - now())
+                f()
+            }
+        } finally {
+            // Given up in line: out of it. Given up just as a leaving call let this one in: pass it on.
+            if (!holding) holding = synchronized(this) { !screenLine.remove(turn) && !backgroundLine.remove(turn) }
+            if (holding) leave()
+        }
+    }
+
+    // ponytail: calls already let in (their starts at most a few spacings away) go anyway; they meet
+    // the limit themselves and back off. Hold them too if a pause still lets a burst through.
+    fun pause(ms: Long) = synchronized(this) { next = maxOf(next, now() + ms) }
+
+    /** Frees a slot and lets in whoever may now go, a screen's call first. */
+    private fun leave() = synchronized(this) {
+        running--
+        while (true) {
+            val turn = when {
+                screenLine.isNotEmpty() && running < slots -> screenLine.removeFirst()
+                backgroundLine.isNotEmpty() && running < backgroundSlots -> backgroundLine.removeFirst()
+                else -> break
+            }
+            turn.complete(letIn())
+        }
+    }
+
+    /** Takes a slot and the next start time. Called holding the lock. */
+    private fun letIn(): Long {
+        running++
+        val start = maxOf(now(), next)
+        next = start + spacing
+        return start
+    }
 }

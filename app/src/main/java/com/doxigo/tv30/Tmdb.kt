@@ -128,7 +128,7 @@ object Tmdb {
         val imdb = async { runCatching { get("$kind/${item.optInt("id")}/external_ids").str("imdb_id") }.getOrNull() }
         val year = (item.str("release_date") ?: item.str("first_air_date"))?.take(4)?.toIntOrNull()
         // ponytail: searches the English name only; also try original_name if foreign titles go missing.
-        val hits = gate.withPermit { Api.search(name, 1) }.optJSONArray("posts").objects()
+        val hits = gate.withPermit { Api.search(name, 1, background = true) }.optJSONArray("posts").objects()
         val id = imdb.await()
         hits.firstOrNull { id != null && it.imdbId == id }
             ?: hits.firstOrNull { (id == null || it.imdbId == null) && it.isNamed(name, year, kind == "tv") }
