@@ -5,6 +5,8 @@ import android.animation.ValueAnimator
 import android.graphics.Bitmap
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.os.SystemClock
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -30,8 +32,21 @@ import org.json.JSONObject
  * touches the TV.
  */
 class LoginActivity : TvActivity() {
+    /** The code on the plate, while it is alive; null once it is dead, asks for a fresh one. */
     private var code: String? = null
+    /** When [code] came, on the uptime clock. */
+    private var issued = 0L
+    /** The white plate is up, with a code on it, live or not. */
+    private var shown = false
+    private var backdrop: Job? = null
+    private var checking = false
     private var polling: Job? = null
+    /** When the page last appeared or heard a key, on the uptime clock: the asking slows, then rests, from it. */
+    private var heard = 0L
+    /** Waiting out a slow pause, which a key cuts short. */
+    private var slow = false
+    /** Asking no more, the code down, until a key (see [rest]). */
+    private var resting = false
     private lateinit var status: View
     private lateinit var check: Button
     private lateinit var retry: Button
@@ -77,38 +92,107 @@ class LoginActivity : TvActivity() {
         val column = findViewById<ViewGroup>(R.id.column)
         rise(List(column.childCount) { column.getChildAt(it) } + findViewById<View>(R.id.code))
         check.requestFocus()
+    }
+
+    // The page asks only while it is seen; back in front, a code that may have died meanwhile
+    // makes way for a fresh one. A sign-in that has landed (the page only opens without a
+    // session) sees its welcome through either way.
+    override fun onStart() {
+        super.onStart()
+        if (!Api.loggedIn) wake()
+    }
+
+    override fun onStop() {
+        if (!Api.loggedIn) {
+            polling?.cancel()
+            code = null
+            showChecking(false)
+        }
+        super.onStop()
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val leaving = event.keyCode == KeyEvent.KEYCODE_BACK || event.keyCode == KeyEvent.KEYCODE_ESCAPE
+        if (event.action != KeyEvent.ACTION_DOWN || leaving || Api.loggedIn) return super.dispatchKeyEvent(event)
+        // At rest a key's one job is a fresh code: it neither presses nor moves anything.
+        if (resting) {
+            wake()
+            return true
+        }
+        heard = SystemClock.elapsedRealtime()
+        if (slow) poll(now = false) // the quick asks again, from now
+        return super.dispatchKeyEvent(event)
+    }
+
+    /** In front again, or a key at rest: the quick asks from now, on a fresh code if the last one went. */
+    private fun wake() {
+        resting = false
+        heard = SystemClock.elapsedRealtime()
+        findViewById<View>(R.id.qr_rest).reveal(false)
         poll(now = true)
     }
 
+    /**
+     * Asks on [QrCode.pause]'s schedule: as often as the official app for a while after the page
+     * appears or hears a key, then less often, then not at all (see [rest]), so a TV left on the
+     * sign-in never keeps asking. A dead code gives way to a fresh one first, so neither the
+     * asking nor «بررسی دوباره» ever spends a turn on one. The official app stops after a minute
+     * and leaves it to the button; its codes then die under a TV that still shows them.
+     */
     private fun poll(now: Boolean) {
         polling?.cancel()
+        slow = false
         polling = lifecycleScope.launch {
-            if (code == null && !loadCode()) return@launch
-            showChecking(true)
-            // The official app checks every 5 s for a minute, then waits for "check now".
-            repeat(12) { i ->
-                if (i > 0 || !now) delay(5_000)
+            var wait = !now
+            while (true) {
+                if (wait) {
+                    val pause = QrCode.pause(SystemClock.elapsedRealtime() - heard) ?: return@launch rest()
+                    slow = pause > QrCode.FAST
+                    delay(pause)
+                    slow = false
+                }
+                wait = true
+                if (!QrCode.alive(code, issued, SystemClock.elapsedRealtime()) && !loadCode()) return@launch
+                showChecking(true)
                 if (signIn()) return@launch
             }
-            showChecking(false)
         }
     }
 
-    /** The code onto its plate: a spinner on the dark plate while it comes, why not if it doesn't. */
+    /**
+     * The code onto its plate: a spinner on the dark plate while the first comes, why not if it
+     * doesn't. A fresh code takes a dead one's place on the white plate, the old fading as it
+     * is asked for and the new one rising in.
+     */
     private suspend fun loadCode(): Boolean {
+        code = null
         if (retry.hasFocus()) check.requestFocus() // the retry is about to go
         failure.visibility = View.GONE
-        spinner.visibility = View.VISIBLE
-        if (!Api.initialize()) return failed(getString(R.string.no_internet))
-        lifecycleScope.launch { showBackdrop() }
-        val qr = runCatching { Api.qrCode() as JSONObject }.getOrElse { return failed(errorText(it)) }
-        val code = qr.str("code") ?: return failed(getString(R.string.error_server))
+        val qr = findViewById<ImageView>(R.id.qr)
+        val url = findViewById<TextView>(R.id.url)
+        if (shown) for (v in listOf(qr, url)) v.animate().alpha(0f).setInterpolator(Motion.easeOut).setDuration(Motion.EXIT).start()
+        else spinner.visibility = View.VISIBLE
+        if (!shown && !Api.initialize()) return failed(getString(R.string.no_internet))
+        if (backdrop == null) backdrop = lifecycleScope.launch { showBackdrop() }
+        val answer = runCatching { Api.qrCode() as JSONObject }.getOrElse { return failed(errorText(it)) }
+        val code = answer.str("code") ?: return failed(getString(R.string.error_server))
         // The Tizen client's fallback, should the server leave the address out.
-        val url = qr.str("url") ?: "https://30nama.com/auth/$code"
+        val address = answer.str("url") ?: "https://30nama.com/auth/$code"
         this.code = code
-        findViewById<TextView>(R.id.url).text = url.removePrefix("https://")
-        findViewById<ImageView>(R.id.qr).setImageBitmap(qrBitmap(url, resources.getDimensionPixelSize(R.dimen.login_qr)))
-        // The white plate comes up over the dark one, the address with it.
+        issued = SystemClock.elapsedRealtime()
+        url.text = address.removePrefix("https://")
+        qr.setImageBitmap(qrBitmap(address, resources.getDimensionPixelSize(R.dimen.login_qr)))
+        if (shown) {
+            val from = if (Motion.reduced) 1f else .96f
+            qr.scaleX = from
+            qr.scaleY = from
+            for (v in listOf(qr, url)) v.animate().alpha(1f).scaleX(1f).scaleY(1f).setInterpolator(Motion.easeOut).setDuration(Motion.ENTER).start()
+            return true
+        }
+        // The white plate comes up over the dark one, the address with it (whole again, should a
+        // failed swap have left them faded).
+        shown = true
+        for (v in listOf(qr, url)) v.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(0).start()
         spinner.visibility = View.GONE
         findViewById<View>(R.id.qr_frame).animate().alpha(1f).setInterpolator(Motion.easeOut).setDuration(Motion.ENTER).start()
         findViewById<View>(R.id.address).reveal(true)
@@ -120,11 +204,32 @@ class LoginActivity : TvActivity() {
         // A superseded attempt (another press, or the page closing) reads as a failure to the
         // runCatching under it; it leaves the plate to the attempt that replaced it.
         currentCoroutineContext().ensureActive()
+        showChecking(false)
         spinner.visibility = View.GONE
+        plateDown()
         findViewById<TextView>(R.id.qr_error_text).text = reason
         failure.reveal(true)
         retry.requestFocus()
         return false
+    }
+
+    /** Long without a key, the code steps down and the asking stops, the dark plate saying a key brings a fresh one. */
+    private fun rest() {
+        resting = true
+        code = null
+        showChecking(false)
+        plateDown()
+        findViewById<View>(R.id.qr_rest).reveal(true)
+    }
+
+    /** A dead code never stays up to be scanned: the white plate fades to the dark one, the address with it (its place held). */
+    private fun plateDown() {
+        if (!shown) return
+        shown = false
+        findViewById<View>(R.id.qr_frame).animate().alpha(0f).setInterpolator(Motion.easeOut).setDuration(Motion.EXIT).start()
+        findViewById<View>(R.id.address).run {
+            animate().alpha(0f).setInterpolator(Motion.easeOut).setDuration(Motion.EXIT).withEndAction { visibility = View.INVISIBLE }.start()
+        }
     }
 
     /** As on the Tizen client, the wall behind the sign-in is what 30nama features right now. */
@@ -135,6 +240,7 @@ class LoginActivity : TvActivity() {
 
     private suspend fun signIn(): Boolean {
         val response = runCatching { Api.qrLogin(code!!) }.getOrNull() ?: return false
+        if (QrCode.expired(response)) code = null // the next turn asks for a fresh one
         val token = response.takeIf { it.optBoolean("success") }?.str("result", "token") ?: return false
         Api.token = token
         runCatching { Api.user() }.getOrNull()?.takeIf { it.optBoolean("success") }?.let { Api.user = it.optJSONObject("result") }
@@ -153,6 +259,8 @@ class LoginActivity : TvActivity() {
     }
 
     private fun showChecking(checking: Boolean) {
+        if (checking == this.checking) return // the light keeps its breath
+        this.checking = checking
         status.animate().alpha(if (checking) 1f else 0f).setInterpolator(Motion.easeOut)
             .setDuration(if (checking) Motion.ENTER else Motion.EXIT).start()
         breathing?.cancel()
@@ -184,4 +292,32 @@ class LoginActivity : TvActivity() {
         /** One breath of the status light, in or out. */
         const val BREATH = 1100L
     }
+}
+
+/** A sign-in code's life on 30nama: how long it lasts, the answer that says it is over, and how often to ask after it. */
+internal object QrCode {
+    /** Between asks while the page is fresh, as the official app spaces them ... */
+    const val FAST = 5_000L
+    /** ... for this long after it appears or hears a key ... */
+    const val FAST_FOR = 2 * 60_000L
+    /** ... then this, ... */
+    const val SLOW = 25_000L
+    /** ... until this long without a key, when the page rests. */
+    const val REST_AFTER = 10 * 60_000L
+
+    /** The wait before the next ask, [idle] ms after the page appeared or last heard a key; null: rest. */
+    fun pause(idle: Long): Long? = when {
+        idle < FAST_FOR -> FAST
+        idle < REST_AFTER -> SLOW
+        else -> null
+    }
+
+    /** Unverified: rival clients' figure, not yet measured against 30nama. */
+    const val LIFETIME = 60_000L
+
+    /** Whether [code], given at [issued], can still be asked about at [now] (both on the uptime clock). */
+    fun alive(code: String?, issued: Long, now: Long) = code != null && now - issued < LIFETIME
+
+    /** 30nama's answer to a code it no longer knows. Unverified: a guess at its wording, never yet seen. */
+    fun expired(answer: JSONObject) = !answer.optBoolean("success") && answer.str("msg")?.contains("expire", ignoreCase = true) == true
 }

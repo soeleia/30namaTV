@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.json.JSONObject
 import org.junit.Test
 import java.io.IOException
 import java.net.SocketTimeoutException
@@ -165,5 +166,46 @@ class ApiTest {
         launch { gate.pass(background = true) { ran += "last" } }
         advanceUntilIdle()
         assertEquals(listOf("queued", "last"), ran)
+    }
+
+    @Test
+    fun aQueryTurnedAwayAsShortIsNoResults() {
+        assertTrue(Api.tooShort(Api.ApiError("server", "search cannot be empty")))
+        assertTrue(Api.tooShort(Api.ApiError("server", "Search cannot be empty.")))
+        assertFalse(Api.tooShort(Api.ApiError("session", "login required")))
+        assertFalse(Api.tooShort(Api.ApiError("server")))
+        assertFalse(Api.tooShort(java.io.IOException("search cannot be empty"))) // only the server's refusal
+    }
+
+    @Test
+    fun aSignInCodeIsAskedAboutOnlyWhileItLives() {
+        assertFalse(QrCode.alive(null, 0, 0)) // none yet, or dropped
+        assertTrue(QrCode.alive("abc", 1_000, 1_000))
+        assertTrue(QrCode.alive("abc", 1_000, 1_000 + QrCode.LIFETIME - 1))
+        assertFalse(QrCode.alive("abc", 1_000, 1_000 + QrCode.LIFETIME))
+    }
+
+    @Test
+    fun anUnscannedCodeIsNotADeadOne() {
+        assertFalse(QrCode.expired(JSONObject("""{"success":false,"msg":"CODE_NOT_USED"}""")))
+        assertFalse(QrCode.expired(JSONObject("""{"success":true,"result":{"token":"t"}}""")))
+        assertFalse(QrCode.expired(JSONObject()))
+    }
+
+    @Test
+    fun theSignInAsksQuicklyThenSlowlyThenRests() {
+        assertEquals(QrCode.FAST, QrCode.pause(0)) // just appeared, or a key
+        assertEquals(QrCode.FAST, QrCode.pause(QrCode.FAST_FOR - 1))
+        assertEquals(QrCode.SLOW, QrCode.pause(QrCode.FAST_FOR))
+        assertEquals(QrCode.SLOW, QrCode.pause(QrCode.REST_AFTER - 1))
+        assertEquals(null, QrCode.pause(QrCode.REST_AFTER))
+        // A TV left on the page asks a bounded number of times before it rests.
+        var idle = 0L
+        var asks = 0
+        while (true) {
+            idle += QrCode.pause(idle) ?: break
+            asks++
+        }
+        assertTrue("asked $asks times", asks in 30..60)
     }
 }

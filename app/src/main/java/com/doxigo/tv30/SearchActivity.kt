@@ -42,6 +42,7 @@ import androidx.leanback.widget.VerticalGridPresenter
 import androidx.leanback.widget.VerticalGridView
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.delay
+import org.json.JSONObject
 import java.util.Locale
 
 class SearchActivity : TvActivity() {
@@ -503,7 +504,7 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
      * loses its spaces). Opening a result keeps its query among the recent searches.
      */
     private fun search(text: String, debounce: Boolean) {
-        val q = text.trim().takeIf { it.length >= 2 }.orEmpty()
+        val q = searchQuery(text)
         if (q == query) {
             if (!debounce && waitingForTyping) {
                 waitingForTyping = false
@@ -548,7 +549,8 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
                 delay(600)
                 waitingForTyping = false
             }
-            if (q.isEmpty()) Api.archive("suggested", page, "relevant") else Api.search(q, page)
+            if (q.isEmpty()) Api.archive("suggested", page, "relevant")
+            else runCatching { Api.search(q, page) }.getOrElse { if (Api.tooShort(it)) JSONObject() else throw it }
         }
         this.pager = pager
         title(getString(if (q.isEmpty()) R.string.suggested else R.string.search_results))
@@ -564,6 +566,16 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
         const val KEYS = "اآبپتثجچحخدذرزژسشصضطظعغفقکگلمنوهیءئؤ۱۲۳۴۵۶۷۸۹۰"
     }
 }
+
+/**
+ * Letters a query takes before it is searched; under that, the page offers the suggestions.
+ * Unverified: rival clients say 30nama turns away queries under 3 (see [Api.tooShort]); until
+ * that is measured the app keeps its 2, and a refusal shows as no results.
+ */
+internal const val MIN_QUERY = 2
+
+/** What [text] searches for: itself, trimmed, or "" for the suggestions while it is shorter than [MIN_QUERY]. */
+internal fun searchQuery(text: String) = text.trim().takeIf { it.length >= MIN_QUERY }.orEmpty()
 
 /** The end of the recent searches: forget them. */
 private object ClearRecents

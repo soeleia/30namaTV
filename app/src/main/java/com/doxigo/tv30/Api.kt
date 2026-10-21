@@ -95,8 +95,11 @@ object Api {
         }
     }
 
-    /** The server said no. Its message is always words for the screen, in the app's language. */
-    class ApiError(message: String) : IOException(message)
+    /** The server said no. Its message is always words for the screen, in the app's language; [reason] is the server's own. */
+    class ApiError(message: String, val reason: String? = null) : IOException(message)
+
+    /** 30nama turns a query away as too short where it could have found nothing (wording unverified: rival clients'). */
+    internal fun tooShort(e: Throwable) = (e as? ApiError)?.reason?.contains("search cannot be empty", ignoreCase = true) == true
 
     /**
      * Cloudflare's rate limit: HTTP 429, or its "error code: 1015" page. The host is fine and we are
@@ -142,7 +145,7 @@ object Api {
      * required"), so it is shown only as a Persian sentence on a Persian screen, which is 30nama's
      * own copy; anything else gets the app's words. Never an action name.
      */
-    private fun refusal(msg: String?) = ApiError(refusalText(msg, language, loggedIn, ::localized))
+    private fun refusal(msg: String?) = ApiError(refusalText(msg, language, loggedIn, ::localized), msg)
 
     internal fun refusalText(msg: String?, language: String, loggedIn: Boolean, text: (Int) -> String): String = when {
         msg != null && msg.contains("login required", ignoreCase = true) ->

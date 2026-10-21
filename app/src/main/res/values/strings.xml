@@ -48,6 +48,7 @@
     <string name="login_instructions">پس از تأیید ورود در وب‌سایت، تلویزیون خودش وارد می‌شود. اگر نشد، «بررسی دوباره» را بزنید.</string>
     <string name="check_now">بررسی دوباره</string>
     <string name="checking">در حال بررسی…</string>
+    <string name="login_code_rest">برای کد تازه، دکمهٔ OK را بزنید.</string>
     <string name="enter_as_guest">ورود به‌عنوان مهمان</string>
 
     <string name="watch">تماشا</string>

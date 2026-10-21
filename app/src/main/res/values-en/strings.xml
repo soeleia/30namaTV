@@ -42,6 +42,7 @@
     <string name="login_instructions">After scanning the QR code and confirming the sign-in on the website, press Check now.</string>
     <string name="check_now">Check now</string>
     <string name="checking">Checking…</string>
+    <string name="login_code_rest">Press OK for a new code.</string>
     <string name="enter_as_guest">Enter as guest</string>
 
     <string name="watch">Watch now</string>

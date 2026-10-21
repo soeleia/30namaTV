@@ -188,6 +188,18 @@
                 android:indeterminate="true"
                 android:indeterminateTint="@color/brand" />
 
+            <!-- Ten minutes without a key, the code steps down and the TV stops asking; any key
+                 brings a fresh one. A calm line, not a failure: no title, no button. -->
+            <TextView
+                android:id="@+id/qr_rest"
+                android:layout_width="@dimen/login_qr"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:text="@string/login_code_rest"
+                android:textAppearance="@style/TextAppearance.App.Body"
+                android:visibility="gone" />
+
             <!-- Fixed to the code's size: a lone match_parent child would stretch the frame. -->
             <LinearLayout
                 android:id="@+id/qr_error"

@@ -39,4 +39,14 @@ class RecentsTest {
         assertEquals(listOf("dune"), Recents.push(listOf("dune"), "  "))
         assertEquals(listOf("the bear"), Recents.push(emptyList(), "the\nbear"))
     }
+
+    @Test
+    fun shortQueriesShowTheSuggestions() {
+        assertEquals("", searchQuery(""))
+        assertEquals("", searchQuery(" d "))
+        assertEquals("", searchQuery("ب"))
+        assertEquals("du", searchQuery(" du"))
+        assertEquals("با", searchQuery("با "))
+        assertEquals("dune", searchQuery("dune"))
+    }
 }
