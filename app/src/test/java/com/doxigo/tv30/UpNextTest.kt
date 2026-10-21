@@ -1,5 +1,6 @@
 package com.doxigo.tv30
 
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -30,6 +31,28 @@ class UpNextTest {
     fun noEndMark() {
         assertEquals(0 to 2_900L, upNext(listOf(null, 2_640L), 0, 2_900))
         assertEquals(-1 to 300L, upNext(ends, -1, 300)) // a saved file the list no longer has
+    }
+
+    @Test
+    fun nextAfterAFinishedEpisode() {
+        assertEquals(2, nextFile(1 to 2_640L, ends)) // past the credits: the next one
+        assertEquals(2, nextFile(0 to 2_600L, ends) { it == 1 }) // the one after already seen: on to the first that isn't
+        assertNull(nextFile(1 to 1_200L, ends)) // still being watched
+        assertNull(nextFile(2 to 2_750L, ends)) // a finale starts over: nothing next
+        assertNull(nextFile(0 to 7_000L, listOf(6_900L))) // a film
+        assertNull(nextFile(0 to 2_900L, listOf(null, 2_640L))) // no mark and no length: not known to be seen
+        assertNull(nextFile(null, ends))
+    }
+
+    @Test
+    fun nextByWhereThisTvLeftIt() {
+        // The server's point lags, back at the start of the episode; this TV left it in the credits.
+        val ids = listOf("a", "b", "c")
+        val saved = JSONObject("""{"file_id":"b","time":30}""")
+        assertEquals(2, nextFile(Watched.resumePoint(ids, saved, "b 2650"), ends))
+        assertNull(nextFile(Watched.resumePoint(ids, saved, null), ends))
+        // Watched further on another device since: its next, not this TV's.
+        assertNull(nextFile(Watched.resumePoint(ids, JSONObject("""{"file_id":"c","time":900}"""), "b 2650"), ends))
     }
 
     @Test

@@ -2,4 +2,5 @@
 <resources>
     <string name="player_ends_at">Ends at %s</string>
     <string name="upnext_play">Next episode: %s</string>
+    <string name="new_episode">New episode</string>
 </resources>

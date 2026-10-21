@@ -104,6 +104,10 @@ object Watched {
         prefs(context).edit().putString("left.$postId", "$id $at").apply()
     }
 
+    /** Whether the file this TV last left [postId] in ([leave]) counts as seen. */
+    fun leftSeen(context: Context, postId: Int) =
+        prefs(context).getString("left.$postId", null)?.substringBefore(' ')?.let { history(context)[it]?.done } == true
+
     /** [resumePoint] for [postId]'s [files], the server's [saved] point against this TV's own. */
     fun resumePoint(context: Context, postId: Int, files: List<JSONObject>, saved: JSONObject?) =
         resumePoint(files.map { it.str("info", "file_id") }, saved, prefs(context).getString("left.$postId", null))
@@ -125,5 +129,16 @@ object Watched {
 
     /** Play's file and second ([upNext]) by this history: where each file counts as seen, and which were. */
     fun upNext(context: Context, files: List<JSONObject>, index: Int, seconds: Long) =
-        upNext(files.map { line(it.endMark, of(context, it)?.duration ?: 0) }, index, seconds) { of(context, files[it])?.done == true }
+        upNext(ends(context, files), index, seconds) { of(context, files[it])?.done == true }
+
+    private fun ends(context: Context, files: List<JSONObject>) = files.map { line(it.endMark, of(context, it)?.duration ?: 0) }
+
+    /**
+     * The file of [postId]'s [files] it goes on to from where it was left ([nextFile]), the server's
+     * [saved] point folded in first as the player folds it, so the two agree; null for none.
+     */
+    fun next(context: Context, postId: Int, files: List<JSONObject>, saved: JSONObject?): JSONObject? {
+        seed(context, files, saved)
+        return nextFile(resumePoint(context, postId, files, saved), ends(context, files)) { of(context, files[it])?.done == true }?.let(files::get)
+    }
 }

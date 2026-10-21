@@ -19,6 +19,17 @@ fun upNext(ends: List<Long?>, resumeIndex: Int, resumeSeconds: Long, seen: (Int)
     return if (next < ends.size) next to 0L else resumeIndex to 0L
 }
 
+/**
+ * The file a title left at [point] (an index into its files and a second, Watched.resumePoint) goes
+ * on to: [upNext]'s, when that is another file. Null when the point stands, or starts over (a film,
+ * a finale): only a finished episode with one after it has a next. The launcher's Play Next row
+ * offers it, so the row says what Play then plays.
+ */
+fun nextFile(point: Pair<Int, Long>?, ends: List<Long?>, seen: (Int) -> Boolean = { false }): Int? {
+    val (index, seconds) = point ?: return null
+    return upNext(ends, index, seconds, seen).first.takeIf { it != index }
+}
+
 /** "HH:MM:SS" (or "MM:SS") as seconds, the way the `stream` answer writes its marks. */
 fun seconds(hms: String): Long? {
     val parts = hms.split(':').map { it.trim().toLongOrNull() ?: return null }

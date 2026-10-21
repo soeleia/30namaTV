@@ -161,6 +161,19 @@ private const val MDL_BLUE = 0xFF1675B6.toInt()
 fun JSONObject.facts(context: Context): CharSequence = metaLine(context, rating(context, bare = true), year, gap = 0.6f)
 
 /**
+ * A continue poster's caption while its series has an episode out that its viewer has not gone
+ * back to (NewEpisodes), in place of the time left: «● قسمت تازه», "● New episode". The dot is
+ * the rail's update dot, 30nama red at 6dp, which says something waits there; the words keep the
+ * caption's own tone, so the mark stays as quiet as the line it replaces.
+ */
+fun newEpisodeCaption(context: Context): CharSequence = metaLine(
+    context,
+    SpannableStringBuilder().append(" ", Dot(context), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        .append(" ", Gap(0.35f), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        .append(context.getString(R.string.new_episode)),
+)
+
+/**
  * When an airing series' next episode comes, while that is still ahead: «قسمت بعد: شنبه ۲۵ مهر»,
  * "Next episode: Saturday, October 17". The day is the server's, Jalali in Persian and Gregorian
  * in English. Its caption joins in only when it names the episode; it mostly says «قسمت بعدی».
@@ -384,6 +397,21 @@ private class Glyph(context: Context, @DrawableRes id: Int) : ReplacementSpan() 
         icon.setTint(paint.color)
         icon.draw(canvas)
     }
+}
+
+/** [newEpisodeCaption]'s dot: 6dp across on whole pixels, on [Digits]' middle as the chips are. */
+private class Dot(context: Context) : ReplacementSpan() {
+    private val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = ContextCompat.getColor(context, R.color.red) }
+    private val size = (6 * context.resources.displayMetrics.density).roundToInt()
+    private val digits = Digits(context)
+
+    override fun getSize(paint: Paint, text: CharSequence, start: Int, end: Int, fm: Paint.FontMetricsInt?): Int {
+        fm?.let(paint::getFontMetricsInt)
+        return size
+    }
+
+    override fun draw(canvas: Canvas, text: CharSequence, start: Int, end: Int, x: Float, top: Int, y: Int, bottom: Int, paint: Paint) =
+        canvas.drawCircle(x.roundToInt() + size / 2f, (y + digits.middle(paint.textSize)).roundToInt().toFloat(), size / 2f, ink)
 }
 
 /** The hairline between a line's two groups: 1 dp on whole pixels, 0.9 em tall on [Digits]' middle. */

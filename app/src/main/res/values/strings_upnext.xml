@@ -5,4 +5,7 @@
     <string name="player_ends_at">پایان ساعت %s</string>
     <!-- The title page's Play once the saved episode is past its credits: «قسمت بعد: فصل ۱، قسمت ۶». -->
     <string name="upnext_play">قسمت بعد: %s</string>
+    <!-- A followed series has an episode out its viewer has not gone back to (NewEpisodes): a
+         continue poster's caption after the red dot, and the launcher's Play Next row. -->
+    <string name="new_episode">قسمت تازه</string>
 </resources>

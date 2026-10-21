@@ -69,13 +69,15 @@ class MainActivity : TvActivity() {
         setContentView(R.layout.rail_screen)
         if (savedInstanceState == null) supportFragmentManager.beginTransaction().replace(R.id.browse_host, HomeFragment()).commit()
         rail = Rail(this, Rail.Section.HOME) { home?.mainFragment?.view }
-        // From the launcher's Play Next row (WatchNext): straight into the player, with home
-        // loading behind it for Back. The intro would only play unseen under the player.
+        // From the launcher's Play Next row (WatchNext): straight into the player, on the row's
+        // episode if it names one, or a followed series' page, with home loading behind it for
+        // Back. The intro would only play unseen under them.
         val play = if (savedInstanceState == null) intent.getIntExtra(WatchNext.EXTRA_PLAY, 0) else 0
-        if (play != 0) {
-            Intro.shown = true
-            startActivity(PlayerActivity.intent(this, play, intent.getBooleanExtra(WatchNext.EXTRA_FREE, false), title = intent.getStringExtra(WatchNext.EXTRA_TITLE)?.let(::JSONObject)))
-        }
+        val details = if (savedInstanceState == null) intent.getStringExtra(WatchNext.EXTRA_DETAILS) else null
+        if (play != 0) startActivity(PlayerActivity.intent(this, play, intent.getBooleanExtra(WatchNext.EXTRA_FREE, false),
+            intent.getStringExtra(WatchNext.EXTRA_FILE), intent.getStringExtra(WatchNext.EXTRA_TITLE)?.let(::JSONObject)))
+        else details?.let { openDetails(JSONObject(it)) }
+        if (play != 0 || details != null) Intro.shown = true
         // The first home of the process opens on the intro, which plays while home loads.
         if (!Intro.shown) {
             Intro.shown = true
@@ -394,7 +396,7 @@ class HomeFragment : BrowseSupportFragment() {
                 if (Api.loggedIn) {
                     launch { loadUser() }
                     launch { runCatching { Library.load() } }
-                    launch { loadContinueWatching() }
+                    launch { if (loadContinueWatching()) lookForEpisodes() }
                     launch { loadWatchlist() }
                 }
                 launch { runCatching { Api.home() }.onSuccess { keep(HomeCache.HOME, it); showHome(it) } }
@@ -440,7 +442,11 @@ class HomeFragment : BrowseSupportFragment() {
             if (Api.loggedIn) {
                 launch { loadUser(); showLists() }
                 launch { runCatching { Library.load() } }
-                launch { loadContinueWatching(); keepFirstRow() }
+                launch {
+                    val loaded = loadContinueWatching()
+                    keepFirstRow()
+                    if (loaded) lookForEpisodes()
+                }
                 launch { loadWatchlist() }
             }
             home.await().onSuccess { keep(HomeCache.HOME, it); showHome(it) }.onFailure { context?.toast(it) }
@@ -603,35 +609,62 @@ class HomeFragment : BrowseSupportFragment() {
     /** The continue row's last answer, as the server sent it; what shows leaves out [dismissed] titles. */
     private var watching = JSONArray()
 
-    /** A failed fetch keeps what is there; one from the last run is replaced as soon as this answers, as progress moves. */
-    private suspend fun loadContinueWatching() {
-        val result = runCatching { Api.continueWatching() }.getOrNull() ?: return
-        val context = context ?: return
+    /** A failed fetch keeps what is there, and says so (false); one from the last run is replaced as soon as this answers, as progress moves. */
+    private suspend fun loadContinueWatching(): Boolean {
+        val result = runCatching { Api.continueWatching() }.getOrNull() ?: return false
+        val context = context ?: return false
         val posts = (result as? JSONObject)?.optJSONArray("posts") ?: result as? JSONArray ?: JSONArray()
         // Gone from the server's list too: watched again later, a title may come back.
         dismissed.retainAll(posts.objects().map { it.titleId }.toSet())
         showContinueWatching(posts)
         mirror(context)
+        return true
     }
+
+    /** The notify list's series as last fetched: with the row's, what NewEpisodes looks at, and the launcher's news of them (WatchNext). */
+    private var following = emptyList<JSONObject>()
+
+    /**
+     * Whether the followed series have an episode out (NewEpisodes), at launch and with every
+     * refresh: the notify list fetched again and looked at with the row, which then says so, and
+     * the launcher's row with it. A failed fetch looks again next time.
+     */
+    // ponytail: the notify list's first page, its latest additions; page on if someone follows more series than that.
+    private suspend fun lookForEpisodes() {
+        val list = runCatching { Api.userList("notify", 1, "add_list") }.getOrNull() ?: return
+        val context = context ?: return
+        following = list.optJSONArray("posts").objects()
+        NewEpisodes.look(context, shown() + following)
+        showContinueWatching(watching)
+        mirror(context)
+    }
+
+    private fun shown() = watching.objects().filter { it.titleId !in dismissed }
 
     /** The row as it shows, kept for the next launch and mirrored on the launcher's Play Next row (WatchNext). */
     private fun mirror(context: Context) {
-        val shown = JSONArray(watching.objects().filter { it.titleId !in dismissed })
-        keep(HomeCache.WATCHING, shown)
+        val shown = shown()
+        keep(HomeCache.WATCHING, JSONArray(shown))
+        // The launcher's words in the app's language, which the activity's configuration carries and the application's does not.
+        val app = context.applicationContext.createConfigurationContext(context.resources.configuration)
         // Api.scope, so leaving home mid-sync can't cut it short.
-        Api.scope.launch { WatchNext.sync(context.applicationContext, shown.objects()) }
+        Api.scope.launch { WatchNext.sync(app, shown, following) }
     }
 
     private suspend fun showContinueWatching(posts: JSONArray) {
         val context = context ?: return
         watching = posts
+        // Here, not below: NewEpisodes is the main thread's.
+        val news = posts.objects().filter { NewEpisodes.of(context, it) != null }.mapTo(HashSet()) { it.titleId }
         val cards = withContext(Dispatchers.Default) {
             posts.objects().filter { it.titleId !in dismissed }.map { t ->
                 // data: {episode_title: "فصل 1 - قسمت 4", display_time: "00:33:00", progress, ...}. The
                 // red bar already says how far in, so the line names only the episode: «فصل ۱، قسمت ۴».
+                // A series with an episode out says that instead of the time left.
                 val where = t.str("data", "episode_title")?.episodeLabel()
                 val progress = t.str("data", "progress")?.toFloatOrNull()?.div(100)
-                t.toCard(context, lead = where, progress = progress, left = t.timeLeft(context), caption = t.shortTimeLeft(context), onLongClick = { confirmDismiss(t) }) {
+                val caption = if (t.titleId in news) newEpisodeCaption(context) else t.shortTimeLeft(context)
+                t.toCard(context, lead = where, progress = progress, left = t.timeLeft(context), caption = caption, onLongClick = { confirmDismiss(t) }) {
                     startActivity(PlayerActivity.intent(context, t.titleId, t.isFree, title = t))
                 }
             }
@@ -754,8 +787,9 @@ fun forgetSession(context: android.content.Context) {
     Api.user = null
     Library.clear()
     Api.scope.launch { WatchNext.clear(context.applicationContext) }
-    // The home kept for the next launch (HomeFragment.KEPT) and the watched episodes are this
-    // account's: they go with it.
+    // The home kept for the next launch (HomeFragment.KEPT), the watched episodes and the followed
+    // series' news are this account's: they go with it.
     context.applicationContext.filesDir.resolve("home").deleteRecursively()
     Watched.clear(context.applicationContext)
+    NewEpisodes.clear(context.applicationContext)
 }

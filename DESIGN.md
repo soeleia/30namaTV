@@ -232,7 +232,7 @@ Motion is the second craft bar. One set of curves (a strong ease-out that moves 
 A near-black neutral ladder, white glass controls, and three borrowed marks (30nama red, "free" green, IMDb yellow), each confined to one meaning.
 
 ### Primary
-- **30nama Red** (brand-red): the one accent. Watched progress (playback and card progress bars), the rail's current-page mark (a 3 × 16dp bar), 30nama's own marks, sign-in steps, the status light, the update dot (a dot, never a bar: on home's update notice and on the rail's Settings icon), the done check and the player's loading indicator. As a fill it carries white text (4.8:1). Never a large area, never body text.
+- **30nama Red** (brand-red): the one accent. Watched progress (playback and card progress bars), the rail's current-page mark (a 3 × 16dp bar), 30nama's own marks, sign-in steps, the status light, the update dot (a dot, never a bar: on home's update notice and on the rail's Settings icon, and the same 6dp dot before «قسمت تازه» on a continue poster), the done check and the player's loading indicator. As a fill it carries white text (4.8:1). Never a large area, never body text.
 
 ### Secondary
 - **Free Green** (free-green): the «رایگان» badge on artwork and the Free plan's mark. Ink on it. It means "free" and nothing else.
@@ -332,7 +332,7 @@ White glass that turns solid white under the remote: quiet and sure under a 38sp
 - **Value chip (Settings):** a 28dp pill, surface-high at rest, ink at 12% on the focused white row.
 
 ### Cards / Containers
-- **Poster card:** artwork with its caption always shown beneath (title, then IMDb score and year); no plate, no background. 6dp corners. The caption's score mark is bare: the word «IMDb» alone in IMDb yellow at the badge's word size (0.8em), no box, the score 0.25em after it and the year 0.6em after that, in both languages. A filled badge under every card of a row read louder than the titles above it; the box stays for the billboard, the title page and the player, where one mark leads the line. MAL and MDL marks, whose blues are too dark to read bare on ink, are lifted 45% toward white. Focus: a 3dp white ring drawn inside the art's edge, fading in over 150ms, plus a 1.08 lift. Art fades in over 240ms only when it arrives off network or disk.
+- **Poster card:** artwork with its caption always shown beneath (title, then IMDb score and year); no plate, no background. 6dp corners. The caption's score mark is bare: the word «IMDb» alone in IMDb yellow at the badge's word size (0.8em), no box, the score 0.25em after it and the year 0.6em after that, in both languages. A filled badge under every card of a row read louder than the titles above it; the box stays for the billboard, the title page and the player, where one mark leads the line. MAL and MDL marks, whose blues are too dark to read bare on ink, are lifted 45% toward white. A Continue Watching poster's caption is its time left instead («۸ دقیقه مانده»), and while its series has an episode out that the viewer has not gone back to, «● قسمت تازه» / "● New episode": the rail's 6dp red update dot on the digits' middle, 0.35em before the words in the caption's own grey, so the news is a mark and the line stays as quiet as the one it replaces. Focus: a 3dp white ring drawn inside the art's edge, fading in over 150ms, plus a 1.08 lift. Art fades in over 240ms only when it arrives off network or disk.
 - **Panel / sheet:** surface (#1F1F1F) at 20dp radius, 12dp inner pad, no border, no shadow.
 
 ### Inputs / Fields

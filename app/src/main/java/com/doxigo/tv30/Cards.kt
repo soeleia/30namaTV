@@ -50,7 +50,7 @@ import org.json.JSONObject
  * Continue Watching's does.
  */
 fun JSONObject.toCard(
-    context: Context, lead: String? = null, progress: Float? = null, left: String? = null, caption: String? = left,
+    context: Context, lead: String? = null, progress: Float? = null, left: String? = null, caption: CharSequence? = left,
     onLongClick: (() -> Unit)? = { (context as? FragmentActivity)?.quickActions(this) }, onClick: () -> Unit,
 ) = Card(englishName, meta(context, lead, left), poster, plot = plot, backdrop = cover, localTitle = localName, source = this,
     facts = caption ?: facts(context), progress = progress, free = isFree, onLongClick = onLongClick, onClick = onClick)
