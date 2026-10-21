@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.text.Layout
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.TextPaint
@@ -107,6 +108,7 @@ class DetailsActivity : TvActivity() {
             runCatching { Api.single(title.titleId) }.onSuccess {
                 title = it
                 bind()
+                updateActions() // a list that left options.stream out may have led to a title 30nama doesn't stream
             }
             loadEpisodes()
             showCast()
@@ -152,7 +154,12 @@ class DetailsActivity : TvActivity() {
     }
 
     private fun bind() {
-        billboard.show(Card(title.englishName, title.meta(this, page = true), plot = title.plot, backdrop = title.cover, localTitle = title.localName, source = title) {})
+        // The critics' scores make way when the line would otherwise lose its end, the length and
+        // the Persian subtitles chip, to the ellipsis.
+        val room = findViewById<View>(R.id.billboard).layoutParams.width
+        val facts = title.meta(this, page = true).takeIf { Layout.getDesiredWidth(it, findViewById<TextView>(R.id.bb_meta).paint) <= room }
+            ?: title.meta(this, page = true, critics = false)
+        billboard.show(Card(title.englishName, facts, plot = title.plot, backdrop = title.cover, localTitle = title.localName, source = title) {})
         // The genres get their own quieter line under the facts, where the countries and the
         // language follow once `single` brings them; the cast has its own row below.
         val genres = dotted(*title.optJSONArray("genre").objects().mapNotNull { it.str("name") }.take(3).toTypedArray())
@@ -226,7 +233,9 @@ class DetailsActivity : TvActivity() {
     }
 
     private fun updateActions() {
+        dressWatch(title.streams)
         watch.text = when {
+            !title.streams -> getString(if (title.comingSoon) R.string.coming_soon else R.string.not_streaming)
             !Api.loggedIn && !title.isFree -> getString(R.string.login_and_watch)
             // The episode a step quieter than the action, in whichever ink the button has now.
             // ponytail: upnext_play ends in its %s in both languages, so the episode still trails the verb.
@@ -257,6 +266,27 @@ class DetailsActivity : TvActivity() {
             val (off, on) = icons.getValue(group)
             toggle.setCompoundDrawablesRelativeWithIntrinsicBounds(if (Library.has(group, title.titleId)) on else off, 0, 0, 0)
         }
+    }
+
+    /** Whether Play wears its play look; a title 30nama doesn't stream may only learn so from `single`. */
+    private var watchStreams = true
+
+    /**
+     * For a title 30nama doesn't stream, Play gives way to what stands in its place («به‌زودی», «پخش
+     * آنلاین ندارد»): no icon, a secondary button's glass and a dim label at rest, a step below the
+     * action it replaces, and still where the remote starts, so the page reads the same. OK says why
+     * (Context.play).
+     */
+    private fun dressWatch(streams: Boolean) {
+        if (streams == watchStreams) return
+        watchStreams = streams
+        watch.setBackgroundResource(if (streams) R.drawable.button_primary else R.drawable.button)
+        watch.setTextColor(getColorStateList(if (streams) R.color.on_button else R.color.person_pill_ink))
+        watch.setCompoundDrawablesRelativeWithIntrinsicBounds(if (streams) R.drawable.act_play else 0, 0, 0, 0)
+        val pad = resources.getDimensionPixelSize(R.dimen.button_pad)
+        watch.setPaddingRelative(if (streams) resources.getDimensionPixelSize(R.dimen.button_pad_icon) else pad, watch.paddingTop, pad, watch.paddingBottom)
+        // A new background takes its state before its callback, so its fade into focus would never run.
+        watch.jumpDrawablesToCurrentState()
     }
 
     /**

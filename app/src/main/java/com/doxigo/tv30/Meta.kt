@@ -15,6 +15,7 @@ import android.text.style.ForegroundColorSpan
 import android.text.style.LineHeightSpan
 import android.text.style.MetricAffectingSpan
 import android.text.style.ReplacementSpan
+import androidx.annotation.DrawableRes
 import androidx.annotation.FontRes
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
@@ -34,7 +35,7 @@ import kotlin.math.roundToLong
  * still to watch) follows its lead in white. The title's own [page] has room for every score (one
  * badge, the rest as words) and the Persian-subtitles chip.
  */
-fun JSONObject.meta(context: Context, lead: String? = null, left: String? = null, page: Boolean = false): CharSequence {
+fun JSONObject.meta(context: Context, lead: String? = null, left: String? = null, page: Boolean = false, critics: Boolean = true): CharSequence {
     val minutes = obj("info", "time")?.optInt("default")?.takeIf { it > 0 }?.let { runtime(context, it) }
     val seasons = obj("info")?.optInt("seasons")?.takeIf { it > 0 && !isMovie }?.let { context.resources.getQuantityString(R.plurals.seasons, it, it) }
     return metaLine(
@@ -42,8 +43,8 @@ fun JSONObject.meta(context: Context, lead: String? = null, left: String? = null
         category(context),
         lead?.tinted(ContextCompat.getColor(context, R.color.text)),
         left?.tinted(ContextCompat.getColor(context, R.color.text)),
-        *(if (page) scores(context) else listOf(rating(context))).toTypedArray(),
-        year,
+        *(if (page) scores(context, critics) else listOf(rating(context))).toTypedArray(),
+        if (page) years else year,
         str("info", "age")?.let { outlined(context, it) },
         // A continue card's lead already names the season, and its time left says the rest: no length.
         (seasons ?: minutes).takeIf { lead == null && left == null },
@@ -97,11 +98,28 @@ fun JSONObject.rating(context: Context, bare: Boolean = false): CharSequence? =
 /**
  * Every score the title has, for its own page: the one [rating] picks in its source's badge, the
  * rest as quiet words, so a single mark leads the line instead of three coloured ones competing.
+ * The critics' follow, each its site's glyph in the line's grey: Rotten Tomatoes' share, «۹۴٪», and
+ * Metacritic's score out of 100, «۷۵».
  */
-private fun JSONObject.scores(context: Context): List<CharSequence> {
+private fun JSONObject.scores(context: Context, critics: Boolean): List<CharSequence> {
     var quiet = false
     return listOf<(Boolean) -> CharSequence?>({ imdbScore(context, it) }, { fanScore(context, it) })
-        .mapNotNull { score -> score(quiet)?.also { quiet = true } }
+        .mapNotNull { score -> score(quiet)?.also { quiet = true } } +
+        if (critics) listOfNotNull(
+            critics(context, R.string.score_rotten_tomatoes, R.drawable.meta_tomato, "rottentomatoes", "%"),
+            critics(context, R.string.score_metacritic, R.drawable.meta_metacritic, "metacritic", ""),
+        ) else emptyList()
+}
+
+/**
+ * A critics' score out of 100 beside its site's [glyph], in the line's digits (Persian's percent is
+ * its own «٪»). The glyph stands in for the site's [name] in the UI's language, which TalkBack reads
+ * and which sets the mark first in either reading order.
+ */
+private fun JSONObject.critics(context: Context, name: Int, glyph: Int, source: String, unit: String): CharSequence? = score(source)?.let {
+    val number = "${it.roundToInt()}$unit".let { n -> if (Api.language == "fa") n.persianDigits().replace('%', '٪') else n }
+    SpannableStringBuilder().append(context.getString(name), Glyph(context, glyph), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        .append(" ", Gap(0.3f), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE).append(number)
 }
 
 private fun JSONObject.imdbScore(context: Context, quiet: Boolean = false, bare: Boolean = false) =
@@ -168,7 +186,7 @@ fun JSONObject.nextEpisode(context: Context): String? {
 
 /**
  * The title page's second line, in two groups told apart by more than space. What it is: the
- * [genres], in the line's own grey (Inter Medium in English). Where it is from: a [Globe],
+ * [genres], in the line's own grey (Inter Medium in English). Where it is from: a [Glyph] globe,
  * then the countries and the language, a step quieter (meta_origin; Inter Regular). A [Rule]
  * between them, only when both are there. Null when the title has neither.
  */
@@ -176,7 +194,7 @@ fun JSONObject.genresLine(context: Context, genres: String): CharSequence? {
     val tone = ContextCompat.getColor(context, R.color.meta_origin)
     val where = dotted(*countries().toTypedArray(), spoken()).ifEmpty { null }?.let {
         SpannableStringBuilder()
-            .append(" ", Globe(context, tone), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            .append(" ", Glyph(context, R.drawable.meta_globe), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             .append(" ", Gap(0.35f), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             .append(latin(context, it, R.font.inter_regular)) // before metaLine's Medium, which then leaves it be
             .tinted(tone)
@@ -280,8 +298,9 @@ fun Context.font(@FontRes id: Int): Typeface? = ResourcesCompat.getFont(this, id
 val CharSequence.isLatin get() = none { it in '؀'..'ۿ' }
 
 // Latin words and the spaces, punctuation and direction marks (see [fence]) between them, so a
-// run's word spaces, and the commas of a fenced list («Adventure, Drama»), are Inter's too.
-internal val LATIN_RUN = Regex("[A-Za-z0-9À-ɏ]+(?:[ .,:;'’&!?()\\-\u200E\u200F]+[A-Za-z0-9À-ɏ]+)*")
+// run's word spaces, the commas of a fenced list («Adventure, Drama») and a series' years'
+// dash ("2004–2012") are Inter's too.
+internal val LATIN_RUN = Regex("[A-Za-z0-9À-ɏ]+(?:[ .,:;'’&!?()\\-–\u200E\u200F]+[A-Za-z0-9À-ɏ]+)*")
 
 /** [text] with each Latin run set in [face], around whatever already sets its own (a chip, a score, a gap). */
 fun latin(context: Context, text: CharSequence, @FontRes face: Int): CharSequence {
@@ -330,13 +349,14 @@ private class Gap(private val em: Float) : ReplacementSpan() {
 }
 
 /**
- * Where-from's globe (meta_globe.xml), drawn 1 em square so its 1.8/24 stroke is the text's own
- * stem, and centred on [Digits]' middle as the chips are: an ImageSpan would sit it on the
- * baseline, low beside Persian. It takes 0.8 em of the line, its circle's 0.74 and a hair: the
- * drawable's margin overhangs, so the space either side is the line's [Gap]s.
+ * A glyph in the line's own ink, where-from's globe (meta_globe.xml) or a critics' mark (meta_tomato,
+ * meta_metacritic), drawn 1 em square so its 1.8/24 stroke is the text's own stem, and centred on
+ * [Digits]' middle as the chips are: an ImageSpan would sit it on the baseline, low beside Persian.
+ * It takes 0.8 em of the line, the globe's circle's 0.74 and a hair: the drawable's margin
+ * overhangs, so the space either side is the line's [Gap]s. The text it stands for is what TalkBack reads.
  */
-private class Globe(context: Context, color: Int) : ReplacementSpan() {
-    private val icon = ContextCompat.getDrawable(context, R.drawable.meta_globe)!!.mutate().apply { setTint(color) }
+private class Glyph(context: Context, @DrawableRes id: Int) : ReplacementSpan() {
+    private val icon = ContextCompat.getDrawable(context, id)!!.mutate()
     private val digits = Digits(context)
 
     override fun getSize(paint: Paint, text: CharSequence, start: Int, end: Int, fm: Paint.FontMetricsInt?): Int {
@@ -349,6 +369,7 @@ private class Globe(context: Context, color: Int) : ReplacementSpan() {
         val left = (x + (getSize(paint, text, start, end, null) - size) / 2f).roundToInt()
         val upper = (y + digits.middle(paint.textSize) - size / 2f).roundToInt()
         icon.setBounds(left, upper, left + size, upper + size)
+        icon.setTint(paint.color)
         icon.draw(canvas)
     }
 }

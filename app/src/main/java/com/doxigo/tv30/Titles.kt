@@ -47,15 +47,32 @@ val JSONObject.cover get() = str("image", "cover", "webp") ?: str("image", "cove
  */
 val JSONObject.playerFacts get() = JSONObject().also { facts -> for (key in arrayOf("title", "image", "info", "score", "options", "subtitle")) opt(key)?.let { facts.put(key, it) } }
 val JSONObject.isFree get() = obj("options")?.optBoolean("free_stream") == true
-/** The official app's rule (module 10223): a free title plays for anyone, the rest for a signed-in plan that streams. */
-val JSONObject.streamable get() = Api.loggedIn && Api.user?.optBoolean("user_allowed_to_stream") == true || isFree
+/**
+ * 30nama streams it (options.stream): not a title it only lists, announced or still in cinemas,
+ * which a list, a person's page or the website's favourites can still lead to. A list that leaves
+ * the flag out means it does.
+ */
+val JSONObject.streams get() = obj("options")?.optBoolean("stream", true) != false
+/** Announced (options.coming_soon). Only says why a title doesn't stream: one that does can carry it too. */
+val JSONObject.comingSoon get() = obj("options")?.optBoolean("coming_soon") == true
+/** The official app's rule (module 10223): a free title plays for anyone, the rest for a signed-in plan that streams; neither one 30nama doesn't stream. */
+val JSONObject.streamable get() = streams && (isFree || Api.loggedIn && Api.user?.optBoolean("user_allowed_to_stream") == true)
 /** Persian subtitles, 30nama's own (exclusive) or not. */
 val JSONObject.subtitled get() = obj("options")?.run { optBoolean("persian_subtitle") || optBoolean("exclusive_subtitle") } == true
 val JSONObject.isMovie get() = str("options", "title_type") == "movie"
-/** A score out of 10 from [source] ("imdb", "myanimelist", "mydramalist"); an unrated title says 0. */
+/** A score from [source]: out of 10 ("imdb", "myanimelist", "mydramalist") or 100 ("rottentomatoes", "metacritic"); an unrated title says 0. */
 fun JSONObject.score(source: String) = obj("score", source)?.optDouble("score")?.takeIf { it > 0 }
 val JSONObject.imdb get() = score("imdb")
 val JSONObject.year get() = str("info", "year")?.localDigits()
+/** A series' years on the air, «۲۰۰۴–۲۰۱۲», once 30nama gives it an end; else the [year] alone. */
+val JSONObject.years get() = (if (isMovie) null else yearRange(str("info", "year"), str("info", "year_end")))?.localDigits() ?: year
+
+/** [start]–[end] when [end] is a later year; null when there is no range to show. */
+internal fun yearRange(start: String?, end: String?): String? {
+    val from = start?.toIntOrNull() ?: return null
+    val to = end?.toIntOrNull()?.takeIf { it > from } ?: return null
+    return "$from–$to"
+}
 val JSONObject.plot get() = (if (Api.language == "fa") str("plot", "local") ?: str("plot", "english") else str("plot", "english") ?: str("plot", "local"))?.unescaped()?.trailed()
 
 /** The server cuts plots short with its own ".." or "..." («درگ..»); the cut reads as one ellipsis, «درگ…». */

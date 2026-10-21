@@ -63,4 +63,14 @@
     <string name="subtitle_later">Later</string>
     <string name="subtitle_later_hint">When lines run ahead of the speech</string>
     <string name="subtitle_timing_error">Couldn\'t shift this subtitle. Try again.</string>
+
+    <string name="sleep_timer">Sleep timer</string>
+    <string name="sleep_off">Off</string>
+    <string name="sleep_end_episode">End of this episode</string>
+    <string name="sleep_end_film">End of this film</string>
+    <plurals name="sleep_minutes">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
+    <string name="sleep_paused">The sleep timer paused playback.</string>
 </resources>

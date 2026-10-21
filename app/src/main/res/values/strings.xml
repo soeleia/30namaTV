@@ -55,6 +55,15 @@
     <string name="resume">ادامهٔ تماشا</string>
     <string name="login_and_watch">ورود و تماشا</string>
     <string name="not_allowed_to_stream">برای تماشا، اشتراک خود را ارتقا دهید.</string>
+    <!-- Play's place on the page of a title 30nama doesn't stream (options.stream false): announced
+         (options.coming_soon), or listed only. Under each, what OK on it says. -->
+    <string name="coming_soon">به‌زودی</string>
+    <string name="not_streaming">پخش آنلاین ندارد</string>
+    <string name="coming_soon_notice">پخش آنلاین این عنوان به‌زودی به ۳۰نما اضافه می‌شود.</string>
+    <string name="not_streaming_notice">این عنوان در ۳۰نما پخش آنلاین ندارد.</string>
+    <!-- The critics' sites on the title page's meta line, drawn as their glyphs (Meta.kt, critics): what TalkBack reads. -->
+    <string name="score_rotten_tomatoes">راتن تومیتوز</string>
+    <string name="score_metacritic">متاکریتیک</string>
     <string name="season_n">فصل %d</string>
     <string name="season_episode">فصل %1$d، قسمت %2$d</string>
     <plurals name="seasons">

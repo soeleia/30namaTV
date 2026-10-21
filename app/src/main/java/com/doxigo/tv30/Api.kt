@@ -321,8 +321,9 @@ object Api {
     suspend fun menu() = result("menu") as JSONObject
     suspend fun search(query: String, page: Int, background: Boolean = false) =
         result("search", "query" to query, "streamonly" to true, "page" to page, background = background) as JSONObject
+    /** Coming Soon is what doesn't stream yet: asked for streaming titles only, it kept 1 of its 403. */
     suspend fun archive(slugs: String, page: Int, orderBy: String) =
-        result("archive", "slugs" to slugs, "streamonly" to true, "page" to page, "orderby" to orderBy, "order" to "DESC") as JSONObject
+        result("archive", "slugs" to slugs, "streamonly" to true.takeIf { slugs != "coming-soon" }, "page" to page, "orderby" to orderBy, "order" to "DESC") as JSONObject
     /** What advanced_search can narrow by: {genre, country, imdb_rate: [{name, value}], min_year, max_year, …}. */
     suspend fun filterChoices() = result("advanced_search_parameters") as JSONObject
     /**

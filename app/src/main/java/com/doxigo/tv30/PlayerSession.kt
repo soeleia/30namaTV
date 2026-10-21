@@ -48,6 +48,10 @@ class PlayerSession(context: Context, player: Player, private val previous: () -
             KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_STOP -> if (once) player.pause()
             KeyEvent.KEYCODE_MEDIA_NEXT -> if (once) player.seekToNext()
             KeyEvent.KEYCODE_MEDIA_PREVIOUS -> if (once) player.seekToPrevious()
+            // Sony's, TCL's and Philips' remotes have channel keys and no track keys: up and down the
+            // series, straight to the episode either side. Where there is none, the key is the TV's.
+            KeyEvent.KEYCODE_CHANNEL_UP -> if (!hasNext) return false else if (once) next()
+            KeyEvent.KEYCODE_CHANNEL_DOWN -> if (!hasPrevious) return false else if (once) previous()
             KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> if (down) player.seekForward()
             KeyEvent.KEYCODE_MEDIA_REWIND -> if (down) player.seekBack()
             else -> return false
@@ -55,23 +59,27 @@ class PlayerSession(context: Context, player: Player, private val previous: () -
         return true
     }
 
+    /** The transport row's previous: as the remote's (see [restarts]). */
+    fun seekToPrevious() = player.seekToPrevious()
+
     /** Before the player's own release. */
     fun release() = session.release()
 
     /**
      * The player as the session and the keys drive it: next and previous are the series' episodes
-     * (the playlist only ever holds the one file), seeks step 10 s as the transport row's do, and
-     * stop only pauses: leaving the screen is what ends playback.
+     * (the playlist only ever holds the one file), previous restarting first ([restarts]), seeks
+     * step 10 s as the transport row's do, and stop only pauses: leaving the screen is what ends playback.
      */
     private inner class Episodic(player: Player) : ForwardingPlayer(player) {
+        // Previous itself stays as the player has it: a film can always go back to its start.
         override fun getAvailableCommands(): Player.Commands = super.getAvailableCommands().buildUpon()
-            .removeAll(Player.COMMAND_SEEK_TO_PREVIOUS, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM, Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+            .removeAll(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM, Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
             .addIf(Player.COMMAND_SEEK_TO_PREVIOUS, hasPrevious).addIf(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM, hasPrevious)
             .addIf(Player.COMMAND_SEEK_TO_NEXT, hasNext).addIf(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM, hasNext)
             .build()
 
         override fun isCommandAvailable(command: Int) = availableCommands.contains(command)
-        override fun seekToPrevious() = seekToPreviousMediaItem()
+        override fun seekToPrevious() = if (restarts(currentPosition, hasPrevious)) seekTo(0) else seekToPreviousMediaItem()
         override fun seekToPreviousMediaItem() {
             if (hasPrevious) previous()
         }
@@ -92,3 +100,12 @@ class PlayerSession(context: Context, player: Player, private val previous: () -
         const val SEEK_MS = 10_000L
     }
 }
+
+/**
+ * Previous as media players have it: past the first [RESTART_MS], back to the start of what plays;
+ * within them, the episode before. A film, or a first episode, has none: its start again.
+ */
+internal fun restarts(positionMs: Long, hasPrevious: Boolean) = !hasPrevious || positionMs > RESTART_MS
+
+/** How far in a press of previous restarts rather than going back an episode. */
+internal const val RESTART_MS = 10_000L

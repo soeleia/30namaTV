@@ -88,4 +88,16 @@
     <string name="subtitle_later">دیرتر</string>
     <string name="subtitle_later_hint">وقتی زیرنویس از صدا جلو است</string>
     <string name="subtitle_timing_error">این زیرنویس جابه‌جا نشد. دوباره امتحان کنید.</string>
+
+    <!-- Sleep timer: the controls' moon button and its page. Playback pauses at the end of what
+         plays or after the minutes (%d, Persian digits by the locale), then says so in a notice. -->
+    <string name="sleep_timer">تایمر خواب</string>
+    <string name="sleep_off">خاموش</string>
+    <string name="sleep_end_episode">پایان این قسمت</string>
+    <string name="sleep_end_film">پایان این فیلم</string>
+    <plurals name="sleep_minutes">
+        <item quantity="one">%d دقیقه</item>
+        <item quantity="other">%d دقیقه</item>
+    </plurals>
+    <string name="sleep_paused">پخش با تایمر خواب متوقف شد.</string>
 </resources>

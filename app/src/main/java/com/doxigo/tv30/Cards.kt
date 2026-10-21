@@ -57,8 +57,12 @@ fun JSONObject.toCard(
 
 fun Context.openDetails(title: JSONObject) = startActivity(DetailsActivity.intent(this, title))
 
-/** Play, from the title page or the hero: a guest without a free title signs in first, and a plan that can't stream is told so. */
+/**
+ * Play, from the title page or the hero: a title 30nama doesn't stream says so (and whether it is on
+ * its way), a guest without a free title signs in first, and a plan that can't stream is told so.
+ */
 fun Context.play(title: JSONObject) = when {
+    !title.streams -> toast(getString(if (title.comingSoon) R.string.coming_soon_notice else R.string.not_streaming_notice))
     title.streamable -> startActivity(PlayerActivity.intent(this, title.titleId, title.isFree, title = title))
     !Api.loggedIn -> startActivity(Intent(this, LoginActivity::class.java))
     else -> toast(getString(R.string.not_allowed_to_stream))

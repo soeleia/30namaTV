@@ -11,7 +11,6 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.WindowManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.widget.Button
@@ -56,7 +55,6 @@ class TrailerActivity : TvActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val id = intent.getStringExtra(EXTRA_ID).orEmpty()
         player = if (intent.getBooleanExtra(EXTRA_YOUTUBE, false)) YoutubePlayer(this, id) else ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(OkHttpDataSource.Factory(Api.http)
@@ -104,6 +102,11 @@ class TrailerActivity : TvActivity() {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_READY) loading.visibility = View.GONE
                 if (playbackState == Player.STATE_ENDED) finish() // back to the title, as Netflix does
+            }
+
+            // Lit while it plays: a paused trailer lets the screensaver come.
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                video.keepScreenOn = isPlaying
             }
 
             override fun onPlayerError(exception: PlaybackException) = showError()

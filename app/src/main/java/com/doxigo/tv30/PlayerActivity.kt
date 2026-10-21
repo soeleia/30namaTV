@@ -8,6 +8,7 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.TextPaint
@@ -21,7 +22,6 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -57,6 +57,7 @@ import androidx.media3.common.text.CueGroup
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy
 import androidx.media3.datasource.DefaultDataSource
@@ -86,7 +87,6 @@ import kotlin.math.abs
 class PlayerActivity : TvActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) // no screensaver mid-film
         // Leanback fits the video surface to the film's shape; the letterbox bars around it are
         // the window, which must be true black there, not the app's ink.
         window.setBackgroundDrawableResource(android.R.color.black)
@@ -128,6 +128,15 @@ class PlayerFragment : VideoSupportFragment() {
     /** What the system and Assistant see and steer; the remote's media keys go through it too (see [onKey]). */
     private lateinit var session: PlayerSession
     private val prefs by lazy { requireContext().getSharedPreferences("player", Context.MODE_PRIVATE) }
+    /**
+     * The connection's speed, where Auto's first rung comes from until segments measure it: what the
+     * last viewing measured, else [INITIAL_ESTIMATE]. ExoPlayer's own guess, 1 Mbps (860 kbps for
+     * Iran), started Mux's test film at 480p and held it 30 s on a 20 Mbps link; a fixed 6 Mbps
+     * instead stalled 10 s at the start on a 1.5 Mbps one. Disk reads don't count (not network).
+     */
+    private val bandwidth by lazy {
+        DefaultBandwidthMeter.Builder(requireContext()).setInitialBitrateEstimate(prefs.getLong("bandwidth", INITIAL_ESTIMATE)).build()
+    }
 
     private var postId = 0
     /** The title as the screen that opened this one had it (Titles.playerFacts): its poster, score and year. */
@@ -158,6 +167,7 @@ class PlayerFragment : VideoSupportFragment() {
             // the connection whenever it loads (see Buffering).
             .setLoadControl(Buffering.loadControl())
             .setPriorityTaskManager(Buffering.priority)
+            .setBandwidthMeter(bandwidth)
             .setAudioAttributes(AudioAttributes.Builder().setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).setUsage(C.USAGE_MEDIA).build(), true)
             // DefaultDataSource reads the subtitles found on the subtitle sites from disk (Subtitles.kt)
             // and hands everything over http to Buffering's.
@@ -165,7 +175,7 @@ class PlayerFragment : VideoSupportFragment() {
                 // Each subtitle's Persian put right as it is parsed (see Subtitles.cleaned).
                 .setSubtitleParserFactory(Subtitles.Parsers()))
             .build()
-        player.setPlaybackSpeed(Settings.speed) // the panel's speed then holds for this viewing
+        player.setPlaybackSpeed(Settings.speed) // a series' own, once known (load), and the panel's then hold
         applyTrackPreferences()
         session = PlayerSession(context, player, ::previousEpisode, ::nextEpisode)
         player.addListener(object : Player.Listener {
@@ -178,9 +188,13 @@ class PlayerFragment : VideoSupportFragment() {
                 if (finds.picked != null) applyTrackPreferences()
             }
             override fun onPlaybackStateChanged(state: Int) {
-                if (state == Player.STATE_ENDED && autoplays) autoplayNext()
+                if (state != Player.STATE_ENDED) return
+                if (sleep == SLEEP_END) sleep = 0 // the sleep timer's end: nothing plays on
+                else if (autoplays) autoplayNext()
             }
             override fun onIsPlayingChanged(isPlaying: Boolean) {
+                // No screensaver mid-film, but a paused or finished one lets it come, and the TV sleep.
+                view?.keepScreenOn = isPlaying
                 if (!isPlaying) report()
                 syncCountdown()
             }
@@ -309,6 +323,7 @@ class PlayerFragment : VideoSupportFragment() {
 
     override fun onDestroy() {
         super.onDestroy()
+        prefs.edit().putLong("bandwidth", bandwidth.bitrateEstimate).apply()
         session.release()
         player.release()
     }
@@ -380,6 +395,7 @@ class PlayerFragment : VideoSupportFragment() {
             }
         }
         files = stream.optJSONArray("hls").objects()
+        if (files.size > 1) player.setPlaybackSpeed(prefs.getFloat("speed.$postId", Settings.speed))
         val resume = stream.optJSONObject("continue_watching")
         val chosen = args.getStringExtra("file")
         // The server's point or where this TV left the title, whichever is further on (Watched).
@@ -429,6 +445,8 @@ class PlayerFragment : VideoSupportFragment() {
         reportedAt = -1
         qualities = qualities(next)
         quality = pickQuality(qualities)
+        // 30nama's own subtitles keep the title's timing: the next episode, or the next evening, starts shifted as this one was.
+        for (own in ownSubtitles(next)) prefs.getLong(timingPref(own), 0L).takeIf { it != 0L }?.let { offsets.getOrPut(timingKey(own)) { it } }
         val info = next.optJSONObject("info")
         val season = info?.optInt("season") ?: 0
         val episode = info?.optInt("episode_number", info.optInt("episode")) ?: 0
@@ -506,6 +524,7 @@ class PlayerFragment : VideoSupportFragment() {
     }
 
     private fun tick() {
+        if (sleepAt > 0 && SystemClock.elapsedRealtime() >= sleepAt) fallAsleep()
         val f = file ?: return
         val seconds = player.currentPosition / 1000
         updateSkip(f, seconds)
@@ -570,9 +589,10 @@ class PlayerFragment : VideoSupportFragment() {
     /**
      * Netflix's autoplay, as Settings has it, until three episodes in a row have played with no key
      * pressed: then the next one waits for the remote, so a sleeping viewer doesn't run through a
-     * series, its "continue watching" and a metered connection.
+     * series, its "continue watching" and a metered connection. A sleep timer set to the end of this
+     * episode stops it too.
      */
-    private val autoplays get() = Settings.autoplay && unattended < 3
+    private val autoplays get() = Settings.autoplay && unattended < 3 && sleep != SLEEP_END
 
     private fun autoplayNext() {
         unattended++
@@ -626,7 +646,9 @@ class PlayerFragment : VideoSupportFragment() {
         val introEnd = mark("intro_end")
         val recapStart = mark("previously_start")
         val recapEnd = mark("previously_end")
-        val end = f.endMark
+        // No credits mark: the last [NO_MARK_LEAD_S] stand in for them, so the next episode is still
+        // announced with its countdown, and Back still keeps this one to its end.
+        val end = f.endMark ?: player.duration.takeIf { it > 0 }?.let { it / 1000 - NO_MARK_LEAD_S }?.takeIf { it > 0 }
         val next = nextFile()
         // Seeking out of its seconds, or past them, ends the offer for good.
         if (startOverMs > 0 && t * 1000 !in startOverMs - 1_000 until startOverMs + START_OVER_MS) startOverMs = 0
@@ -1097,8 +1119,11 @@ class PlayerFragment : VideoSupportFragment() {
         setSource(player.currentPosition)
     }
 
-    /** Not saved: ExoPlayer keeps the speed across episodes, and a fresh player starts at 1×. */
-    private fun applySpeed(speed: Float) = player.setPlaybackSpeed(speed)
+    /** A series keeps it, over Settings' (load); a film's holds for this viewing. ExoPlayer keeps it across episodes. */
+    private fun applySpeed(speed: Float) {
+        player.setPlaybackSpeed(speed)
+        if (files.size > 1) prefs.edit().putFloat("speed.$postId", speed).apply()
+    }
 
     /** The audio variant [channels] ("default", "6ch", "2ch"), each its own m3u8, for this viewing. Later titles start from Settings. */
     private fun applyAudio(channels: String) {
@@ -1430,7 +1455,7 @@ class PlayerFragment : VideoSupportFragment() {
     // ---- cut. Media3 has no offset, and its renderer shows no cue before its time, so a moved
     // ---- subtitle is drawn from here instead, against the playhead. ----
 
-    /** Offsets (ms, later is positive) for this viewing, by [timingKey]; none leaves the subtitle to ExoPlayer. */
+    /** Offsets (ms, later is positive) for this viewing, by [timingKey]; none leaves the subtitle to ExoPlayer. 30nama's own are also kept per title ([timingPref]). */
     private val offsets = HashMap<String, Long>()
     /** The subtitle [timing] is loading or following, by [timingKey]. */
     private var timingFor: String? = null
@@ -1440,6 +1465,13 @@ class PlayerFragment : VideoSupportFragment() {
 
     /** An offset belongs to a subtitle on one file: the same season's zip found for two episodes is timed for each. */
     private fun timingKey(subtitle: MediaItem.SubtitleConfiguration) = "${file?.str("info", "file_id")} ${subtitle.uri}"
+
+    /**
+     * Where a title keeps the offset of one of 30nama's own subtitles, by language: its files' subtitles
+     * come from one source, so one shift holds across them. A found one is for its file alone.
+     */
+    // ponytail: a key per title ever shifted, a few bytes each, as Watched.leave keeps.
+    private fun timingPref(own: MediaItem.SubtitleConfiguration) = "timing.$postId.${own.id}"
 
     /** The subtitle showing, as ExoPlayer was given it; null with none. */
     private fun shownSubtitle(): MediaItem.SubtitleConfiguration? {
@@ -1536,9 +1568,12 @@ class PlayerFragment : VideoSupportFragment() {
 
     /** Moves the shown subtitle [by] ms, up to [TIMING_MAX_MS] either way; 0 puts it back on its own times. */
     private fun nudge(by: Long) {
-        shownSubtitle()?.let(::timingKey)?.let { key ->
+        shownSubtitle()?.let { subtitle ->
+            val key = timingKey(subtitle)
             val offset = if (by == 0L) 0L else ((offsets[key] ?: 0L) + by).coerceIn(-TIMING_MAX_MS, TIMING_MAX_MS)
             if (offset == 0L) offsets.remove(key) else offsets[key] = offset
+            // Not picked from the sites, it is one of 30nama's own (currentSubtitle).
+            if (finds.picked == null) prefs.edit().apply { if (offset == 0L) remove(timingPref(subtitle)) else putLong(timingPref(subtitle), offset) }.apply()
             retime()
         }
         panel.refresh()
@@ -1550,6 +1585,44 @@ class PlayerFragment : VideoSupportFragment() {
         val seconds = "%.2f".format(Locale.US, abs(offset) / 1000.0).trimEnd('0').trimEnd('.')
         val number = if (Api.language == "fa") seconds.replace('.', '٫').persianDigits() else seconds
         return getString(if (offset < 0) R.string.subtitle_timing_earlier else R.string.subtitle_timing_later, number)
+    }
+
+    // ---- Sleep timer: playback pauses at the end of this episode or film, or after a set time,
+    // ---- and the screensaver may come (see onIsPlayingChanged). For this viewing only. ----
+
+    /** [SLEEP_END], the minutes it was set for, or 0 for none; [sleepAt]: when a timed one pauses (elapsedRealtime). */
+    private var sleep = 0
+    private var sleepAt = 0L
+
+    /** Off, the end of what plays, then 15 to 60 minutes; a running one says how long it has left. */
+    private fun sleepTimer(): Page {
+        val left = ((sleepAt - SystemClock.elapsedRealtime() + 59_999) / 60_000).toInt().coerceAtLeast(1)
+        val choices = listOf(
+            Choice(getString(R.string.sleep_off), sleep == 0) { setSleep(0) },
+            Choice(getString(if (files.size > 1) R.string.sleep_end_episode else R.string.sleep_end_film), sleep == SLEEP_END) { setSleep(SLEEP_END) },
+        ) + SLEEP_MINUTES.map { minutes ->
+            val running = sleep == minutes && sleepAt > 0
+            Choice(resources.getQuantityString(R.plurals.sleep_minutes, minutes, minutes), sleep == minutes,
+                getString(R.string.time_left, getString(R.string.runtime_minutes, left)).takeIf { running }) { setSleep(minutes) }
+        }
+        return Page(getString(R.string.sleep_timer), listOf(listOf(Group(null, choices))))
+    }
+
+    /** Picking a time again starts it over; the page shows what it has left. */
+    private fun setSleep(choice: Int) {
+        sleep = choice
+        sleepAt = if (choice > 0) SystemClock.elapsedRealtime() + choice * 60_000L else 0L
+        // The end of this episode holds autoplay back, its countdown on the pill included.
+        if (offered == R.string.next_episode) offer(0, null)
+        panel.refresh()
+    }
+
+    /** The time is up: playback pauses, and says why to anyone still awake. */
+    private fun fallAsleep() {
+        sleep = 0
+        sleepAt = 0
+        player.pause()
+        requireContext().toast(getString(R.string.sleep_paused))
     }
 
     /** Besides "label", each quality maps audio variants ("default", channel counts) to URLs. */
@@ -1608,6 +1681,13 @@ class PlayerFragment : VideoSupportFragment() {
         const val AUTO_SKIP_MS = 1_500L
         /** How long a title picked up part-way offers its start, in playing time. */
         const val START_OVER_MS = 10_000L
+        /** The connection's speed (bps) a TV's first viewing assumes until its segments measure it. */
+        const val INITIAL_ESTIMATE = 6_000_000L
+        /** Without a credits mark, how long before the end (s) the next episode is offered and counted down to. */
+        const val NO_MARK_LEAD_S = 25L
+        /** The sleep timer's choices past off and the end of this episode, in minutes; [SLEEP_END] is that end. */
+        val SLEEP_MINUTES = intArrayOf(15, 30, 45, 60)
+        const val SLEEP_END = -1
         /** How long before the end the next episode's opening starts loading, without a credits mark or before a late one. */
         const val NEAR_END_MS = 120_000L
         /** The seek bar's step for a press, and the pause after the last one before the seek lands. */
@@ -1658,6 +1738,7 @@ class PlayerFragment : VideoSupportFragment() {
         private val hq = Action(3, context.getString(R.string.quality), null, ContextCompat.getDrawable(context, R.drawable.player_quality))
         private val speed = Action(0, context.getString(R.string.player_speed), null, ContextCompat.getDrawable(context, R.drawable.player_speed))
         private val episodes = Action(1, context.getString(R.string.episodes), null, ContextCompat.getDrawable(context, R.drawable.player_episodes))
+        private val sleeper = Action(4, context.getString(R.string.sleep_timer), null, ContextCompat.getDrawable(context, R.drawable.player_sleep))
 
         /** The glue's row and description, including its key listener and title layout. */
         override fun onCreateRowPresenter(): PlaybackRowPresenter = object : PlaybackTransportRowPresenter() {
@@ -1736,6 +1817,7 @@ class PlayerFragment : VideoSupportFragment() {
             adapter.add(captions)
             adapter.add(hq)
             adapter.add(speed)
+            adapter.add(sleeper)
             if (series) adapter.add(episodes)
         }
 
@@ -1746,11 +1828,12 @@ class PlayerFragment : VideoSupportFragment() {
                     player.seekTo(player.currentPosition + 10_000)
                     player.play()
                 }
-                previous -> previousEpisode()
+                previous -> session.seekToPrevious() // the start first, as the remote's previous
                 next -> nextEpisode()
                 captions -> openPanel(subtitlesPage)
                 hq -> openPanel { qualityAndSpeed(onSpeed = false) }
                 speed -> openPanel { qualityAndSpeed(onSpeed = true) }
+                sleeper -> openPanel(::sleepTimer)
                 episodes -> openEpisodes()
                 else -> super.onActionClicked(action)
             }
