@@ -242,10 +242,13 @@ class SeekPreview(private val root: ViewGroup, private val player: ExoPlayer, pr
     }
 
     private companion object {
-        /** Whether the decoder named [name] works in software, by the platform's own list from Android 10, by its maker's prefix before. */
-        fun softwareOnly(name: String) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        /**
+         * Whether the decoder named [name] works in software: Google's own (OMX.google.*, c2.android.*)
+         * always do, though an emulator's codec list may not say so; others by that list from Android 10.
+         */
+        fun softwareOnly(name: String) = name.startsWith("OMX.google.") || name.startsWith("c2.android.") ||
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
             MediaCodecList(MediaCodecList.ALL_CODECS).codecInfos.firstOrNull { it.name == name || it.canonicalName == name }?.isSoftwareOnly == true
-        } else name.startsWith("OMX.google.") || name.startsWith("c2.android.")
 
         /** The card's width (dp), a quarter of the screen; its height is the film's shape. */
         const val WIDTH = 224
