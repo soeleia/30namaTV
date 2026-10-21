@@ -17,6 +17,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -26,15 +27,32 @@ import java.nio.ByteBuffer
 import java.nio.charset.Charset
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipInputStream
+import kotlin.math.abs
 
 /**
- * Subtitles from outside 30nama, for when its own are off or missing: SubDL first (a free key, no
- * login, and the Persian archive it took over from Subscene), then OpenSubtitles. Each source is
- * off without its key: the viewer's own from Settings, else (the developer's builds only)
- * `subdl.key`, `opensubtitles.key` in local.properties. With neither, the player offers no search.
- * API keys only, never a login.
+ * Subtitles from outside 30nama, for when its own are off or missing: SubSource, the site 30nama
+ * itself links to, with no key at all; SubDL (a free key, no login, and the Persian archive it took
+ * over from Subscene) and OpenSubtitles beside it once they have theirs: the viewer's own from
+ * Settings, else (the developer's builds only) `subdl.key`, `opensubtitles.key` in local.properties.
+ * API keys only, never a login. What they find is ranked by how well its release fits the file
+ * that plays ([ranked]).
  *
  * The shapes, as checked in October 2026:
+ * - SubSource has no API for programs without a key; these are the requests its own pages make
+ *   (subsource.net's script, seen live from here with no key, cookie or Cloudflare challenge), so
+ *   they may change when the site does. After Core/SubSource.swift in the Mac client
+ *   (github.com/thesaikodelik/30nama-apps, MIT), which reads the listing's page instead. 30nama's
+ *   `single` links each title's listings in `subtitle` [{language, link
+ *   ("https://subsource.net/subtitles/dark-matter-2024/season-2/farsi_persian"), season}]; without
+ *   them, `POST api.subsource.net/v1/movie/search {query, includeSeasons, limit}` takes an IMDb id
+ *   (answering that title alone) or a name and answers {results: [{title, type ("movie" |
+ *   "tvseries"), releaseYear, link ("/subtitles/hush-2016"), seasons: [{season, link
+ *   ("/subtitles/dark-matter-2024/season=2")}]}]}. `GET /v1/subtitles/{dark-matter-2024/season-2}
+ *   ?language=farsi_persian,english` lists a season's or a film's subtitles, a row for each release
+ *   one fits: {subtitles: [{id, language, release_info, hearing_impaired (0, 1 or null), link
+ *   ("dark-matter-season-2-1/farsi_persian/10270792")}]}, and a title it has no page for is a 404.
+ *   `GET /v1/subtitle/{link}` gives {subtitle: {download_token}}, and `GET
+ *   /v1/subtitle/download/{token}` the zip.
  * - SubDL documents its API behind a bot wall (subdl.com/api-doc), so from the clients that track
  *   it: Bazarr's provider and its tests (github.com/morpheus65535/bazarr,
  *   custom_libs/subliminal_patch/providers/subdl.py, tests/subliminal_patch/test_subdl.py) and
@@ -55,8 +73,10 @@ import java.util.zip.ZipInputStream
  *   per IP; 406 says they are spent.
  */
 object Subtitles {
+    const val SUBSOURCE = "SubSource"
     const val SUBDL = "SubDL"
     const val OPENSUBTITLES = "OpenSubtitles"
+    private const val SUBSOURCE_API = "https://api.subsource.net/v1"
     // ponytail: 20 per language, the first page of each source; ask for a second page if a title ever outgrows it.
     private const val PER_LANGUAGE = 20
     /** No subtitle, nor a season's zip of them, comes near this: anything bigger is not one. */
@@ -66,17 +86,21 @@ object Subtitles {
 
     val subdlKey get() = Settings.pickKey(Settings.savedKey(SUBDL), BuildConfig.SUBDL_KEY)
     val openSubtitlesKey get() = Settings.pickKey(Settings.savedKey(OPENSUBTITLES), BuildConfig.OPENSUBTITLES_KEY)
-    val enabled get() = subdlKey.isNotEmpty() || openSubtitlesKey.isNotEmpty()
 
-    // Short, as for TMDB: the remote waits on this, and from Iran either site may be out of reach.
+    // Short, as for TMDB: the remote waits on this, and from Iran any of the sites may be out of reach.
     private val client by lazy { Api.http.newBuilder().connectTimeout(5, TimeUnit.SECONDS).callTimeout(15, TimeUnit.SECONDS).build() }
 
-    /** What plays: a film, or one episode ([season] and [episode] above 0), by IMDb id when 30nama links one, else by name and year. */
-    class Wanted(val imdb: String?, val name: String, val year: Int?, val season: Int, val episode: Int) {
+    /**
+     * What plays: a film, or one episode ([season] and [episode] above 0), by IMDb id when 30nama
+     * links one, else by name and year. [release] is what is known of the file itself (its quality,
+     * its name), to rank what is found by; [pages], 30nama's own links to SubSource (`single`'s
+     * `subtitle`), when the title came with them.
+     */
+    class Wanted(val imdb: String?, val name: String, val year: Int?, val season: Int, val episode: Int, val release: String = "", val pages: JSONArray? = null) {
         val isEpisode get() = season > 0 && episode > 0
     }
 
-    /** One subtitle on offer: [ref] is what its source downloads it by (SubDL's path, OpenSubtitles' file id). */
+    /** One subtitle on offer: [ref] is what its source downloads it by (SubSource's link, SubDL's path, OpenSubtitles' file id). */
     class Found(val source: String, val language: String, val release: String, val downloads: Int, val hearingImpaired: Boolean, internal val ref: String)
 
     /** A source said no: its allowance for today is spent ([quota]), or it is down or refused the key. */
@@ -86,20 +110,127 @@ object Subtitles {
     class Unreadable : IOException("no readable subtitle")
 
     /**
-     * Both sources at once: Persian, then English, at most [PER_LANGUAGE] of each, SubDL's ahead of
-     * OpenSubtitles'. One source failing leaves the other's answer; with nothing found, the first
-     * failure is what went wrong.
+     * Every source at once: Persian, then English, at most [PER_LANGUAGE] of each, best [ranked]
+     * first, ties in the sources' order (SubSource's, SubDL's, OpenSubtitles'). One source failing
+     * leaves the others' answers; with nothing found, the first failure is what went wrong.
      */
     suspend fun search(wanted: Wanted): List<Found> = coroutineScope {
         val sources = listOfNotNull<suspend (Wanted) -> List<Found>>(
+            ::subSource,
             ::subdl.takeIf { subdlKey.isNotEmpty() },
             ::openSubtitles.takeIf { openSubtitlesKey.isNotEmpty() },
         )
         val answers = sources.map { async { runCatching { it(wanted) } } }.awaitAll()
         val found = answers.flatMap { it.getOrDefault(emptyList()) }
         if (found.isEmpty()) answers.firstNotNullOfOrNull { it.exceptionOrNull() }?.let { throw it }
-        listOf("fa", "en").flatMap { language -> found.filter { it.language == language }.take(PER_LANGUAGE) }
+        val ranked = ranked(found, wanted)
+        listOf("fa", "en").flatMap { language -> ranked.filter { it.language == language }.take(PER_LANGUAGE) }
     }
+
+    /** Words of a release that say where the copy came from, which decides its timing most. */
+    private val SOURCES = setOf("bluray", "web", "webrip", "hdtv", "dvdrip", "hdrip")
+
+    /** An episode a release names: "S02E08", "S01E01-E10", "2x08", "Eps 07", "E08"; not the 265 of "x265". */
+    private val EPISODE = Regex("(?i)(?<![a-z0-9])(?:s(\\d{1,2})[ ._-]?e|(\\d{1,2})x|(?:episode|eps|ep|e)[ ._-]*)(\\d{1,3})(?:-e?(\\d{1,3}))?(?!\\d)")
+
+    /** A name's words, a source's spellings as one ("WEB-DL" is "web", "BRRip" "bluray"): "1080p", "s02e08", "cakes". */
+    internal fun words(name: String) = name.lowercase().replace("web-dl", "webdl").replace("blu-ray", "bluray")
+        .split(Regex("[^\\p{L}\\p{N}]+"))
+        .mapNotNull { word ->
+            when (word) {
+                "" -> null
+                "webdl" -> "web"
+                "bdrip", "brrip" -> "bluray"
+                else -> word
+            }
+        }.toSet()
+
+    /**
+     * How well [release] fits what plays, after best(for:) in the Mac client's Core/Models.swift:
+     * for an episode, naming it is worth 100 and naming none (a season's pack) 20, and a release
+     * naming another episode is no use (null). Then each word shared with the file's [Wanted.release]:
+     * a source 30, anything else (resolution, group) 1.
+     */
+    internal fun score(release: String, wanted: Wanted): Int? {
+        var score = 0
+        if (wanted.isEpisode) {
+            val named = EPISODE.find(release)?.destructured
+            score += when {
+                named == null -> 20
+                named.let { (season, otherSeason, from, to) ->
+                    (season.ifEmpty { otherSeason }.toIntOrNull() ?: wanted.season) == wanted.season &&
+                        wanted.episode in from.toInt()..(to.toIntOrNull() ?: from.toInt())
+                } -> 100
+                else -> return null
+            }
+        }
+        val shared = words(wanted.release) intersect words(release)
+        return score + shared.sumOf { if (it in SOURCES) 30 else 1 }
+    }
+
+    /** [found] best [score] first, ties as they came; those for another episode go. */
+    internal fun ranked(found: List<Found>, wanted: Wanted) =
+        found.mapNotNull { f -> score(f.release, wanted)?.let { f to it } }.sortedByDescending { it.second }.map { it.first }
+
+    private suspend fun subSource(wanted: Wanted): List<Found> {
+        val path = subSourcePage(wanted.pages, wanted) ?: subSourceSearch(wanted) ?: return emptyList()
+        val url = "$SUBSOURCE_API/subtitles/$path".toHttpUrl().newBuilder().addEncodedQueryParameter("language", "farsi_persian,english").build()
+        // ponytail: a stale 30nama link (SubSource's 404) reads as SubSource down; search when one turns up.
+        return subSourceFound(json(SUBSOURCE, Request.Builder().url(url).build()), wanted)
+    }
+
+    /** The listing's path ("dark-matter-2024/season-2") in 30nama's own link for what plays, any language's; "season=2" is how the site once wrote it. */
+    internal fun subSourcePage(pages: JSONArray?, wanted: Wanted) = pages.objects()
+        .filter { it.optInt("season") == wanted.season }
+        .firstNotNullOfOrNull { Regex("subsource\\.net/subtitles/(.+)/[a-z_]+$").find(it.str("link").orEmpty())?.groupValues?.get(1) }
+        ?.replace("season=", "season-")
+
+    /** The listing's path by SubSource's own search: by IMDb id, else (or when it has none by that id) by name. */
+    private suspend fun subSourceSearch(wanted: Wanted): String? {
+        suspend fun search(query: String): JSONObject {
+            val body = JSONObject().put("query", query).put("includeSeasons", true).put("limit", 15).toString()
+            return json(SUBSOURCE, Request.Builder().url("$SUBSOURCE_API/movie/search").post(body.toRequestBody("application/json".toMediaType())).build())
+        }
+        return wanted.imdb?.let { subSourcePath(search(it), wanted, byImdb = true) } ?: subSourcePath(search(wanted.name), wanted, byImdb = false)
+    }
+
+    /**
+     * The listing's path in a search [answer]: a series for an episode (its season's listing), else
+     * a film. By IMDb id the first, as an id finds that title alone; by name one named the same
+     * (as TMDB's are matched) within a year, the nearest year first.
+     */
+    internal fun subSourcePath(answer: JSONObject, wanted: Wanted, byImdb: Boolean): String? {
+        /** Years between [result] and what plays, 0 when either has none. */
+        fun off(result: JSONObject) = result.optInt("releaseYear").takeIf { it > 0 }?.let { year -> wanted.year?.let { abs(it - year) } } ?: 0
+        val kind = answer.optJSONArray("results").objects().filter { (it.str("type") == "tvseries") == wanted.isEpisode }
+        val title = (if (byImdb) kind.firstOrNull() else kind
+            .filter { it.str("title")?.normalized() == wanted.name.normalized() && off(it) <= 1 }
+            .minByOrNull(::off)) ?: return null
+        val link = if (!wanted.isEpisode) title.str("link") else title.optJSONArray("seasons").objects().firstOrNull { it.optInt("season") == wanted.season }?.str("link")
+        return link?.removePrefix("/subtitles/")?.replace("season=", "season-")
+    }
+
+    /**
+     * A listing [answer]'s subtitles, each once under the release it lists that fits [wanted] best
+     * (its rows are one a release), Persian and English; one whose every release names another
+     * episode, as most of a season's do, is left out.
+     */
+    internal fun subSourceFound(answer: JSONObject, wanted: Wanted) = answer.optJSONArray("subtitles").objects()
+        .groupBy { it.optLong("id") }.values.mapNotNull { rows ->
+            val row = rows.first()
+            Found(
+                SUBSOURCE,
+                when (row.str("language")) {
+                    "farsi_persian" -> "fa"
+                    "english" -> "en"
+                    else -> return@mapNotNull null
+                },
+                rows.mapNotNull { it.str("release_info")?.trim() }.mapNotNull { r -> score(r, wanted)?.let { r to it } }.maxByOrNull { it.second }?.first ?: return@mapNotNull null,
+                0, // only its page says
+                row.optInt("hearing_impaired") == 1,
+                row.str("link") ?: return@mapNotNull null,
+            )
+        }
 
     private suspend fun subdl(wanted: Wanted): List<Found> {
         val url = "https://api.subdl.com/api/v1/subtitles".toHttpUrl().newBuilder()
@@ -220,17 +351,24 @@ object Subtitles {
      * disk. [episode] picks the right file from a season's zip.
      */
     suspend fun download(found: Found, episode: Int, dir: File): File {
-        val (bytes, name) = if (found.source == SUBDL) {
-            bytes(SUBDL, Request.Builder().url(found.ref.takeIf { it.startsWith("https://") } ?: "https://dl.subdl.com${found.ref}").build()) to found.ref
-        } else {
-            val body = JSONObject().put("file_id", found.ref.toLong()).toString().toRequestBody("application/json".toMediaType())
-            val link = json(OPENSUBTITLES, openSubtitlesCall("https://api.opensubtitles.com/api/v1/download").post(body).build())
-            val url = link.str("link") ?: throw Refused(OPENSUBTITLES, quota = false)
-            bytes(OPENSUBTITLES, Request.Builder().url(url).build()) to (link.str("file_name") ?: "subtitle.srt")
+        val (bytes, name) = when (found.source) {
+            SUBSOURCE -> {
+                // Its page holds the token its file is fetched by.
+                val page = json(SUBSOURCE, Request.Builder().url("$SUBSOURCE_API/subtitle/${found.ref}").build())
+                val token = page.str("subtitle", "download_token") ?: throw Unreadable()
+                bytes(SUBSOURCE, Request.Builder().url("$SUBSOURCE_API/subtitle/download/$token").build()) to found.ref
+            }
+            SUBDL -> bytes(SUBDL, Request.Builder().url(found.ref.takeIf { it.startsWith("https://") } ?: "https://dl.subdl.com${found.ref}").build()) to found.ref
+            else -> {
+                val body = JSONObject().put("file_id", found.ref.toLong()).toString().toRequestBody("application/json".toMediaType())
+                val link = json(OPENSUBTITLES, openSubtitlesCall("https://api.opensubtitles.com/api/v1/download").post(body).build())
+                val url = link.str("link") ?: throw Refused(OPENSUBTITLES, quota = false)
+                bytes(OPENSUBTITLES, Request.Builder().url(url).build()) to (link.str("file_name") ?: "subtitle.srt")
+            }
         }
         return withContext(Dispatchers.IO) {
             val (file, text) = runCatching { open(bytes, name, episode, found.language) }.getOrElse { throw Unreadable() }
-            // A SubDL file sent bare, not zipped, is named after its zip: SubRip, as nearly all are.
+            // A SubSource or SubDL file sent bare, not zipped, is named after its zip or page: SubRip, as nearly all are.
             val type = file.substringAfterLast('.').lowercase().takeIf { it in TYPES } ?: "srt"
             File(dir.apply { mkdirs() }, "${found.source}-${found.ref.hashCode().toUInt()}.$type")
                 .apply { writeText(text) }
@@ -403,7 +541,7 @@ object Subtitles {
 
     /**
      * The body, or why not: [Refused] for the source's own no (406 and 429 its allowance), a plain
-     * IOException for the network. Both sites ask for a User-Agent that names the app.
+     * IOException for the network. The sites ask for a User-Agent that names the app.
      */
     private suspend fun bytes(source: String, request: Request): ByteArray =
         Api.run { client.newCall(request.newBuilder().header("User-Agent", AGENT).build()).await() }.use { response ->

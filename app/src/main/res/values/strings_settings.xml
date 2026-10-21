@@ -87,7 +87,7 @@
     <string name="settings_translators">ساخت زیرنویس فارسی</string>
     <!-- Under each service's name: what its key unlocks, in one short line. -->
     <string name="settings_tmdb_unlocks">نام فارسی، پرطرفدارها و تریلر</string>
-    <string name="settings_subdl_unlocks">یافتن زیرنویس در پخش</string>
+    <string name="settings_subdl_unlocks">زیرنویس‌های بیشتر در پخش</string>
     <string name="settings_opensubtitles_unlocks">زیرنویس‌های بیشتر در پخش</string>
     <string name="settings_translator_unlocks">ترجمهٔ زیرنویس با یک کلیک</string>
     <!-- The group's first row: the model that translates, every provider's in one list (Latin names). -->
@@ -100,11 +100,11 @@
     <string name="settings_model_missing_key">کلید %1$s را پایین‌تر وارد کنید؛ تا آن موقع ترجمه با %2$s است.</string>
     <string name="settings_model_no_key">برای ترجمه، کلید یکی از سرویس‌های پایین را وارد کنید.</string>
     <string name="settings_tmdb_help">پایگاه فیلم TMDB ردیف پرطرفدارها، تریلرها، پیشنهادهای مشابه، تصویر قسمت‌ها و نام فارسی عنوان‌هایی را که ۳۰نما ندارد می‌آورد. کلید رایگان را از صفحهٔ API حساب TMDB بردارید؛ API Key و API Read Access Token هر دو کار می‌کنند.</string>
-    <string name="settings_subdl_help">نتیجه‌های SubDL، که آرشیو زیرنویس فارسی Subscene را دارد، در «یافتن زیرنویس» پخش اول می‌آیند. پس از ثبت‌نام، کلید رایگان را از صفحهٔ API پنل حسابتان بردارید.</string>
+    <string name="settings_subdl_help">نتیجه‌های SubDL، که آرشیو زیرنویس فارسی Subscene را دارد، کنار نتیجه‌های SubSource در «یافتن زیرنویس» پخش می‌آیند. پس از ثبت‌نام، کلید رایگان را از صفحهٔ API پنل حسابتان بردارید.</string>
     <string name="settings_gemini_help">با «ساخت زیرنویس فارسی» در پخش، زیرنویس انگلیسی فیلم را به فارسیِ روان و محاوره‌ای ترجمه می‌کند. کلید را از صفحهٔ API Keys در Google AI Studio بسازید؛ با سهمیهٔ رایگانِ آن، ترجمه هزینه‌ای ندارد.</string>
     <string name="settings_claude_help">با «ساخت زیرنویس فارسی» در پخش، زیرنویس انگلیسی فیلم را به فارسیِ روان و محاوره‌ای ترجمه می‌کند. کلید را از صفحهٔ API Keys کنسول Anthropic بسازید. هزینه از اعتبار حسابتان کم می‌شود. از میان سه سرویس، فارسیِ Claude از همه دقیق‌تر است.</string>
     <string name="settings_openai_help">با «ساخت زیرنویس فارسی» در پخش، زیرنویس انگلیسی فیلم را به فارسیِ روان و محاوره‌ای ترجمه می‌کند. کلید را از صفحهٔ API keys حساب OpenAI بسازید. هزینه از اعتبار حسابتان کم می‌شود.</string>
-    <string name="settings_opensubtitles_help">در «یافتن زیرنویس» پخش، نتیجه‌های OpenSubtitles بعد از SubDL می‌آیند. پس از ثبت‌نام، در صفحهٔ API consumers یک consumer بسازید و کلید API آن را بردارید. هر کلید رایگان روزی ۵ زیرنویس دانلود می‌کند.</string>
+    <string name="settings_opensubtitles_help">نتیجه‌های OpenSubtitles هم کنار نتیجه‌های SubSource در «یافتن زیرنویس» پخش می‌آیند. پس از ثبت‌نام، در صفحهٔ API consumers یک consumer بسازید و کلید API آن را بردارید. هر کلید رایگان روزی ۵ زیرنویس دانلود می‌کند.</string>
     <!-- A key's state, as the row's value; a set key shows its last four characters only. -->
     <string name="settings_key_none">تنظیم نشده</string>
     <string name="settings_key_checking">در حال بررسی…</string>

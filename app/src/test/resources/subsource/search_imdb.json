@@ -1,0 +1,26 @@
+{
+ "success": true,
+ "results": [
+  {
+   "id": 131507,
+   "title": "Dark Matter",
+   "type": "tvseries",
+   "link": "/series/dark-matter-2024",
+   "releaseYear": 2024,
+   "seasons": [
+    {
+     "season": 1,
+     "id": 131507,
+     "link": "/subtitles/dark-matter-2024/season=1"
+    },
+    {
+     "season": 2,
+     "id": 162344,
+     "link": "/subtitles/dark-matter-2024/season=2"
+    }
+   ]
+  }
+ ],
+ "count": 1,
+ "source": "imdb_direct"
+}

@@ -1,0 +1,95 @@
+{
+ "success": true,
+ "results": [
+  {
+   "id": 29130,
+   "title": "Dark Matter",
+   "type": "tvseries",
+   "link": "/series/dark-matter",
+   "releaseYear": 2015,
+   "seasons": [
+    {
+     "season": 0,
+     "id": 113261,
+     "link": "/subtitles/dark-matter/season=0"
+    },
+    {
+     "season": 1,
+     "id": 29130,
+     "link": "/subtitles/dark-matter/season=1"
+    },
+    {
+     "season": 2,
+     "id": 29135,
+     "link": "/subtitles/dark-matter/season=2"
+    },
+    {
+     "season": 3,
+     "id": 29139,
+     "link": "/subtitles/dark-matter/season=3"
+    }
+   ]
+  },
+  {
+   "id": 131507,
+   "title": "Dark Matter",
+   "type": "tvseries",
+   "link": "/series/dark-matter-2024",
+   "releaseYear": 2024,
+   "seasons": [
+    {
+     "season": 1,
+     "id": 131507,
+     "link": "/subtitles/dark-matter-2024/season=1"
+    },
+    {
+     "season": 2,
+     "id": 162344,
+     "link": "/subtitles/dark-matter-2024/season=2"
+    }
+   ]
+  },
+  {
+   "id": 147916,
+   "title": "Trail of Dark Matter",
+   "type": "tvseries",
+   "link": "/series/trail-of-dark-matter-2022",
+   "releaseYear": 2022,
+   "seasons": [
+    {
+     "season": 1,
+     "id": 147916,
+     "link": "/subtitles/trail-of-dark-matter-2022/season=1"
+    }
+   ]
+  },
+  {
+   "id": 29156,
+   "title": "Dark Matter",
+   "type": "movie",
+   "link": "/subtitles/dark-matter-2007",
+   "releaseYear": 2007
+  },
+  {
+   "id": 57826,
+   "title": "Masterpiece: Frank Miller's the Dark Knight Returns",
+   "type": "movie",
+   "link": "/subtitles/masterpiece-frank-millers-the-dark-knight-returns-2013",
+   "releaseYear": 2013
+  },
+  {
+   "id": 147148,
+   "title": "Twilight of the Dark Master",
+   "type": "movie",
+   "link": "/subtitles/twilight-of-the-dark-master-1997",
+   "releaseYear": 1997
+  },
+  {
+   "id": 152911,
+   "title": "The Hunt for Dark Matter",
+   "type": "movie",
+   "link": "/subtitles/the-hunt-for-dark-matter-2017",
+   "releaseYear": 2017
+  }
+ ]
+}

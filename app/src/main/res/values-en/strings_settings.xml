@@ -78,11 +78,11 @@
     <string name="settings_claude_help">Make Persian subtitles, in the player, translates a film\'s English subtitles into natural, spoken Persian. Create a key on the API Keys page of the Anthropic Console. Your account is charged. Of the three, Claude writes the most faithful Persian.</string>
     <string name="settings_openai_help">Make Persian subtitles, in the player, translates a film\'s English subtitles into natural, spoken Persian. Create a key on the API keys page of your OpenAI account. Your account is charged.</string>
     <string name="settings_tmdb_unlocks">Trending and Persian names</string>
-    <string name="settings_subdl_unlocks">Find subtitles in the player</string>
+    <string name="settings_subdl_unlocks">More subtitles in the player</string>
     <string name="settings_opensubtitles_unlocks">More subtitles in the player</string>
     <string name="settings_tmdb_help">TMDB, the film database, brings the trending row, trailers, More Like This, episode stills and Persian names where 30nama has none. Take a free key from the API page of your TMDB account; the API Key and the API Read Access Token both work.</string>
-    <string name="settings_subdl_help">SubDL, which holds Subscene\'s Persian archive, comes first in the player\'s Find subtitles. Sign up, then take your free key from the API page of your account panel.</string>
-    <string name="settings_opensubtitles_help">In the player\'s Find subtitles, OpenSubtitles comes after SubDL. Sign up, create a consumer on the API consumers page and take its API key. A free key downloads 5 subtitles a day.</string>
+    <string name="settings_subdl_help">SubDL, which holds Subscene\'s Persian archive, adds its subtitles to SubSource\'s in the player\'s Find subtitles. Sign up, then take your free key from the API page of your account panel.</string>
+    <string name="settings_opensubtitles_help">OpenSubtitles adds its subtitles to SubSource\'s in the player\'s Find subtitles. Sign up, create a consumer on the API consumers page and take its API key. A free key downloads 5 subtitles a day.</string>
     <string name="settings_key_none">Not set</string>
     <string name="settings_key_checking">Checking…</string>
     <string name="settings_key_rejected">Rejected</string>

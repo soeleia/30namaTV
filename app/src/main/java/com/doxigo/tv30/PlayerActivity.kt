@@ -1006,7 +1006,7 @@ class PlayerFragment : VideoSupportFragment() {
                 languages.map { Choice(languageName(it), it == current) { applySubtitle(it) } } +
                 finds.added.values.map { Choice(it.label.orEmpty(), it.id == current) { pickFound(it.id) } }),
             Group(null, listOfNotNull(
-                Choice(getString(R.string.subtitle_find), null) { findSubtitles() }.takeIf { Subtitles.enabled && wanted() != null },
+                Choice(getString(R.string.subtitle_find), null) { findSubtitles() }.takeIf { wanted() != null },
                 Translator.model?.takeIf { canTranslate() }?.let { model ->
                     Choice(getString(R.string.subtitle_translate), null, translateDetail(model)) {
                         translate()
@@ -1153,13 +1153,19 @@ class PlayerFragment : VideoSupportFragment() {
      * What plays, as the subtitle sites know it: by the IMDb id 30nama links (a series' own, with
      * this file's season and episode), else by the English name and year. The year comes from the
      * title's info, else from the end of its English name ("Black Clover 2017"), as 30nama writes it.
+     * What is known of the file itself ranks what is found: its name, when it has one, and the
+     * quality it plays in (on Auto, the best it has, which a TV soon reaches). 30nama's links to
+     * SubSource come from the title page (Titles.playerFacts).
      */
     private fun wanted(): Subtitles.Wanted? {
         val title = stream?.optJSONObject("info") ?: return null
         val name = title.englishName.ifEmpty { return null }
         val info = file?.optJSONObject("info")
         val season = if (title.isMovie) 0 else info?.optInt("season") ?: 0
-        return Subtitles.Wanted(title.imdbId, name, year()?.toIntOrNull(), season, file?.episodeNumber ?: 0)
+        val sizes = qualities.mapNotNull { q -> q.str("label")?.takeIf { it.any(Char::isDigit) } }
+        val size = qualities.getOrNull(quality)?.str("label")?.takeIf { it in sizes } ?: sizes.maxByOrNull { it.filter(Char::isDigit).toIntOrNull() ?: 0 }
+        val release = listOfNotNull(info?.str("title", "english"), size).joinToString(" ")
+        return Subtitles.Wanted(title.imdbId, name, year()?.toIntOrNull(), season, file?.episodeNumber ?: 0, release, facts.optJSONArray("subtitle"))
     }
 
     /** The title's year, wherever the stream's answer keeps it, else the one its English name ends in ("Dune 2021"). */
@@ -1292,7 +1298,7 @@ class PlayerFragment : VideoSupportFragment() {
     // ---- model the viewer keyed (Translator.kt). Kept on disk, so making it again costs nothing. ----
 
     /** While a model has a key, there is English to start from, and this file has no Persian made yet. */
-    private fun canTranslate() = finds.added.keys.none { it.ref == TRANSLATED } && (englishSource() != null || Subtitles.enabled && wanted() != null)
+    private fun canTranslate() = finds.added.keys.none { it.ref == TRANSLATED } && (englishSource() != null || wanted() != null)
 
     /** The row's quiet line: which model translates, how far it has got, or why it stopped. */
     private fun translateDetail(model: Translator.Model) =
