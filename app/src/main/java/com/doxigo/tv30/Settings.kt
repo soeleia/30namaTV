@@ -73,8 +73,9 @@ object Settings {
 
     /**
      * «صرفه‌جویی در اینترنت», off by default, for metered internet: nothing is fetched ahead of the
-     * remote (home's covers and logos, the hero's next pages), episodes take no new frames
-     * (EpisodeFrames) and the player shows no seek previews. The film's read-ahead keeps [bufferPercent].
+     * remote (home's covers and logos, the hero's next pages, a YouTube trailer's page on the title
+     * page: TrailerActivity.preload), episodes take no new frames (EpisodeFrames) and the player
+     * shows no seek previews. The film's read-ahead keeps [bufferPercent].
      */
     var saveData: Boolean
         get() = prefs.getBoolean("save_data", false)

@@ -2,6 +2,7 @@ package com.doxigo.tv30
 
 import android.content.Context
 import android.content.Intent
+import android.content.MutableContextWrapper
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
@@ -19,6 +20,7 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -47,6 +49,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 class TrailerActivity : TvActivity() {
     private lateinit var player: Player
     private lateinit var video: PlayerView
+    private lateinit var playPause: View
     private lateinit var loading: ProgressBar
     private lateinit var error: LinearLayout
     private lateinit var retry: Button
@@ -56,7 +59,9 @@ class TrailerActivity : TvActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val id = intent.getStringExtra(EXTRA_ID).orEmpty()
-        player = if (intent.getBooleanExtra(EXTRA_YOUTUBE, false)) YoutubePlayer(this, id) else ExoPlayer.Builder(this)
+        player = if (intent.getBooleanExtra(EXTRA_YOUTUBE, false)) {
+            preloaded?.takeIf { it.key == id }?.also { preloaded = null; it.moveTo(this) } ?: YoutubePlayer(this, id)
+        } else ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(OkHttpDataSource.Factory(Api.http)
                 .setDefaultRequestProperties(mapOf("Referer" to "https://www.aparat.com/"))))
             .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
@@ -70,6 +75,7 @@ class TrailerActivity : TvActivity() {
             setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
             isFocusable = true
         }
+        playPause = video.findViewById(androidx.media3.ui.R.id.exo_play_pause)
         // Above PlayerView's blank video surface, under its controls.
         (player as? YoutubePlayer)?.let { video.overlayFrameLayout?.addView(it.view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)) }
         loading = ProgressBar(this)
@@ -158,8 +164,13 @@ class TrailerActivity : TvActivity() {
             else -> return super.dispatchKeyEvent(event)
         }
         if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+            val shown = video.isControllerFullyVisible
             action()
             video.showController()
+            // media3 focuses play / pause only when its controls were gone. For 2 s after they fade
+            // out they are only invisible, the focus on the video itself, and fading back in from
+            // there Android hands it to their first button, back 10 s.
+            if (!shown) playPause.requestFocus()
         }
         return true
     }
@@ -205,6 +216,30 @@ class TrailerActivity : TvActivity() {
         /** Aparat's video [id], or with [youtube] a YouTube video key. */
         fun intent(context: Context, id: String, youtube: Boolean = false): Intent =
             Intent(context, TrailerActivity::class.java).putExtra(EXTRA_ID, id).putExtra(EXTRA_YOUTUBE, youtube)
+
+        /** A YouTube trailer loaded ahead, paused, waiting for its [intent]; one at a time. */
+        private var preloaded: YoutubePlayer? = null
+
+        /**
+         * Loads YouTube video [key] ahead while [page] is started: YouTube's page and player take
+         * seconds on a TV, so a press then only starts the video. Not with Data saver.
+         */
+        fun preload(page: TvActivity, key: String) {
+            if (Settings.saveData) return
+            var mine: YoutubePlayer? = null
+            page.lifecycle.addObserver(LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_START && preloaded?.key != key) {
+                    preloaded?.release()
+                    mine = YoutubePlayer(page, key).apply { prepare() }
+                    preloaded = mine
+                }
+                // A page opened over this one has loaded its own by now, and the trailer took its.
+                if (event == Lifecycle.Event.ON_STOP && preloaded === mine) {
+                    preloaded?.release()
+                    preloaded = null
+                }
+            })
+        }
     }
 }
 
@@ -212,15 +247,17 @@ class TrailerActivity : TvActivity() {
  * A YouTube video as a media3 [Player], so the trailer's PlayerView, keys and lifecycle drive it as
  * they drive Aparat's: YouTube's IFrame API in a [view] with its own controls off. Its streams
  * can't be had otherwise without breaking YouTube's terms. Stop blanks the page (no loading or
- * sound in the background); prepare loads it again at the second it stopped.
+ * sound in the background); prepare loads it again at the second it stopped. Prepared paused on
+ * the title page (TrailerActivity.preload), it [moveTo]s the trailer's window ready to play.
  */
 @UnstableApi
-private class YoutubePlayer(context: Context, private val key: String) : SimpleBasePlayer(Looper.getMainLooper()) {
-    val view = WebView(context).apply {
+private class YoutubePlayer(context: Context, val key: String) : SimpleBasePlayer(Looper.getMainLooper()) {
+    val view = WebView(MutableContextWrapper(context)).apply {
         setBackgroundColor(Color.BLACK)
         isFocusable = false // the keys stay with the activity and the controls
         settings.javaScriptEnabled = true
         settings.mediaPlaybackRequiresUserGesture = false
+        settings.domStorageEnabled = true // YouTube keeps its estimate of the connection's speed there
         addJavascriptInterface(Bridge(), "app")
     }
     private val main = Handler(Looper.getMainLooper())
@@ -297,6 +334,11 @@ private class YoutubePlayer(context: Context, private val key: String) : SimpleB
         return Futures.immediateVoidFuture()
     }
 
+    /** From the page that preloaded it to the trailer's own, which the WebView then answers to. */
+    fun moveTo(context: Context) {
+        (view.context as MutableContextWrapper).baseContext = context
+    }
+
     private fun js(call: String) = view.evaluateJavascript("p && p.$call", null)
 
     /** The page's word, on a WebView thread: brought to the main one, and dropped once stopped. */
@@ -315,6 +357,8 @@ private class YoutubePlayer(context: Context, private val key: String) : SimpleB
             state = when (youtube) {
                 0 -> Player.STATE_ENDED
                 3 -> Player.STATE_BUFFERING
+                // Not started yet: still loading while it is to play, so the spinner stays.
+                -1, 5 -> if (playWhenReady) Player.STATE_BUFFERING else Player.STATE_READY
                 else -> Player.STATE_READY
             }
             playing = youtube == 1

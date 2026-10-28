@@ -175,6 +175,28 @@ object TrailerChecks {
             }
             close()
 
+            // YouTube's page loaded ahead on a started page, taken by the trailer, loaded again
+            // when the page is back, and let go when it stops.
+            val preloadedField = TrailerActivity::class.java.getDeclaredField("preloaded").apply { isAccessible = true }
+            fun preloaded() = preloadedField.get(null)
+            val page = startActivitySync(Intent(targetContext, SettingsActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as SettingsActivity
+            foreground = page
+            var ahead: Any? = null
+            runOnMainSync {
+                TrailerActivity.preload(page, "Way9Dexny3w")
+                ahead = checkNotNull(preloaded()) { "Preload held no player" }
+            }
+            val readyAhead = runCatching { await("", 20_000) { field(ahead!!, "ready") == true } }.isSuccess
+            activity = startActivitySync(TrailerActivity.intent(targetContext, "Way9Dexny3w", youtube = true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as TrailerActivity
+            runOnMainSync { check(field(activity!!, "player") === ahead && preloaded() == null) { "The trailer did not take the preloaded page" } }
+            close()
+            await("Back on the page, the trailer was not loaded again") { preloaded().let { it != null && it !== ahead } }
+            runOnMainSync { page.finish() }
+            foreground = null
+            await("A stopped page kept its preloaded trailer") { preloaded() == null }
+
             host = launch("invalid!")
             val retry = field(host, "retry") as Button
             await("Invalid trailer did not focus Retry") { (field(host, "error") as View).visibility == View.VISIBLE && retry.hasFocus() }
@@ -185,7 +207,7 @@ object TrailerChecks {
                 check(field(host, "loadJob") !== firstLoad) { "Retry did not start a new load" }
             }
             await("Retry lost its error/focus state") { (field(host, "error") as View).visibility == View.VISIBLE && retry.hasFocus() }
-            result.putString("stream", "PASS: ${if (publicPlayed) "real Animals HLS" else "public network unavailable, silence fixture"}; held metadata pause, forward resume, paused rewind, five-second controls, background/return, invalid UID retry\n")
+            result.putString("stream", "PASS: ${if (publicPlayed) "real Animals HLS" else "public network unavailable, silence fixture"}; held metadata pause, forward resume, paused rewind, five-second controls, background/return, YouTube preload hand-off (page ready ahead: $readyAhead), invalid UID retry\n")
         } catch (error: Throwable) {
             result.putString("stream", error.stackTraceToString())
             resultCode = Activity.RESULT_CANCELED

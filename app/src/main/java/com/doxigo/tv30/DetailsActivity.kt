@@ -437,7 +437,10 @@ class DetailsActivity : TvActivity() {
     private suspend fun showTrailer() {
         val sources = Trailer.find(title) ?: return
         trailer.setCompoundDrawablesRelativeWithIntrinsicBounds(sources.icon, 0, 0, 0)
-        if (sources.viaYoutube) trailer.contentDescription = getString(R.string.trailer_on_youtube)
+        if (sources.viaYoutube) {
+            trailer.contentDescription = getString(R.string.trailer_on_youtube)
+            TrailerActivity.preload(this, sources.youtube!!)
+        }
         trailer.setOnClickListener { Trailer.play(this, sources) }
         // With both sources, a long press asks: «آپارات» or «یوتیوب».
         trailer.setOnLongClickListener { Trailer.choose(this, sources); true }
