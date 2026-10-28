@@ -225,7 +225,8 @@ class HomeFragment : BrowseSupportFragment() {
      * press used to wait for its own; now the next one is usually here already. Billboard's
      * request shape (1280x720, centre-crop) makes it a memory hit. Covers the remote has left
      * behind are dropped; the focused one never is, since the billboard's load may be riding on
-     * it (App's DeDupe). Their TMDB logos come along (Logos), until the remote moves on.
+     * it (App's DeDupe). Their TMDB logos (Logos) start at once and finish even once the remote
+     * has moved on, as a lookup cut off at the next press used to leave the billboard asking afresh.
      */
     // ponytail: neighbours in the row only; the rows above and below wait for their own rest.
     private fun follow(card: Card, row: ArrayObjectAdapter?) {
@@ -237,10 +238,10 @@ class HomeFragment : BrowseSupportFragment() {
         if (row == null || at < 0) return
         val nearCards = listOf(at + step, at + 2 * step, at - step).mapNotNull { i -> if (i in 0 until row.size()) row.get(i) as? Card else null }
         val near = nearCards.mapNotNull { it.backdrop }
+        context?.let { context -> nearCards.mapNotNull { it.source }.forEach { lifecycleScope.launch { Logos.prefetch(context, it) } } }
         nearing = lifecycleScope.launch {
             delay(REST)
             val context = context ?: return@launch
-            nearCards.mapNotNull { it.source }.forEach { launch { Logos.prefetch(context, it) } }
             val keep = near + listOfNotNull(card.backdrop)
             nearby.forEach { (url, load) -> if (url !in keep) load.dispose() }
             nearby = near.associateWith { url ->
