@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_group_internet">Internet</string>
+    <string name="settings_save_data">Data saver</string>
+    <string name="settings_save_data_help">Art and logos for the titles ahead aren\'t loaded before you reach them, episodes show the series\' art instead of taking a new frame from their own video, and scrubbing shows no preview frame. For metered internet and VPNs with a data cap. Read-ahead for the film itself is set separately, under Playback.</string>
+</resources>

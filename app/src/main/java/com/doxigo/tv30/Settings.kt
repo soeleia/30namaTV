@@ -71,6 +71,15 @@ object Settings {
         get() = prefs.getBoolean("reduce_motion", false)
         set(v) = prefs.edit().putBoolean("reduce_motion", v).apply()
 
+    /**
+     * «صرفه‌جویی در اینترنت», off by default, for metered internet: nothing is fetched ahead of the
+     * remote (home's covers and logos, the hero's next pages), episodes take no new frames
+     * (EpisodeFrames) and the player shows no seek previews. The film's read-ahead keeps [bufferPercent].
+     */
+    var saveData: Boolean
+        get() = prefs.getBoolean("save_data", false)
+        set(v) = prefs.edit().putBoolean("save_data", v).apply()
+
     /** "off" or a language code. The player's subtitle menu writes it too, so it is also the last choice. */
     var subtitle: String
         get() = prefs.getString("subtitle", null) ?: "fa"

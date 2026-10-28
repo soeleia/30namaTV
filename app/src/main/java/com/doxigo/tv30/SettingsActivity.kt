@@ -558,6 +558,9 @@ class SettingsActivity : TvActivity() {
                 if (Motion.systemReduced) getString(R.string.settings_reduce_motion_system) else null
             },
         )),
+        Group(R.string.settings_group_internet, listOf(
+            toggle(R.string.settings_save_data, text(R.string.settings_save_data_help), { Settings.saveData }, { Settings.saveData = it }),
+        )),
         Group(R.string.settings_group_storage, listOf(
             Option(R.string.settings_image_cache, text(R.string.settings_image_cache_help), value = { size(imageBytes) }, trail = R.drawable.settings_ic_clear) { clearImages() },
             Option(R.string.settings_video_cache, ::videoHelp, value = { size(videoBytes) }, trail = R.drawable.settings_ic_clear) { clearVideo() },

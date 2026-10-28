@@ -141,7 +141,8 @@ class EpisodePresenter(private val owner: LifecycleOwner? = null) : Presenter() 
             scale(Scale.FILL)
             listener(onSuccess = { _, _ -> view.slice(pan(number, rtl)) })
         } else view.still.apply { dispose(); setImageDrawable(null) }
-        frame(view, card.source, extract = owner != null)
+        // Saving data, frames already on disk still show; the rest keep the series' art.
+        frame(view, card.source, extract = owner != null && !Settings.saveData)
         view.settle()
     }
 

@@ -227,6 +227,7 @@ class HomeFragment : BrowseSupportFragment() {
      * behind are dropped; the focused one never is, since the billboard's load may be riding on
      * it (App's DeDupe). Their TMDB logos (Logos) start at once and finish even once the remote
      * has moved on, as a lookup cut off at the next press used to leave the billboard asking afresh.
+     * None of it with Settings.saveData.
      */
     // ponytail: neighbours in the row only; the rows above and below wait for their own rest.
     private fun follow(card: Card, row: ArrayObjectAdapter?) {
@@ -235,7 +236,7 @@ class HomeFragment : BrowseSupportFragment() {
         val step = if (row === restRow && at < restAt) -1 else 1
         restRow = row
         restAt = at
-        if (row == null || at < 0) return
+        if (row == null || at < 0 || Settings.saveData) return
         val nearCards = listOf(at + step, at + 2 * step, at - step).mapNotNull { i -> if (i in 0 until row.size()) row.get(i) as? Card else null }
         val near = nearCards.mapNotNull { it.backdrop }
         context?.let { context -> nearCards.mapNotNull { it.source }.forEach { lifecycleScope.launch { Logos.prefetch(context, it) } } }

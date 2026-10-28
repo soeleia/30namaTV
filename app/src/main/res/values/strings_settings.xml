@@ -8,7 +8,7 @@
     <string name="settings_account">حساب کاربری</string>
     <string name="settings_playback_about">کیفیت، صدا و سرعتی که پخش با آن شروع می‌شود، و آنچه هنگام تماشا خودکار انجام می‌شود: پیش‌بارگذاری برای اینترنت ناپایدار، قسمت بعد و رد تیتراژ.</string>
     <string name="settings_subtitles_about">زبان زیرنویس و ظاهر آن، در همهٔ فیلم‌ها و سریال‌ها.</string>
-    <string name="settings_app_about">زبان برنامه، حافظهٔ موقت و نسخه.</string>
+    <string name="settings_app_about">زبان برنامه، مصرف اینترنت، حافظهٔ موقت و نسخه.</string>
     <string name="settings_account_about">حساب ۳۰نما و اشتراک شما.</string>
 
     <!-- Group titles in the options' panel. -->

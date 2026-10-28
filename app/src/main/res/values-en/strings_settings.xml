@@ -6,7 +6,7 @@
     <string name="settings_account">Account</string>
     <string name="settings_playback_about">The quality, sound and speed playback starts with, and what happens by itself while you watch: preloading for unsteady connections, the next episode, skipping intros.</string>
     <string name="settings_subtitles_about">Subtitle language and look, for every film and series.</string>
-    <string name="settings_app_about">Interface language, caches and version.</string>
+    <string name="settings_app_about">Interface language, data use, caches and version.</string>
     <string name="settings_account_about">Your 30nama account and plan.</string>
 
     <string name="settings_group_quality">Quality &amp; sound</string>

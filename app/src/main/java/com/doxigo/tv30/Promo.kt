@@ -343,9 +343,10 @@ class PromoHero(
     /**
      * The art of the promos either side, fetched while this one shows. Same size and scale as
      * Billboard's request (1280x720, centre-crop), so a page either way comes out of the memory
-     * cache, and so does its logo (Logos.request).
+     * cache, and so does its logo (Logos.request). None with Settings.saveData: each page loads as it comes.
      */
     private fun preload() {
+        if (Settings.saveData) return
         for (at in intArrayOf(index + 1, index - 1).map { it.mod(cards.size) }.distinct()) {
             val url = cards[at].backdrop ?: continue
             if (!preloaded.add(url)) continue

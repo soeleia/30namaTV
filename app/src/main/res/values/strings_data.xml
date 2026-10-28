@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Data saver (Settings, App section). Same orthography as strings.xml. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fa">
+    <string name="settings_group_internet">اینترنت</string>
+    <string name="settings_save_data">صرفه‌جویی در اینترنت</string>
+    <string name="settings_save_data_help">تصویر و لوگوی عنوان‌های بعدی پیش از رسیدن به آن‌ها بارگذاری نمی‌شود، قسمت‌ها قاب تازه‌ای از ویدیوی خود نمی‌گیرند و تصویر سریال را نشان می‌دهند، و هنگام جلو و عقب بردن فیلم پیش‌نمایش تصویر نمی‌آید. برای اینترنت حجمی و VPN با حجم محدود. پیش‌بارگذاری خود فیلم را در بخش «پخش» جداگانه تنظیم کنید.</string>
+</resources>

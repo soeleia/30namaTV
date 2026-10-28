@@ -145,7 +145,7 @@ class SeekPreview(private val root: ViewGroup, private val player: ExoPlayer, pr
     }
 
     private fun open() {
-        if (extractor != null || filmInSoftware) return
+        if (extractor != null || filmInSoftware || Settings.saveData) return
         val url = file()?.let(EpisodeFrames::lowest)?.takeIf { it != broken } ?: return
         if (url != missed) { // close() forgets [url]; this outlives it
             misses = 0
