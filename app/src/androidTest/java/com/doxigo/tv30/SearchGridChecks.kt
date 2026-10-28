@@ -48,6 +48,7 @@ object SearchGridChecks {
         val originalClient = Api.http
         val originalLanguage = Api.language
         val originalLocale = Locale.getDefault()
+        val originalKeys = SearchKeys.chosen(targetContext)
         val originalRecents = Recents.read(instrumentation.targetContext)
         val clientField = Api::class.java.getDeclaredField("http").apply { isAccessible = true }
         val requests = Collections.synchronizedList(mutableListOf<Pair<String, Int>>())
@@ -83,6 +84,7 @@ object SearchGridChecks {
                     clientField.set(Api, client)
                     // Opens on suggestions alone; the recent searches have their own pass below.
                     Recents.clear(targetContext)
+                    SearchKeys.choose(targetContext, false)
                 }
                 activity = startActivitySync(Intent(targetContext, SearchActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 val host = checkNotNull(activity)
@@ -200,6 +202,7 @@ object SearchGridChecks {
                 runOnMainSync { host.finish() }
                 await("Search activity did not close") { host.isDestroyed }
                 activity = null
+                keysRemembered()
             }
             activity = startActivitySync(GridActivity.archive(targetContext, "movies", "Grid check").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             val host = checkNotNull(activity)
@@ -226,6 +229,7 @@ object SearchGridChecks {
                 clientField.set(Api, originalClient)
                 Recents.clear(targetContext)
                 originalRecents.asReversed().forEach { Recents.add(targetContext, it) }
+                SearchKeys.choose(targetContext, originalKeys)
             }
             client.dispatcher.cancelAll()
         }
@@ -378,8 +382,8 @@ object SearchGridChecks {
     /**
      * The box's own Persian keyboard, from the suggestions [recentSearches] left with the remote:
      * Up from under its button reaches the button without going through the field; OK brings the
-     * keys out on «ا»; the D-pad alone types «کیک‌ها ۲» (ک and ی in their Persian forms, a half
-     * space, a space, a digit, and a slip taken back with delete), which reaches the search as
+     * keys out on «ا»; the D-pad alone types «کیک ۲» (ک and ی in their Persian forms, a space,
+     * a digit, and a slip taken back with delete), which reaches the search as
      * typing does while the system keyboard stays down; the remote crosses into the results and back,
      * and up to the button and down again without passing the field; Back puts the keys away onto
      * the results.
@@ -421,12 +425,9 @@ object SearchGridChecks {
         }
         fun letter(text: String) = reach(text) { (it as? TextView)?.text?.toString() == text }
 
-        val word = "\u06A9\u06CC\u06A9\u200C\u0647\u0627 \u06F2" // کیک‌ها ۲
+        val word = "\u06A9\u06CC\u06A9 \u06F2" // کیک ۲
         for (c in listOf("\u06A9", "\u06CC", "\u06A9", "\u0628")) letter(c)
         reach("delete") { it.contentDescription == host.getString(R.string.search_key_delete) }
-        letter(host.getString(R.string.search_key_zwnj))
-        letter("\u0647")
-        letter("\u0627")
         letter(host.getString(R.string.search_key_space))
         letter("\u06F2")
         await("The D-pad's word did not reach the search", detail = {
@@ -461,6 +462,33 @@ object SearchGridChecks {
         }
         await("Putting the keys away lost the word or the button's name") {
             editor.text.toString() == word && (toggle as TextView).text.toString() == host.getString(R.string.search_keyboard)
+        }
+    }
+
+    /**
+     * The keys' button remembered: search opens again on the keys [persianKeyboard] brought out with
+     * it, the remote on «ا» and the system keyboard down; up to the button, which puts them away and
+     * is remembered in turn.
+     */
+    private fun Instrumentation.keysRemembered() {
+        val host = startActivitySync(Intent(targetContext, SearchActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        try {
+            lateinit var fragment: SearchFragment
+            await("Search did not open") {
+                ((host as SearchActivity).supportFragmentManager.findFragmentById(R.id.browse_host) as? SearchFragment)?.takeIf { it.view != null }?.also { fragment = it } != null
+            }
+            val toggle = field(fragment, "toggle") as View
+            val editor = checkNotNull(fragment.view).findViewById<TextView>(androidx.leanback.R.id.lb_search_text_editor)
+            await("Search did not open on the keys their button brought out last", detail = {
+                "open=${field(fragment, "open")}, focus=${host.currentFocus}, ime=${keyboardVisible(host)}"
+            }) { field(fragment, "open") == true && (host.currentFocus as? TextView)?.text?.toString() == "\u0627" && !editor.hasFocus() && !keyboardVisible(host) }
+            repeat(2) { press(KeyEvent.KEYCODE_DPAD_UP) }
+            await("Up from the keys did not reach their button", detail = { "focus=${host.currentFocus}" }) { toggle.hasFocus() }
+            press(KeyEvent.KEYCODE_DPAD_CENTER)
+            await("The button did not put the keys away for next time") { field(fragment, "open") == false && !SearchKeys.chosen(targetContext) }
+        } finally {
+            runOnMainSync { host.finish() }
+            await("Search activity did not close") { host.isDestroyed }
         }
     }
 

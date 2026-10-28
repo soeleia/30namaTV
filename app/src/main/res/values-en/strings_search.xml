@@ -6,7 +6,6 @@
     <string name="search_keyboard">Persian keyboard</string>
     <string name="search_keyboard_close">Close keyboard</string>
     <string name="search_key_space">Space</string>
-    <string name="search_key_zwnj">Half space</string>
     <string name="search_key_delete">Delete</string>
     <string name="search_key_close">Close</string>
 </resources>

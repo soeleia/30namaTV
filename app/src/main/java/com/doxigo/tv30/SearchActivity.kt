@@ -149,7 +149,10 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
         toggle = Button(context, null, 0, R.style.Widget_App_Button_Icon).apply {
             setText(R.string.search_keyboard)
             setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.search_keyboard, 0, 0, 0)
-            setOnClickListener { showKeys(!open) }
+            setOnClickListener {
+                showKeys(!open)
+                SearchKeys.choose(context, open)
+            }
             widenSpaces()
         }
         bar.addView(toggle, RelativeLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
@@ -179,7 +182,7 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
     /**
      * The box's own Persian keyboard, for a TV whose keyboard has no Persian: Netflix's grid in the
      * alphabet's order, seven keys to a row and right to left in either language, as Persian reads,
-     * under a row of space, half space and delete. The digits run on after ؤ and Close fills the last
+     * under a row of space and delete. The digits run on after ؤ and Close fills the last
      * row. A letter or digit is its glyph alone, on the white disc under the remote as a transport
      * button is (trailer_button); the rest are the secondary pill. Built shut: see [showKeys].
      */
@@ -218,8 +221,7 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
             this.text = text
         }
         row().let { top ->
-            add(top, label(getString(R.string.search_key_space), false), 2, true) { type(" ") }
-            add(top, label(getString(R.string.search_key_zwnj), false), 3, true) { type("\u200C") }
+            add(top, label(getString(R.string.search_key_space), false), 5, true) { type(" ") }
             add(top, ImageView(context).apply {
                 setImageResource(R.drawable.search_key_delete)
                 scaleType = ImageView.ScaleType.CENTER
@@ -334,7 +336,8 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
         }
         styleBar(view)
         search(initial, debounce = false)
-        view.post { view.findViewById<View>(androidx.leanback.R.id.lb_search_text_editor)?.requestFocus() }
+        // On the keys if their button last brought them out, so they are never a trip past the field away.
+        view.post { if (SearchKeys.chosen(view.context)) showKeys(true) else editor.requestFocus() }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -576,6 +579,17 @@ internal const val MIN_QUERY = 2
 
 /** What [text] searches for: itself, trimmed, or "" for the suggestions while it is shorter than [MIN_QUERY]. */
 internal fun searchQuery(text: String) = text.trim().takeIf { it.length >= MIN_QUERY }.orEmpty()
+
+/** Whether search opens on its own Persian keys: the choice last made with their button, which Back and Close leave be. */
+object SearchKeys {
+    private const val KEY = "keys"
+
+    fun chosen(context: Context) = prefs(context).getBoolean(KEY, false)
+
+    fun choose(context: Context, keys: Boolean) = prefs(context).edit().putBoolean(KEY, keys).apply()
+
+    private fun prefs(context: Context) = context.getSharedPreferences("search", Context.MODE_PRIVATE)
+}
 
 /** The end of the recent searches: forget them. */
 private object ClearRecents

@@ -20,7 +20,7 @@
     <dimen name="search_keys_feather">32dp</dimen>
     <!-- A letter or digit: the glyph alone at rest, on the white disc under the remote. -->
     <dimen name="search_key_text">20sp</dimen>
-    <!-- Space, half space, delete and close are pills, 8dp apart so a lifted one clears the next. -->
+    <!-- Space, delete and close are pills, 8dp apart so a lifted one clears the next. -->
     <dimen name="search_key_pill_margin">4dp</dimen>
 
     <!-- Clear, ending the recent searches: a bare pill with the bin, dim until the remote reaches

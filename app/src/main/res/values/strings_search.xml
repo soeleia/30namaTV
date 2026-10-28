@@ -10,7 +10,6 @@
     <string name="search_keyboard">صفحه‌کلید فارسی</string>
     <string name="search_keyboard_close">بستن صفحه‌کلید</string>
     <string name="search_key_space">فاصله</string>
-    <string name="search_key_zwnj">نیم‌فاصله</string>
     <string name="search_key_delete">حذف</string>
     <string name="search_key_close">بستن</string>
 </resources>
