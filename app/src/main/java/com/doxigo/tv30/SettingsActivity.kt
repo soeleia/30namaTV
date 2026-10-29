@@ -905,8 +905,8 @@ class SettingsActivity : TvActivity() {
         private const val EXTRA_ROW = "row"
         private const val SUBTITLES = 1
         private const val APP = 2
-        /** App update among App's rows: language, reduce motion, the two caches, version, then it. */
-        private const val UPDATE_ROW = 5
+        /** App update among App's rows: language, reduce motion, data saver, the two caches, version, then it. */
+        private const val UPDATE_ROW = 6
         private const val ACCOUNT = 4
         private const val SEAM = "seam"
         /**

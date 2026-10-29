@@ -83,7 +83,7 @@ object UpdatesChecks {
                 press(if (code == "fa") KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT)
                 onMain { check(host.findViewById<ViewGroup>(R.id.settings_categories).getChildAt(2).hasFocus()) }
                 press(if (code == "fa") KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT)
-                repeat(5) { press(KeyEvent.KEYCODE_DPAD_DOWN) }
+                repeat(6) { press(KeyEvent.KEYCODE_DPAD_DOWN) }
                 onMain { check(update.hasFocus()) { "Remote could not return to App update" } }
 
                 val version = "9.0.0"
