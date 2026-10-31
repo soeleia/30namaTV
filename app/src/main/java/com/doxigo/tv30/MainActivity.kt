@@ -729,14 +729,18 @@ class HomeFragment : BrowseSupportFragment() {
         progressBarManager.hide()
         (activity as? MainActivity)?.homeReady()
         val root = view as? ViewGroup ?: return
-        root.findViewById<View>(androidx.leanback.R.id.browse_container_dock)?.visibility = View.GONE
+        root.findViewById<ViewGroup>(androidx.leanback.R.id.browse_container_dock)?.apply {
+            visibility = View.GONE
+            // Gone is not enough: Leanback's onStart, say, still hands the rows the remote by requestFocus.
+            descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        }
         val note = layoutInflater.inflate(R.layout.home_note, root, false)
         note.findViewById<TextView>(R.id.home_note_hint).text = why
         val action = note.findViewById<View>(R.id.home_note_retry)
         action.setOnClickListener { retry() }
         root.addView(note)
         note.reveal(true)
-        action.requestFocus()
+        action.takeFocus() // in touch mode too, the first press lands on it
     }
 
     /**
@@ -746,7 +750,10 @@ class HomeFragment : BrowseSupportFragment() {
     private fun retry() {
         val root = view as? ViewGroup ?: return
         root.findViewById<View>(R.id.home_note)?.let(root::removeView)
-        root.findViewById<View>(androidx.leanback.R.id.browse_container_dock)?.visibility = View.VISIBLE
+        root.findViewById<ViewGroup>(androidx.leanback.R.id.browse_container_dock)?.apply {
+            descendantFocusability = ViewGroup.FOCUS_BEFORE_DESCENDANTS // Leanback's own
+            visibility = View.VISIBLE
+        }
         load()
     }
 

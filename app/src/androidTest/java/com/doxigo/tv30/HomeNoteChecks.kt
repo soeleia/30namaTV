@@ -61,6 +61,7 @@ object HomeNoteChecks {
             })
         }.build()
         try {
+            setInTouchMode(false) // a remote's window, as on a TV: an earlier check may have left it in touch mode
             for (language in listOf("fa", "en")) {
                 fail = true
                 runOnMainSync {
@@ -76,7 +77,12 @@ object HomeNoteChecks {
                     .putExtra(MainActivity.EXTRA_GUEST, true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
                 val host = checkNotNull(activity)
                 val retry = { host.findViewById<View>(R.id.home_note_retry) }
-                await("No note in home's rows' place ($language)") {
+                var seen = "nothing"
+                await({ "No note in home's rows' place ($language): $seen" }) {
+                    val root = host.window.decorView as android.view.ViewGroup
+                    val notes = root.touchables.count { it.id == R.id.home_note_retry }
+                    seen = "focus ${host.currentFocus?.javaClass?.simpleName}#${host.currentFocus?.id?.takeIf { it != View.NO_ID }?.let(host.resources::getResourceEntryName)}, " +
+                        "$notes Retry, note alpha ${host.findViewById<View>(R.id.home_note)?.alpha}"
                     host.findViewById<View>(R.id.home_note)?.alpha == 1f && retry()?.hasFocus() == true
                 }
                 runOnMainSync {
@@ -134,7 +140,9 @@ object HomeNoteChecks {
         finish(code, result)
     }
 
-    private fun Instrumentation.await(message: String, timeout: Long = 7_000, condition: () -> Boolean) {
+    private fun Instrumentation.await(message: String, timeout: Long = 7_000, condition: () -> Boolean) = await({ message }, timeout, condition)
+
+    private fun Instrumentation.await(message: () -> String, timeout: Long = 7_000, condition: () -> Boolean) {
         val deadline = SystemClock.elapsedRealtime() + timeout
         do {
             var passed = false
@@ -142,6 +150,6 @@ object HomeNoteChecks {
             if (passed) return
             SystemClock.sleep(50)
         } while (SystemClock.elapsedRealtime() < deadline)
-        error(message)
+        error(message())
     }
 }
