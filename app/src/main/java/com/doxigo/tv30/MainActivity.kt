@@ -10,10 +10,9 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.TextView
 import androidx.annotation.StringRes
-import androidx.core.content.ContextCompat
 import androidx.leanback.app.BrowseSupportFragment
-import androidx.leanback.app.ErrorSupportFragment
 import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.ArrayObjectAdapter
 import androidx.leanback.widget.DiffCallback
@@ -112,9 +111,9 @@ class MainActivity : TvActivity() {
     /** A list toggled from a quick-actions sheet over home (Sheets.kt), which never stops it. */
     fun listsChanged() = home?.listsChanged()
 
-    /** Reveal ready rows or the offline notice immediately. */
-    fun homeReady(rows: Boolean) {
-        if (rows) rail?.ready()
+    /** Home has something to focus, its rows or the note in their place: the rail can take the remote, and the intro leaves. */
+    fun homeReady() {
+        rail?.ready()
         intro?.leave()
     }
 
@@ -349,6 +348,8 @@ class HomeFragment : BrowseSupportFragment() {
         super.onStart()
         // Leanback hands the rows the remote on every start; back from the title page or the player, it returns to the hero.
         if (onHero) hero?.focus()
+        // The note in the rows' place asks again on its own, as the title page's does.
+        if (view?.findViewById<View>(R.id.home_note) != null) return retry()
         if (!loaded) return
         // Back from the player: progress moved, and the continue row with it; back from a title
         // page whose toggle changed the watchlist, My List too. A stale home reloads them with the rest.
@@ -401,7 +402,7 @@ class HomeFragment : BrowseSupportFragment() {
                     launch { if (loadContinueWatching()) lookForEpisodes() }
                     launch { loadWatchlist() }
                 }
-                launch { runCatching { Api.home() }.onSuccess { keep(HomeCache.HOME, it); showHome(it) } }
+                launch { runCatching { fetchHome() }.onSuccess { keep(HomeCache.HOME, it); showHome(it) } }
                 launch { loadMenu() }
             }
             showLists()
@@ -412,7 +413,8 @@ class HomeFragment : BrowseSupportFragment() {
     /**
      * With home from the last run on disk (see [drawKept]) it is drawn at once and arrives as the
      * intro allows; the fetch below then lands on it as a refresh does, unchanged cards untouched.
-     * Without one, home arrives when the catalogue answers, as it always did.
+     * Without one, home arrives when the catalogue answers, as it always did, or its rows' place
+     * says why it didn't (see [showNote]).
      */
     private fun load() {
         lifecycleScope.launch {
@@ -426,12 +428,7 @@ class HomeFragment : BrowseSupportFragment() {
             }
             if (arrival == null) progressBarManager.show()
             if (!Api.initialize()) {
-                if (arrival == null) {
-                    progressBarManager.hide()
-                    (activity as? MainActivity)?.homeReady(rows = false)
-                    showOffline()
-                    return@launch
-                }
+                if (arrival == null) return@launch showNote(getString(R.string.no_internet))
                 // Home from the last run stays up and says so quietly, once it is in; it fetches as
                 // soon as a server answers again.
                 arrival.join()
@@ -439,7 +436,7 @@ class HomeFragment : BrowseSupportFragment() {
                 do delay(RETRY) while (!Api.initialize())
             }
             // Account and menu requests must not hold ready catalogue rows behind the intro.
-            val home = async { runCatching { Api.home() } }
+            val home = async { runCatching { fetchHome() } }
             launch { loadMenu() }
             if (Api.loggedIn) {
                 launch { loadUser(); showLists() }
@@ -451,7 +448,11 @@ class HomeFragment : BrowseSupportFragment() {
                 }
                 launch { loadWatchlist() }
             }
-            home.await().onSuccess { keep(HomeCache.HOME, it); showHome(it) }.onFailure { context?.toast(it) }
+            home.await().onSuccess { keep(HomeCache.HOME, it); showHome(it) }.onFailure {
+                // Nothing from the last run is up to fall back on: the rows' place says why.
+                if (arrival == null) return@launch showNote(requireContext().errorText(it))
+                context?.toast(it)
+            }
             showLists()
             if (arrival == null) arrive()
             loadedAt = SystemClock.elapsedRealtime()
@@ -467,7 +468,7 @@ class HomeFragment : BrowseSupportFragment() {
      * intro (if any) starts to dissolve, so it all reads as one move.
      */
     private fun arrive() {
-        (activity as? MainActivity)?.homeReady(rows = true)
+        (activity as? MainActivity)?.homeReady()
         rise()
     }
 
@@ -516,6 +517,13 @@ class HomeFragment : BrowseSupportFragment() {
         }
         showLists()
         return true
+    }
+
+    /** home_stream, refused when it holds nothing to show (no promoted title, no row): kept or drawn, it would only empty home. */
+    private suspend fun fetchHome() = Api.home().also { home ->
+        check(listOf("hero_header", "suggested", "movies", "series", "anime").any { home.optJSONObject(it)?.optJSONArray("posts").objects().isNotEmpty() }) {
+            "home_stream came back empty"
+        }
     }
 
     private suspend fun showHome(home: JSONObject) {
@@ -711,20 +719,35 @@ class HomeFragment : BrowseSupportFragment() {
         setRow(LISTS, R.string.my_lists, cards, lists)
     }
 
-    private fun showOffline() {
-        val context = requireContext()
-        val error = ErrorSupportFragment().apply {
-            message = context.getString(R.string.no_internet)
-            imageDrawable = ContextCompat.getDrawable(context, androidx.leanback.R.drawable.lb_ic_sad_cloud)
-            buttonText = context.getString(R.string.retry)
-            setDefaultBackground(true)
-        }
-        val fragments = requireActivity().supportFragmentManager
-        error.buttonClickListener = View.OnClickListener {
-            fragments.popBackStack()
-            load()
-        }
-        fragments.beginTransaction().add(android.R.id.content, error).addToBackStack(null).commit()
+    /**
+     * Home's rows' place with none to show and none kept from the last run:
+     * «صفحهٔ اصلی بارگیری نشد» over [why], and Retry, which takes the remote. The page is ready, so
+     * the rail can take it too; the rows' dock goes meanwhile, as what is in it (the menu's rows)
+     * would take the remote unseen. Home back in front while it is up asks again on its own (onStart).
+     */
+    private fun showNote(why: String) {
+        progressBarManager.hide()
+        (activity as? MainActivity)?.homeReady()
+        val root = view as? ViewGroup ?: return
+        root.findViewById<View>(androidx.leanback.R.id.browse_container_dock)?.visibility = View.GONE
+        val note = layoutInflater.inflate(R.layout.home_note, root, false)
+        note.findViewById<TextView>(R.id.home_note_hint).text = why
+        val action = note.findViewById<View>(R.id.home_note_retry)
+        action.setOnClickListener { retry() }
+        root.addView(note)
+        note.reveal(true)
+        action.requestFocus()
+    }
+
+    /**
+     * The note goes, then the rows' dock comes back, unseen until the rows rise: in that order the
+     * remote rests nowhere while home asks again as at launch, not on a row it can't see.
+     */
+    private fun retry() {
+        val root = view as? ViewGroup ?: return
+        root.findViewById<View>(R.id.home_note)?.let(root::removeView)
+        root.findViewById<View>(androidx.leanback.R.id.browse_container_dock)?.visibility = View.VISIBLE
+        load()
     }
 
     /**

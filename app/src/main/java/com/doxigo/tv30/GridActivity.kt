@@ -71,6 +71,8 @@ class GridFragment : VerticalGridSupportFragment() {
     private var type: String? = null
     private var filter = Filter()
     private var choices: FilterChoices? = null
+    /** The note in the grid's place says the titles didn't come, with Retry (see [showFailure]). */
+    private var failed = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -110,17 +112,20 @@ class GridFragment : VerticalGridSupportFragment() {
         // takes seconds over a VPN, and a blank page reads as broken.
         pager = Pager(lifecycleScope, items, { t -> t.toCard(context) { context.openDetails(t) } }, onEmpty = {
             when {
-                group != null -> showEmpty(R.string.lists_empty_title, R.string.lists_empty_hint, R.string.suggested_archive, focus = true) {
+                group != null -> showEmpty(R.string.lists_empty_title, getString(R.string.lists_empty_hint), R.string.suggested_archive, focus = true) {
                     startActivity(GridActivity.archive(requireContext(), "suggested", getString(R.string.suggested)))
                     requireActivity().finish()
                 }
                 // The remote stays on the filter just set; the way out is a step down.
-                !filter.isEmpty -> showEmpty(R.string.filter_empty_title, R.string.filter_empty_hint, R.string.filter_clear, focus = false) {
+                !filter.isEmpty -> showEmpty(R.string.filter_empty_title, getString(R.string.filter_empty_hint), R.string.filter_clear, focus = false) {
                     filter(Filter(), view?.findViewById(R.id.filter_genre))
                 }
-                else -> context.toast(getString(R.string.no_results))
+                else -> showFailure(R.string.grid_empty_title, getString(R.string.grid_empty_hint))
             }
-        }, onError = { context.toast(it) }, skeleton = Skeleton(12, 112, 168)) { page ->
+        }, onError = {
+            // Cards up, they stay and the next move asks again; none yet, their place says why.
+            if (items.size() == 0) showFailure(R.string.grid_failed, context.errorText(it)) else context.toast(it)
+        }, skeleton = Skeleton(12, 112, 168)) { page ->
             // Read when the page is asked for: a new sort or filter resets the pager, and the pages
             // still in flight for the old ones are dropped.
             val order = sorts[sort].first
@@ -170,6 +175,12 @@ class GridFragment : VerticalGridSupportFragment() {
             view.findViewById<View>(R.id.grid_filters).visibility = View.INVISIBLE
             if (choices != null) showFilters(reveal = false) // a view rebuilt over the same fragment
         }
+    }
+
+    /** Coming back to the page (from a title, say) while the titles didn't come asks again on its own. */
+    override fun onStart() {
+        super.onStart()
+        if (failed) retry()
     }
 
     /** The sort button names the order now, and tells TalkBack what it is for. */
@@ -257,30 +268,56 @@ class GridFragment : VerticalGridSupportFragment() {
 
     /**
      * Nothing here says so where the grid would be, with one button: a list offers somewhere to
-     * fill it from, as the official app does; a filtered catalogue takes its filters off. With
-     * [focus], the button takes the remote.
+     * fill it from, as the official app does; a filtered catalogue takes its filters off; titles
+     * that didn't come ask again ([showFailure]). With [focus], the button takes the remote.
      */
-    private fun showEmpty(title: Int, hint: Int, action: Int, focus: Boolean, onAction: () -> Unit) {
+    private fun showEmpty(title: Int, hint: CharSequence, action: Int, focus: Boolean, onAction: () -> Unit) {
         val dock = view?.findViewById<ViewGroup>(androidx.leanback.R.id.browse_grid_dock) ?: return
         if (dock.findViewById<View>(R.id.list_empty) != null) return
         val empty = layoutInflater.inflate(R.layout.list_empty, dock, false)
         empty.findViewById<TextView>(R.id.list_empty_title).setText(title)
-        empty.findViewById<TextView>(R.id.list_empty_hint).setText(hint)
+        empty.findViewById<TextView>(R.id.list_empty_hint).text = hint
         val button = empty.findViewById<Button>(R.id.list_empty_action)
         button.setText(action)
         button.setOnClickListener { onAction() }
-        // An empty grid would still take the remote (back down from the sort orb, say) and show nothing.
-        dock.findViewById<View>(androidx.leanback.R.id.browse_grid)?.visibility = View.GONE
         dock.addView(empty)
         rise(listOf(empty))
         if (focus) button.requestFocus()
+        // An empty grid would still take the remote (back down from the sort orb, say) and show
+        // nothing. Hidden once the button has the remote, so a grid holding it hands it straight over.
+        dock.findViewById<View>(androidx.leanback.R.id.browse_grid)?.visibility = View.GONE
         (activity as? GridActivity)?.rail?.ready() // the button is something to come back to
     }
 
     private fun hideEmpty() {
+        failed = false
         val dock = view?.findViewById<ViewGroup>(androidx.leanback.R.id.browse_grid_dock) ?: return
         dock.findViewById<View>(R.id.list_empty)?.let(dock::removeView)
         dock.findViewById<View>(androidx.leanback.R.id.browse_grid)?.visibility = View.VISIBLE
+    }
+
+    /**
+     * The titles didn't come (a first page that failed, an archive with nothing in it): their place
+     * says so, why beneath, with Retry on the remote, as a series' seasons do. A new sort takes the
+     * note away to ask in its order, and coming back to the page asks again.
+     */
+    private fun showFailure(title: Int, why: CharSequence) {
+        hideEmpty() // an empty list's or filter's note from before no longer says what happened
+        showEmpty(title, why, R.string.retry, focus = true) { retry() }
+        failed = true
+    }
+
+    /**
+     * The skeleton back in the note's place while the first page is asked again. A remote on Retry
+     * waits on the grid itself, which hands it to the first poster as the page lands.
+     */
+    private fun retry() {
+        if (view?.findFocus()?.id == R.id.list_empty_action) view?.findViewById<View>(androidx.leanback.R.id.browse_grid)?.run {
+            visibility = View.VISIBLE // before the note goes, or the remote would fall to the bar
+            requestFocus()
+        }
+        hideEmpty()
+        pager.reset()
     }
 
     private fun chooseSort() {
@@ -288,6 +325,7 @@ class GridFragment : VerticalGridSupportFragment() {
             if (which != sort) {
                 sort = which
                 showSort()
+                if (failed) hideEmpty() // an empty list's or filter's note stays: a new order won't fill it
                 pager.reset()
             }
         }

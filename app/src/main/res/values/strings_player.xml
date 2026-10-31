@@ -29,6 +29,8 @@
     <string name="player_error_server">این ویدیو فعلاً در دسترس نیست. کمی بعد دوباره پخش را بزنید.</string>
     <string name="player_error_format">این فایل روی این تلویزیون پخش نمی‌شود. کیفیت دیگری را امتحان کنید.</string>
     <string name="player_error">پخش متوقف شد. دوباره پخش را بزنید.</string>
+    <!-- The player closed before playing: 30nama's answer had no video in it. Said on the page beneath. -->
+    <string name="player_no_files">۳۰نما فعلاً ویدیویی برای این عنوان نفرستاد. کمی بعد دوباره امتحان کنید.</string>
 
     <!-- Find subtitles (Subtitles.kt): the Subtitles column's entry and the page it opens, which
          searches SubDL and OpenSubtitles for what plays. Site names stay Latin and never open a

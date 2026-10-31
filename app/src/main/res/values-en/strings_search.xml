@@ -8,4 +8,6 @@
     <string name="search_key_space">Space</string>
     <string name="search_key_delete">Delete</string>
     <string name="search_key_close">Close</string>
+    <string name="search_failed">Couldn\'t search</string>
+    <string name="suggestions_failed">Couldn\'t load suggestions</string>
 </resources>

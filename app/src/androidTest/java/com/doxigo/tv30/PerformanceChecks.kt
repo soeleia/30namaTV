@@ -74,6 +74,10 @@ class PerformanceChecks : Instrumentation() {
             "logos" -> return LogoChecks.run(this)
             "episodes" -> return EpisodeChecks.run(this)
             "seasons" -> return SeasonsChecks.run(this)
+        "playernotice" -> return PlayerNoticeChecks.run(this)
+        "gridnote" -> return GridNoteChecks.run(this)
+        "homenote" -> return HomeNoteChecks.run(this)
+        "searchnote" -> return SearchNoteChecks.run(this)
         }
         val result = Bundle()
         try {

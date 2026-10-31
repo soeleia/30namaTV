@@ -7,4 +7,5 @@
     <string name="runtime_hours_minutes">%1$dh %2$dm</string>
     <string name="runtime_hours">%dh</string>
     <string name="runtime_minutes">%dm</string>
+    <string name="home_failed">Couldn\'t load home</string>
 </resources>

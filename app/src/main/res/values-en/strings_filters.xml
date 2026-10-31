@@ -13,4 +13,7 @@
     <string name="filter_clear">Clear filters</string>
     <string name="filter_empty_title">Nothing matches these filters</string>
     <string name="filter_empty_hint">Remove one of them, or clear them all.</string>
+    <string name="grid_failed">Couldn\'t load the titles</string>
+    <string name="grid_empty_title">Nothing here yet</string>
+    <string name="grid_empty_hint">30nama sent no titles for this page. Try again in a moment.</string>
 </resources>

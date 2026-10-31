@@ -9,4 +9,6 @@
     <string name="runtime_hours_minutes">%1$d ساعت و %2$d دقیقه</string>
     <string name="runtime_hours">%d ساعت</string>
     <string name="runtime_minutes">%d دقیقه</string>
+    <!-- Over why and Retry in home's rows' place, when they could not be fetched and none were kept. -->
+    <string name="home_failed">صفحهٔ اصلی بارگیری نشد</string>
 </resources>

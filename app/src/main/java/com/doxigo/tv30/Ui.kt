@@ -87,6 +87,12 @@ open class TvActivity : FragmentActivity() {
     /** The remote stopped racing: show what fast mode held back. */
     open fun onSettled() {}
 
+    /** A closed screen's last words ([parting]), said by the page it left the viewer on. */
+    override fun onResume() {
+        super.onResume()
+        if (this !is PlayerActivity) parting?.let { parting = null; toast(it) }
+    }
+
     override fun onPause() {
         super.onPause()
         handler.removeCallbacks(settle)
@@ -136,6 +142,13 @@ fun Context.toast(message: CharSequence?) {
 }
 
 private const val NOTICE = "notice"
+
+/**
+ * Words for whichever of the app's pages comes to the front next, from a screen that closes as it
+ * says them, its own notice closing with it: the player with nothing to play. Every way into the
+ * player has one of the app's pages beneath it.
+ */
+var parting: CharSequence? = null
 
 fun Context.toast(error: Throwable) = toast(errorText(error))
 

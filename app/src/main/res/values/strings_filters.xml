@@ -17,4 +17,9 @@
     <string name="filter_clear">حذف فیلترها</string>
     <string name="filter_empty_title">با این فیلترها عنوانی پیدا نشد</string>
     <string name="filter_empty_hint">یکی از فیلترها را بردارید یا همه را با هم حذف کنید.</string>
+    <!-- In a catalogue's place (a genre, My List…) when its first page failed, over why and «تلاش دوباره». -->
+    <string name="grid_failed">فهرست عنوان‌ها بارگیری نشد</string>
+    <!-- …and when the plain archive came back with nothing in it, over grid_empty_hint. -->
+    <string name="grid_empty_title">هنوز عنوانی اینجا نیست</string>
+    <string name="grid_empty_hint">۳۰نما فعلاً عنوانی در این فهرست نفرستاد. کمی بعد دوباره امتحان کنید.</string>
 </resources>

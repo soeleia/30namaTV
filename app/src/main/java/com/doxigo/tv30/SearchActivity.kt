@@ -504,7 +504,8 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
      * 30nama's suggestions, so the page never opens on an empty screen. Either way the row stands at
      * once, a skeleton until the first page lands; results head it as «نتایج», then with their count
      * once it is known (never the query again: it is in the field just above, and Latin set in Peyda
-     * loses its spaces). Opening a result keeps its query among the recent searches.
+     * loses its spaces), or say there are none or that they failed. Opening a result keeps its
+     * query among the recent searches.
      */
     private fun search(text: String, debounce: Boolean) {
         val q = searchQuery(text)
@@ -538,6 +539,9 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
         }, onError = {
             if (query == q) {
                 context.toast(it)
+                // A first page that failed leaves nothing under the heading, so it says so, the grid
+                // unfocusable as for no results; a later page's keeps the results and their heading.
+                if (items.size() == 0) title(getString(if (q.isEmpty()) R.string.suggestions_failed else R.string.search_failed))
                 showRecents(q.isEmpty())
             }
         }, skeleton = Skeleton(12, 112, 168), onFirst = { total ->

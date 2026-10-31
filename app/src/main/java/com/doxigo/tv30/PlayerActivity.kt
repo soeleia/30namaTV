@@ -399,8 +399,9 @@ class PlayerFragment : VideoSupportFragment() {
         facts = args.getStringExtra("title")?.let { runCatching { JSONObject(it) }.getOrNull() } ?: JSONObject()
         val loaded = runCatching { Api.stream(postId, args.getBooleanExtra("free", false)) }
         val context = context ?: return // left while loading
+        // A notice here would close with the player: the page beneath says why (parting).
         val stream = loaded.getOrElse {
-            context.toast(it)
+            parting = context.errorText(it)
             requireActivity().finish()
             return
         }
@@ -420,6 +421,7 @@ class PlayerFragment : VideoSupportFragment() {
         // The server's point or where this TV left the title, whichever is further on (Watched).
         val point = Watched.resumePoint(context, postId, files, resume)
         val start = chosen?.let { id -> files.firstOrNull { it.str("info", "file_id") == id } } ?: files.getOrNull(point?.first ?: 0) ?: run {
+            parting = context.getString(R.string.player_no_files)
             requireActivity().finish()
             return
         }

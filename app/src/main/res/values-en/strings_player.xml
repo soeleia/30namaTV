@@ -21,6 +21,7 @@
     <string name="player_error_server">This video isn\'t available right now. Press Play again in a moment.</string>
     <string name="player_error_format">This file won\'t play on this TV. Try another quality.</string>
     <string name="player_error">Playback stopped. Press Play to try again.</string>
+    <string name="player_no_files">30nama sent no video for this title. Try again in a moment.</string>
 
     <string name="subtitle_find">Find subtitles</string>
     <string name="subtitle_searching">Searching for subtitles…</string>

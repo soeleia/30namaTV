@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home's rows' place when nothing came and nothing was kept from the last run (HomeFragment's
+     showNote): the title, why, and Retry, centred where the rows would be, under the billboard's
+     room and clear of the rail. Gone until it rises in. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/home_note"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:layout_marginStart="@dimen/content_start"
+    android:layout_marginTop="@dimen/billboard_height"
+    android:clipChildren="false"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:visibility="gone">
+
+    <TextView
+        android:id="@+id/home_note_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/home_failed"
+        android:textAppearance="@style/TextAppearance.App.DialogTitle" />
+
+    <TextView
+        android:id="@+id/home_note_hint"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="center"
+        android:maxWidth="520dp"
+        android:textAppearance="@style/TextAppearance.App.Body"
+        android:textColor="@color/text_dim" />
+
+    <Button
+        android:id="@+id/home_note_retry"
+        style="@style/Widget.App.Button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="@string/retry" />
+</LinearLayout>
