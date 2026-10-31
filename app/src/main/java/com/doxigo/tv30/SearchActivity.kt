@@ -172,10 +172,11 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
                 else -> null
             }
         }
-        // Down from the box, ahead of the keyboard: see [down]. Back puts the keys away: see [back].
+        // Down from the box, ahead of the keyboard: see [down]; after it, with nothing under the box
+        // yet: see [early]. Back puts the keys away: see [back].
         return object : FrameLayout(context) {
             override fun dispatchKeyEventPreIme(event: KeyEvent) = down(event) || super.dispatchKeyEventPreIme(event)
-            override fun dispatchKeyEvent(event: KeyEvent) = back(event) || super.dispatchKeyEvent(event)
+            override fun dispatchKeyEvent(event: KeyEvent) = back(event) || early(event) || super.dispatchKeyEvent(event)
         }.apply { addView(root) }
     }
 
@@ -319,6 +320,17 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
         val box = editor
         if (!box.isFocused || box.selectionEnd != box.length() || box.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) != false) return false
         return under()?.requestFocusFromTouch() == true
+    }
+
+    /**
+     * Down from the box that the keyboard left to the page before anything is under the box: the
+     * remote goes on to the results as they land ([focusResults]), rather than staying in the box,
+     * where OK brings the keyboard back up. Here, not in the focus search, which the field also runs
+     * as the keyboard connects. Never takes the key, so the focus search still runs.
+     */
+    private fun early(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN && event.action == KeyEvent.ACTION_DOWN && bar.hasFocus() && under() == null) moveToResults = true
+        return false
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -549,7 +561,8 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
                 grid.isFocusable = true
                 showRecents(q.isEmpty())
                 if (q.isNotEmpty() && total != null) title(resources.getQuantityString(R.plurals.search_count, total, total))
-                if (moveToResults) focusResults()
+                // Only from the box: a remote that has gone on to the rail or the keys meanwhile stays there.
+                if (moveToResults && bar.hasFocus()) focusResults()
             }
         }) { page ->
             if (page == 1 && waitingForTyping) {

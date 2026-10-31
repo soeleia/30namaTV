@@ -54,6 +54,8 @@ object SearchGridChecks {
         val requests = Collections.synchronizedList(mutableListOf<Pair<String, Int>>())
         val slowStarted = CountDownLatch(1)
         val releaseSlow = CountDownLatch(1)
+        val lateStarted = CountDownLatch(1)
+        val releaseLate = CountDownLatch(1)
         val client = OkHttpClient.Builder().addInterceptor { chain ->
             val body = chain.request().body as? FormBody
             if (body == null) return@addInterceptor Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200).message("OK")
@@ -65,6 +67,10 @@ object SearchGridChecks {
             if (query == "slow") {
                 slowStarted.countDown()
                 check(releaseSlow.await(15, TimeUnit.SECONDS))
+            }
+            if (query == "late") {
+                lateStarted.countDown()
+                check(releaseLate.await(15, TimeUnit.SECONDS))
             }
             val total = when (query) { "none" -> 0; "suggested", "beta" -> 48; else -> 12 }
             val posts = JSONArray()
@@ -181,6 +187,18 @@ object SearchGridChecks {
                     runOnMainSync { fragment.onSearchQuerySubmit("fresh") }
                     releaseSlow.countDown()
                     await("Cancelled search replaced current results") { first(fragment)?.title == "fresh 0" }
+
+                    // Down before the results land waits for them: left in the box, the remote's next OK brings the keyboard back.
+                    text(editor, "late")
+                    runOnMainSync { host.getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(editor.windowToken, 0) }
+                    await("Search keyboard did not hide before an early Down") { !keyboardVisible(host) }
+                    check(lateStarted.await(5, TimeUnit.SECONDS))
+                    press(KeyEvent.KEYCODE_DPAD_DOWN)
+                    runOnMainSync { check(editor.hasFocus()) { "Down left the box before the results landed" } }
+                    releaseLate.countDown()
+                    await("Down before the results landed was lost", detail = {
+                        "grid.hasFocus=${grid.hasFocus()}, focus=${host.currentFocus?.javaClass?.simpleName}"
+                    }) { first(fragment)?.title == "late 0" && grid.hasFocus() }
                 }
                 text(editor, "none")
                 runOnMainSync { fragment.onSearchQuerySubmit("none") }
@@ -214,13 +232,14 @@ object SearchGridChecks {
                     true
                 }
             }
-            result.putString("stream", "PASS: cached pagination after layout, six-column RTL/LTR search, D-pad/editor/rail/clicks, row spacing, pagination, debounce/cancel, empty/error and voice results, recent searches, in-app Persian keyboard\n")
+            result.putString("stream", "PASS: cached pagination after layout, six-column RTL/LTR search, D-pad/editor/rail/clicks, Down before results, row spacing, pagination, debounce/cancel, empty/error and voice results, recent searches, in-app Persian keyboard\n")
         } catch (error: Throwable) {
             capture("search-failure")
             result.putString("stream", error.stackTraceToString())
             resultCode = Activity.RESULT_CANCELED
         } finally {
             releaseSlow.countDown()
+            releaseLate.countDown()
             runOnMainSync { activity?.finish() }
             await("Grid activity did not close") { activity?.isDestroyed != false }
             runOnMainSync {
