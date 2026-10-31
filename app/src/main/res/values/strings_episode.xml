@@ -6,4 +6,8 @@
     <string name="episode_numbered">قسمت %s</string>
     <!-- What a screen reader adds for an episode seen through; its tile wears a check. -->
     <string name="episode_watched">دیده‌شده</string>
+    <!-- In the seasons' place on a series' page when 30nama's answer failed or came back empty, as its row title; why and «تلاش دوباره» beneath. -->
+    <string name="episodes_failed">قسمت‌ها بارگیری نشد</string>
+    <!-- Why, when 30nama answered with no episodes for a series it streams. -->
+    <string name="episodes_none">۳۰نما فعلاً قسمتی از این سریال نفرستاد. کمی بعد دوباره امتحان کنید.</string>
 </resources>

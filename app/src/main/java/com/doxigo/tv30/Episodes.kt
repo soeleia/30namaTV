@@ -15,6 +15,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
+import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -361,6 +362,51 @@ private class EpisodeView(context: Context) : FrameLayout(context) {
         val SEEN = ColorMatrixColorFilter(DIM)
         val GREY_SEEN = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0.5f); postConcat(DIM) })
     }
+}
+
+/**
+ * The seasons' row when they didn't come (DetailsActivity.noteEpisodes): under the row's title, why
+ * ([Card.title]) in the body face and the Retry pill ([Card.subtitle]), as a person's page says it
+ * (PersonActivity.showNote). The note is the row's one stop and the pill wears its state, so Down
+ * from Play turns the pill white and OK asks again.
+ */
+class EpisodesNotePresenter : Presenter() {
+    override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
+        val context = parent.context
+        val dp = context.resources.displayMetrics.density
+        val why = TextView(context).apply {
+            setTextAppearance(R.style.TextAppearance_App_Body)
+            setTextColor(ContextCompat.getColor(context, R.color.text_dim))
+            maxWidth = (520 * dp).toInt()
+            widenSpaces()
+        }
+        val retry = Button(context, null, 0, R.style.Widget_App_Button).apply {
+            isFocusable = false
+            isDuplicateParentStateEnabled = true
+            widenSpaces()
+        }
+        return ViewHolder(LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            isFocusable = true
+            isFocusableInTouchMode = true
+            clipChildren = false // the pill's focus lift
+            // Both wrapped: a vertical layout's default fills its width, here the pill's, and cut why to a line.
+            addView(why, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            addView(retry, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                topMargin = (20 * dp).toInt()
+            })
+        })
+    }
+
+    override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {
+        val card = item as Card
+        val note = viewHolder.view as LinearLayout
+        (note.getChildAt(0) as TextView).text = card.title
+        (note.getChildAt(1) as TextView).text = card.subtitle
+        note.contentDescription = "${card.title} ${card.subtitle}"
+    }
+
+    override fun onUnbindViewHolder(viewHolder: ViewHolder) = Unit
 }
 
 /**

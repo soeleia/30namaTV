@@ -26,6 +26,8 @@ import androidx.leanback.widget.OnItemViewClickedListener
 import androidx.leanback.widget.VerticalGridView
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -43,7 +45,7 @@ class DetailsActivity : TvActivity() {
     private lateinit var trailer: Button
     private val toggles = mutableMapOf<String, Button>()
     private lateinit var rowsFragment: RowsSupportFragment
-    /** Start-anchored rows that remember their card, as on home; each row's id is its place here. */
+    /** Start-anchored rows that remember their card, as on home, by [rowIds]. */
     private val rows = ArrayObjectAdapter(CardRowPresenter())
     private var resumeLabel: String? = null
     /** What Play does with [resumeLabel]'s episode: resume it, start the next one (UpNext.kt), or start it over. */
@@ -52,6 +54,12 @@ class DetailsActivity : TvActivity() {
     private var landing: Pair<Int, Int>? = null
     /** The seasons' rows of tiles, in order; coming back to the page their tiles catch up in place (see [onRestart]). */
     private val episodeRows = mutableListOf<ArrayObjectAdapter>()
+    /** In the seasons' place while 30nama's answer failed or came back empty (see [noteEpisodes]). */
+    private var episodesNote: ListRow? = null
+    /** Another ask for the episodes, from the note or on coming back; one at a time. */
+    private var episodesAsk: Job? = null
+    /** Each row's id, which keeps its last focused card: rows come and go, so not their place. */
+    private var rowIds = 0L
     /** TMDB's entry for the title, once it lands: the logo, the tagline, a series' state and network, a synopsis where 30nama has none. */
     private var tmdb: JSONObject? = null
     /**
@@ -85,7 +93,10 @@ class DetailsActivity : TvActivity() {
         val past = PastRows { fragment.verticalGridView }
         fragment.setOnItemViewSelectedListener { _, _, _, _ -> past.update() }
         fragment.setAlignment(waiting)
-        window.decorView.viewTreeObserver.addOnGlobalFocusChangeListener { _, _ ->
+        window.decorView.viewTreeObserver.addOnGlobalFocusChangeListener { old, _ ->
+            // Focus from nowhere fell from a view taken away (the seasons replacing their note), and
+            // the grid gives it back in the same layout: not the remote moving, so nothing moves.
+            if (old == null) return@addOnGlobalFocusChangeListener
             val inRows = fragment.view?.hasFocus() == true
             if (inRows == risen) return@addOnGlobalFocusChangeListener
             risen = inRows
@@ -164,7 +175,11 @@ class DetailsActivity : TvActivity() {
     /** Back from the player, most likely: the server's point has moved and Watched with it, so Play and the tiles follow. */
     override fun onRestart() {
         super.onRestart()
-        if (episodeRows.isNotEmpty()) lifecycleScope.launch { loadEpisodes() }
+        if (episodeRows.isNotEmpty() || episodesNote != null) askEpisodes()
+    }
+
+    private fun askEpisodes() {
+        if (episodesAsk?.isActive != true) episodesAsk = lifecycleScope.launch { loadEpisodes() }
     }
 
     private fun bind() {
@@ -351,10 +366,17 @@ class DetailsActivity : TvActivity() {
      */
     private suspend fun loadEpisodes() {
         if (title.isMovie || !title.streamable) return
-        val stream = runCatching { Api.stream(title.titleId, title.isFree) }.getOrNull() ?: return
+        val stream = runCatching { Api.stream(title.titleId, title.isFree) }.getOrElse {
+            if (it is CancellationException) throw it
+            // Tiles already up keep what they show; none yet, their place says why.
+            if (episodeRows.isEmpty()) noteEpisodes(errorText(it))
+            return
+        }
         // Play's episode by the player's own rule (UpNext.kt): saved in the credits, it is the next one
         // not yet seen, from its start (a finale starts over), so the button and the marked tile say what Play does.
         val all = stream.optJSONArray("hls").objects()
+        val seasons = all.groupBy { it.obj("info")?.optInt("season") ?: 0 }.filterKeys { it != 0 }.toSortedMap()
+        if (seasons.isEmpty()) return run { if (episodeRows.isEmpty()) noteEpisodes(getString(R.string.episodes_none)) }
         val saved = stream.optJSONObject("continue_watching")
         // The server's point or where this TV left it, as the player picks (Watched.resumePoint).
         val point = Watched.resumePoint(this, title.titleId, all, saved)
@@ -375,8 +397,7 @@ class DetailsActivity : TvActivity() {
         resumeLabel = null
         landing = null
         var index = 0
-        stream.optJSONArray("hls").objects().groupBy { it.obj("info")?.optInt("season") ?: 0 }.toSortedMap().forEach { (season, files) ->
-            if (season == 0) return@forEach
+        seasons.forEach { (season, files) ->
             fun card(file: JSONObject): Card {
                 val fileId = file.str("info", "file_id")
                 return episodeCard(file, watching?.takeIf { fileId != null && fileId == resumeFile }, title.cover) {
@@ -397,11 +418,38 @@ class DetailsActivity : TvActivity() {
                 }
                 val header = if (stretches.isEmpty()) name else getString(R.string.season_range, name, rangeLabel(files, range))
                 val row = ArrayObjectAdapter(episodes).apply { setItems(cards, null) }
-                rows.add(ListRow(HeaderItem(rows.size().toLong(), header), row))
+                val seasonRow = ListRow(HeaderItem(rowIds++, header), row)
+                // The note gives its place to the first season, so a remote on it stays in that row.
+                if (at == 0 && episodesNote != null) rows.replace(0, seasonRow) else rows.add(at, seasonRow)
                 episodeRows += row
             }
         }
         updateActions()
+        if (episodesNote == null) return
+        episodesNote = null
+        // Asked again from the note, the remote is in the rows already: on to Play's episode.
+        if (rowsFragment.view?.hasFocus() == true) {
+            val (row, tile) = landing ?: (0 to 0)
+            landing = null
+            rowsFragment.setSelectedPosition(row, false, ListRowPresenter.SelectItemViewHolderTask(tile).apply { isSmoothScroll = false })
+        }
+    }
+
+    /**
+     * The seasons' place while 30nama's answer failed or came back empty: «قسمت‌ها بارگیری نشد» over
+     * [why] and Retry, where the first season would be, so the page never just goes without them.
+     * Down from Play lands on it; coming back to the page asks again on its own (see [onRestart]).
+     */
+    private fun noteEpisodes(why: String) {
+        val card = Card(why, getString(R.string.retry)) {
+            if (episodesAsk?.isActive == true) return@Card
+            (episodesNote?.adapter as? ArrayObjectAdapter)?.replace(0, Card(why, getString(R.string.intro_loading)) {})
+            askEpisodes()
+        }
+        episodesNote?.let { return (it.adapter as ArrayObjectAdapter).replace(0, card) }
+        val note = ListRow(HeaderItem(rowIds++, getString(R.string.episodes_failed)), ArrayObjectAdapter(EpisodesNotePresenter()).apply { add(card) })
+        rows.add(0, note)
+        episodesNote = note
     }
 
     private fun showCast() {
@@ -430,7 +478,7 @@ class DetailsActivity : TvActivity() {
         val cards = cast + makers
         if (cards.isEmpty()) return
         val header = getString(if (makers.isEmpty()) R.string.cast else R.string.person_cast_crew)
-        rows.add(ListRow(HeaderItem(rows.size().toLong(), header), ArrayObjectAdapter(CastPresenter()).apply { setItems(cards, null) }))
+        rows.add(ListRow(HeaderItem(rowIds++, header), ArrayObjectAdapter(CastPresenter()).apply { setItems(cards, null) }))
     }
 
     /** «تریلر» once there is somewhere to play one from: Aparat in Iran, YouTube elsewhere (Trailer.kt). */
@@ -450,7 +498,7 @@ class DetailsActivity : TvActivity() {
     /** The last row: «عناوین مشابه» from TMDB, else «بیشتر در درام», as posters. */
     private fun showSimilar(shelf: Similar.Shelf) {
         val cards = shelf.titles.map { t -> t.toCard(this) { openDetails(t) } }
-        rows.add(ListRow(HeaderItem(rows.size().toLong(), shelf.name), ArrayObjectAdapter(PosterPresenter(108, 162)).apply { setItems(cards, null) }))
+        rows.add(ListRow(HeaderItem(rowIds++, shelf.name), ArrayObjectAdapter(PosterPresenter(108, 162)).apply { setItems(cards, null) }))
     }
 
     companion object {

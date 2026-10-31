@@ -73,6 +73,7 @@ class PerformanceChecks : Instrumentation() {
             "preview" -> return SeekPreviewChecks.run(this)
             "logos" -> return LogoChecks.run(this)
             "episodes" -> return EpisodeChecks.run(this)
+            "seasons" -> return SeasonsChecks.run(this)
         }
         val result = Bundle()
         try {
