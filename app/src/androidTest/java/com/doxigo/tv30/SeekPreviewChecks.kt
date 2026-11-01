@@ -6,7 +6,6 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.os.SystemClock
-import android.util.LruCache
 import android.view.KeyEvent
 import android.view.View
 import android.widget.ImageView
@@ -21,7 +20,8 @@ import java.io.File
 /**
  * Run with -e check preview. A film on a public HLS stream, played at 480p with a 240p quality
  * beside it: scrubbing the bar shows that quality's frame over the dot (SeekPreview), Persian then
- * English. In Persian the same rounds of scrubbing, landing and playing on run with the previews
+ * English. In English the storyboard fills on its own from segments read only to their keyframes,
+ * and a press then shows its frame within half a second. In Persian the same rounds of scrubbing, landing and playing on run with the previews
  * off, then on, and the result reports the player's dropped frames for each.
  */
 object SeekPreviewChecks {
@@ -113,6 +113,18 @@ object SeekPreviewChecks {
                     return "dropped ${dropped1 - dropped0} of ${dropped1 - dropped0 + rendered1 - rendered0} frames, preview shown in $shown of $rounds rounds"
                 }
 
+                /** Ms from a press of [key] to the card coming up with a frame. */
+                fun firstFrameMs(key: Int): Long {
+                    val pressed = SystemClock.elapsedRealtime()
+                    sendKeyDownUpSync(key)
+                    var showing = false
+                    while (!showing && SystemClock.elapsedRealtime() - pressed < 3_000) {
+                        runOnMainSync { showing = card.visibility == View.VISIBLE && image.drawable != null }
+                        if (!showing) SystemClock.sleep(10)
+                    }
+                    return SystemClock.elapsedRealtime() - pressed
+                }
+
                 var soft = false
                 runOnMainSync { soft = field(preview, "filmInSoftware") as Boolean }
                 if (soft) {
@@ -130,7 +142,7 @@ object SeekPreviewChecks {
                                 exo.play()
                             }
                             // Opened a few seconds into playing, the frame where the playhead is already decoded.
-                            await("The extractor did not open and warm", 30_000) { (field(preview, "frames") as LruCache<*, *>).size() > 0 }
+                            await("The extractor did not open and warm", 30_000) { frames(preview) > 0 }
                         } else runOnMainSync {
                             preview.close()
                             setField(preview, "broken", lowest())
@@ -140,10 +152,19 @@ object SeekPreviewChecks {
                         check(rounds.contains("shown in 0 of") != on) { "Previews ${if (on) "missing" else "shown while off"}" }
                     }
                 } else {
-                    await("The extractor did not open and warm", 30_000) { (field(preview, "frames") as LruCache<*, *>).size() > 0 }
-                    // Forward, then back over the frames that came meanwhile: these show at once.
-                    scrub(1)
-                    await("No frame came for the scrub", 30_000) { (field(preview, "frames") as LruCache<*, *>).size() > 1 }
+                    // The storyboard fills on its own, every segment of this 10-minute film read only to its keyframe.
+                    val segments = { (field(preview, "starts") as LongArray?)?.size ?: Int.MAX_VALUE }
+                    val took = SystemClock.elapsedRealtime()
+                    await("The storyboard did not fill", 60_000) { frames(preview) >= segments() }
+                    report.append("storyboard (en): ${frames(preview)} frames in ${SystemClock.elapsedRealtime() - took} ms\n")
+                    var cut = false
+                    runOnMainSync { cut = field(field(preview, "heads")!!, "cut") as Boolean }
+                    check(cut) { "Segments came whole: the range was refused" }
+                    // A press anywhere shows its frame at once, from the storyboard.
+                    val shownIn = firstFrameMs(KeyEvent.KEYCODE_DPAD_RIGHT)
+                    report.append("first preview (en): $shownIn ms after the press\n")
+                    check(shownIn < 500) { "The preview took $shownIn ms" }
+                    await("The seek did not land", 30_000) { exo.isPlaying }
                     val back = scrub(1, "preview-seek-en", KeyEvent.KEYCODE_DPAD_LEFT)
                     report.append("on (en): $back\n")
                     check(!back.contains("shown in 0 of")) { "No preview showed while scrubbing in English" }
@@ -168,6 +189,8 @@ object SeekPreviewChecks {
         }
         finish(resultCode, result)
     }
+
+    private fun frames(preview: SeekPreview) = (field(preview, "frames") as Map<*, *>).size
 
     private fun field(instance: Any, name: String): Any? =
         instance.javaClass.getDeclaredField(name).apply { isAccessible = true }.get(instance)

@@ -72,7 +72,8 @@ object Buffering {
      */
     val priority = PriorityTaskManager()
 
-    private val upstream by lazy { OkHttpDataSource.Factory(cdn).setUserAgent(Api.userAgent) }
+    /** Straight to the CDN on [cdn], no disk: playlists, and the seek previews' cut segments (SeekPreview). */
+    val upstream by lazy { OkHttpDataSource.Factory(cdn).setUserAgent(Api.userAgent) }
 
     private val key = CacheKeyFactory { spec -> spec.key ?: cacheKey(spec.uri.toString()) }
 
@@ -262,6 +263,12 @@ object Buffering {
             it.open()
             HlsPlaylistParser().parse(source.uri ?: Uri.parse(url), it)
         }
+    }
+
+    /** [url]'s media playlist; a multivariant one leads to its lowest variant. Blocks on the network. */
+    fun mediaPlaylist(url: String): HlsMediaPlaylist? = when (val fetched = playlist(url)) {
+        is HlsMultivariantPlaylist -> fetched.nearest(0)?.let { playlist(it) as? HlsMediaPlaylist }
+        else -> fetched as? HlsMediaPlaylist
     }
 
     /** The variant nearest [bitrate], the one the player reads at that rate. */
