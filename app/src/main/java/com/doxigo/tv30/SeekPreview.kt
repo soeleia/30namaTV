@@ -277,7 +277,7 @@ class SeekPreview(private val root: ViewGroup, private val player: ExoPlayer, pr
             // The frames already taken still show.
             val network = (e.cause as? PlaybackException)?.errorCode in 2000..2999
             if (!network || ++misses >= 3) broken = url
-            Buffering.cdn.connectionPool.evictAll()
+            Api.scope.launch(Dispatchers.IO) { Buffering.cdn.connectionPool.evictAll() } // closing a TLS socket writes to it: on the main thread an older Android kills the app
             release()
             if (broken == null) root.postDelayed(pump, RETRY_MS)
         }
