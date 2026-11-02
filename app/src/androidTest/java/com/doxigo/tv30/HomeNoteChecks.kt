@@ -25,6 +25,9 @@ import java.util.Locale
  */
 object HomeNoteChecks {
     @Volatile private var fail = true
+    /** 30nama's calls this round, with their ms since it started: what a failure reports. */
+    private val calls = java.util.Collections.synchronizedList(ArrayList<String>())
+    @Volatile private var roundAt = 0L
 
     fun run(instrumentation: Instrumentation) = with(instrumentation) {
         val result = Bundle()
@@ -55,6 +58,7 @@ object HomeNoteChecks {
                 Response.Builder().request(request).protocol(Protocol.HTTP_1_1).code(status).message("-").body(body.toResponseBody()).build()
             }
             if ("/action/" !in request.url.encodedPath) return@addInterceptor reply(404, "")
+            calls += "${request.url.pathSegments.last()}${if (fail) "" else " (ok)"} +${SystemClock.elapsedRealtime() - roundAt}"
             reply(200, when (request.url.pathSegments.last()) {
                 "home_stream" -> if (fail) """{"success":false}""" else """{"success":true,"result":$home}"""
                 else -> """{"success":true,"result":{}}"""
@@ -64,6 +68,8 @@ object HomeNoteChecks {
             setInTouchMode(false) // a remote's window, as on a TV: an earlier check may have left it in touch mode
             for (language in listOf("fa", "en")) {
                 fail = true
+                calls.clear()
+                roundAt = SystemClock.elapsedRealtime()
                 runOnMainSync {
                     clientField.set(Api, client)
                     Api.language = language
@@ -78,7 +84,6 @@ object HomeNoteChecks {
                 val host = checkNotNull(activity)
                 val retry = { host.findViewById<View>(R.id.home_note_retry) }
                 var seen = "nothing"
-                val started = System.currentTimeMillis()
                 await({ "No note in home's rows' place ($language): $seen" }) {
                     val root = host.window.decorView as android.view.ViewGroup
                     val notes = root.touchables.count { it.id == R.id.home_note_retry }
@@ -89,14 +94,11 @@ object HomeNoteChecks {
                     fun spinners(v: View): Int = (if (v is android.widget.ProgressBar && v.isShown) 1 else 0) +
                         ((v as? android.view.ViewGroup)?.let { g -> (0 until g.childCount).sumOf { spinners(g.getChildAt(it)) } } ?: 0)
                     val dock = host.findViewById<View>(androidx.leanback.R.id.browse_container_dock)
-                    val answered = listOf("test", "home_stream", "menu").joinToString { action ->
-                        val file = targetContext.filesDir.resolve("dump/$action.json")
-                        "$action ${if (file.lastModified() >= started) "at +${file.lastModified() - started} ms" else "not yet"}"
-                    }
                     seen = "focus ${host.currentFocus?.javaClass?.simpleName}#${host.currentFocus?.id?.takeIf { it != View.NO_ID }?.let(host.resources::getResourceEntryName)}, " +
                         "$notes Retry, note alpha ${host.findViewById<View>(R.id.home_note)?.alpha}; ${homes.size} home, view ${home?.view != null}, " +
                         "loaded ${field("loaded")}, riseOnView ${field("riseOnView")}, rows ${home?.adapter?.size()}, dock ${dock?.visibility} alpha ${dock?.alpha}, " +
-                        "${spinners(root)} spinner, destroyed ${host.isDestroyed}; $answered"
+                        "${spinners(root)} spinner, ${host.lifecycle.currentState}, home ${home?.lifecycle?.currentState}, window focus ${host.hasWindowFocus()}, " +
+                        "at +${SystemClock.elapsedRealtime() - roundAt} ms; calls ${synchronized(calls) { calls.toList() }}"
                     host.findViewById<View>(R.id.home_note)?.alpha == 1f && retry()?.hasFocus() == true
                 }
                 runOnMainSync {
