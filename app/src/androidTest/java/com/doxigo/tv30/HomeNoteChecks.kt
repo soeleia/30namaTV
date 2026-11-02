@@ -78,11 +78,25 @@ object HomeNoteChecks {
                 val host = checkNotNull(activity)
                 val retry = { host.findViewById<View>(R.id.home_note_retry) }
                 var seen = "nothing"
+                val started = System.currentTimeMillis()
                 await({ "No note in home's rows' place ($language): $seen" }) {
                     val root = host.window.decorView as android.view.ViewGroup
                     val notes = root.touchables.count { it.id == R.id.home_note_retry }
+                    // What home is doing instead, for a failure on CI's Android 11 that never shows here.
+                    val homes = host.supportFragmentManager.fragments.filterIsInstance<HomeFragment>()
+                    val home = homes.firstOrNull()
+                    fun field(name: String) = home?.let { HomeFragment::class.java.getDeclaredField(name).apply { isAccessible = true }.get(it) }
+                    fun spinners(v: View): Int = (if (v is android.widget.ProgressBar && v.isShown) 1 else 0) +
+                        ((v as? android.view.ViewGroup)?.let { g -> (0 until g.childCount).sumOf { spinners(g.getChildAt(it)) } } ?: 0)
+                    val dock = host.findViewById<View>(androidx.leanback.R.id.browse_container_dock)
+                    val answered = listOf("test", "home_stream", "menu").joinToString { action ->
+                        val file = targetContext.filesDir.resolve("dump/$action.json")
+                        "$action ${if (file.lastModified() >= started) "at +${file.lastModified() - started} ms" else "not yet"}"
+                    }
                     seen = "focus ${host.currentFocus?.javaClass?.simpleName}#${host.currentFocus?.id?.takeIf { it != View.NO_ID }?.let(host.resources::getResourceEntryName)}, " +
-                        "$notes Retry, note alpha ${host.findViewById<View>(R.id.home_note)?.alpha}"
+                        "$notes Retry, note alpha ${host.findViewById<View>(R.id.home_note)?.alpha}; ${homes.size} home, view ${home?.view != null}, " +
+                        "loaded ${field("loaded")}, riseOnView ${field("riseOnView")}, rows ${home?.adapter?.size()}, dock ${dock?.visibility} alpha ${dock?.alpha}, " +
+                        "${spinners(root)} spinner, destroyed ${host.isDestroyed}; $answered"
                     host.findViewById<View>(R.id.home_note)?.alpha == 1f && retry()?.hasFocus() == true
                 }
                 runOnMainSync {
