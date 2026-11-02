@@ -319,7 +319,9 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
         if (Build.VERSION.SDK_INT < 30 || event.keyCode != KeyEvent.KEYCODE_DPAD_DOWN || event.action != KeyEvent.ACTION_DOWN) return false
         val box = editor
         if (!box.isFocused || box.selectionEnd != box.length() || box.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) != false) return false
-        return under()?.requestFocusFromTouch() == true
+        // Nothing under the box yet: on to the results as they land, as [early] would, had the keyboard let it see the key.
+        val next = under() ?: return false.also { moveToResults = true }
+        return next.requestFocusFromTouch()
     }
 
     /**
