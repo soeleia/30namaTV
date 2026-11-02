@@ -89,7 +89,8 @@ object FiltersChecks {
                     .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) as GridActivity
                 activity = host
                 fun <T : View> view(id: Int): T = host.findViewById(id)
-                val grid = view<VerticalGridView>(androidx.leanback.R.id.browse_grid)
+                lateinit var grid: VerticalGridView
+                runOnMainSync { grid = view(androidx.leanback.R.id.browse_grid) } // the screen may still be adding views
                 fun first(at: Int = 0): String? = (host.supportFragmentManager.findFragmentById(R.id.browse_host) as? GridFragment)
                     ?.adapter?.let { if (it.size() > at) (it[at] as? Card)?.title else null }
                 fun focused() = host.currentFocus

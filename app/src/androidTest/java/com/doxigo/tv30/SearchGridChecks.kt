@@ -497,7 +497,8 @@ object SearchGridChecks {
                 ((host as SearchActivity).supportFragmentManager.findFragmentById(R.id.browse_host) as? SearchFragment)?.takeIf { it.view != null }?.also { fragment = it } != null
             }
             val toggle = field(fragment, "toggle") as View
-            val editor = checkNotNull(fragment.view).findViewById<TextView>(androidx.leanback.R.id.lb_search_text_editor)
+            lateinit var editor: TextView
+            runOnMainSync { editor = checkNotNull(fragment.view).findViewById(androidx.leanback.R.id.lb_search_text_editor) } // the screen may still be adding views
             await("Search did not open on the keys their button brought out last", detail = {
                 "open=${field(fragment, "open")}, focus=${host.currentFocus}, ime=${keyboardVisible(host)}"
             }) { field(fragment, "open") == true && (host.currentFocus as? TextView)?.text?.toString() == "\u0627" && !editor.hasFocus() && !keyboardVisible(host) }

@@ -73,7 +73,8 @@ object GridNoteChecks {
                 activity = startActivitySync(GridActivity.archive(targetContext, "drama", if (language == "fa") "درام" else "Drama")
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as GridActivity
                 val host = checkNotNull(activity)
-                val grid = host.findViewById<VerticalGridView>(androidx.leanback.R.id.browse_grid)
+                lateinit var grid: VerticalGridView
+                runOnMainSync { grid = host.findViewById(androidx.leanback.R.id.browse_grid) } // the screen may still be adding views
                 val title = host.getString(if (broken == "fail") R.string.grid_failed else R.string.grid_empty_title)
                 val why = host.getString(if (broken == "fail") R.string.error_server else R.string.grid_empty_hint)
                 fun text(id: Int) = host.findViewById<TextView>(id)?.text?.toString()

@@ -78,9 +78,14 @@ object SearchNoteChecks {
                 await("Search did not open ($language)") {
                     (host.supportFragmentManager.findFragmentById(R.id.browse_host) as? SearchFragment)?.takeIf { it.view != null }?.also { fragment = it } != null
                 }
-                val view = checkNotNull(fragment.view)
-                val grid = view.findViewById<VerticalGridView>(androidx.leanback.R.id.browse_grid)
-                val editor = view.findViewById<TextView>(androidx.leanback.R.id.lb_search_text_editor)
+                lateinit var grid: VerticalGridView
+                lateinit var editor: TextView
+                // On the main thread: the screen is still adding views, and a lookup from here met a null child.
+                runOnMainSync {
+                    val view = checkNotNull(fragment.view)
+                    grid = view.findViewById(androidx.leanback.R.id.browse_grid)
+                    editor = view.findViewById(androidx.leanback.R.id.lb_search_text_editor)
+                }
                 val heading = { (field(fragment, "heading") as TextView).text.toString() }
                 val cards = { (field(fragment, "pager") as Pager).adapter.size() }
                 fun failed(note: Int) = await({ "The heading did not say the search failed ($language): «${heading()}», ${cards()} cards, focusable ${grid.isFocusable}" }) {
