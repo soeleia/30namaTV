@@ -25,7 +25,7 @@ import kotlin.math.roundToInt
  *
  * Shut, the rail is a scope of its own that focus search never wanders into: the remote enters
  * only toward the start edge from content with nothing further that way (a row's first card,
- * or the hero's Play), or with Back on home, and lands on the page's own item. Up and Down glide the one white
+ * or the hero on its first promo), or with Back on home, and lands on the page's own item. Up and Down glide the one white
  * pill between items, OK goes, and the way back toward the content returns to the card it came
  * from. Catalogues replace one another rather than stack, and the home rows are reached by
  * returning to home, so Back from any page lands on home.

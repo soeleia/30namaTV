@@ -22,8 +22,9 @@ import org.json.JSONObject
  * app opens: one at a time on the billboard, over one button and the page dots beside it. OK on
  * the button opens the title's page, where Play, the episodes and the rest live; the remote's
  * Play key plays it from here, as that page's Play would. Left and right page through the titles
- * in reading order, wrapping round (toward the end edge is the next one), and so does the hero
- * by itself every [ADVANCE] ms while the remote rests on it, counted again from every key. The
+ * in reading order (toward the end edge is the next one), on from the last round to the first but
+ * back from the first into the rail, and the hero pages on by itself every [ADVANCE] ms while the
+ * remote rests on it, counted again from every key. The
  * words leave toward the start edge and the next ones arrive from the end, the art turning
  * with them; paging back runs it the other way. Down hands the remote to the rows, which rise
  * to their usual place while the billboard goes back to following focus; [focus] (Up from the
@@ -89,9 +90,10 @@ class PromoHero(
     private var aside = false
 
     /**
-     * Down to the rows, nothing above, and left and right page; with a single promo they go
-     * nowhere, so the rail is only ever Back away. Play keeps both halves of its press, so no
-     * player elsewhere on the TV hears the one let through.
+     * Down to the rows, nothing above, and left and right page, except back from the first
+     * promo, which goes on to the rail (Search one press from launch); with a single promo the
+     * way on goes nowhere. Play keeps both halves of its press, so no player elsewhere on the
+     * TV hears the one let through.
      */
     private val keys = View.OnKeyListener { _, code, event ->
         val down = event.action == KeyEvent.ACTION_DOWN
@@ -110,8 +112,13 @@ class PromoHero(
                 down
             }
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                if (down) step(if (code == toEnd) 1 else -1)
-                down
+                val by = if (code == toEnd) 1 else -1
+                // Back from the first promo is the rail's, as from a row's first card.
+                if (by < 0 && index == 0) false
+                else {
+                    if (down) step(by)
+                    down
+                }
             }
             else -> false
         }
@@ -285,7 +292,7 @@ class PromoHero(
         refresh()
     }
 
-    /** Pages [by] promos (on toward the end edge, back toward the start), wrapping round. The pill glides at once; the words follow once paging stops. */
+    /** Pages [by] promos (on toward the end edge, back toward the start), on from the last round to the first. The pill glides at once; the words follow once paging stops. */
     private fun step(by: Int): Boolean {
         if (cards.size < 2) return false
         index = (index + by).mod(cards.size)

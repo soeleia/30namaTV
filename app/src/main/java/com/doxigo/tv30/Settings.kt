@@ -46,7 +46,7 @@ object Settings {
         set(v) = prefs.edit().putString("quality", v).apply()
 
     /** In step with R.array.player_speeds. */
-    val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
+    val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.1f, 1.2f, 1.25f, 1.5f, 2f)
     var speed: Float
         get() = prefs.getFloat("speed", 1f)
         set(v) = prefs.edit().putFloat("speed", v).apply()

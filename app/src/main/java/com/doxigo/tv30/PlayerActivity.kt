@@ -1089,7 +1089,7 @@ class PlayerFragment : VideoSupportFragment() {
         val names = resources.getStringArray(R.array.player_speeds)
         val now = player.playbackParameters.speed
         // Alone, the page's title already names the speed.
-        val speed = listOf(Group(getString(R.string.player_speed).takeIf { video != null }, SPEEDS.mapIndexed { i, s ->
+        val speed = listOf(Group(getString(R.string.player_speed).takeIf { video != null }, Settings.SPEEDS.mapIndexed { i, s ->
             Choice(names[i], s == now) { applySpeed(s) }
         }))
         val columns = listOfNotNull(video, speed)
@@ -1727,8 +1727,6 @@ class PlayerFragment : VideoSupportFragment() {
         /** Subtitle timing's step, and its reach either way. */
         const val TIMING_STEP_MS = 250L
         const val TIMING_MAX_MS = 10_000L
-        /** In step with the player_speeds labels. */
-        val SPEEDS = floatArrayOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
         /** The title, its Persian name, the episode line and the poster beside them, which lifted subtitles clear vertically. */
         val TITLE = intArrayOf(androidx.leanback.R.id.lb_details_description_title, androidx.leanback.R.id.lb_details_description_subtitle, androidx.leanback.R.id.lb_details_description_body, androidx.leanback.R.id.image)
     }
