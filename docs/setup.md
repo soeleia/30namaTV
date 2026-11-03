@@ -69,7 +69,7 @@ gh secret set RELEASE_STORE_PASSWORD --repo soeleia/30namaTV
 
 ## Service keys
 
-TMDB, SubDL, OpenSubtitles and the translating models each need an API key, and each viewer enters their own under **Settings > Services** (see the [README](../README.en.md#service-keys)). The app keeps it in its private preferences on that TV and tries it once on saving: TMDB's `/3/configuration`, a one-result SubDL search, and OpenSubtitles' `utilities/guessit` (its `/infos` lists answer any key). Actions passes no keys, so public APKs carry none and nobody spends anyone else's allowance.
+TMDB, SubDL, OpenSubtitles and the translating models each need an API key, and each viewer enters their own under **Settings > Services** (see the [README](../README.en.md#optional-services)). The app keeps it in its private preferences on that TV and tries it once on saving: TMDB's `/3/configuration`, a one-result SubDL search, and OpenSubtitles' `utilities/guessit` (its `/infos` lists answer any key). Actions passes no keys, so public APKs carry none and nobody spends anyone else's allowance.
 
 - TMDB: `https://www.themoviedb.org/settings/api`. A v3 API key (32 hex digits) is sent as `api_key`, a v4 read access token (`eyJ…`) as a Bearer header.
 - SubDL: `https://subdl.com/panel/api`.
@@ -108,6 +108,6 @@ The workflow pins actions to verified commit SHAs and excludes Gradle's local bu
 
 Increment both `versionCode` and `versionName` in `app/build.gradle.kts`, commit and push, then tag that tested commit as `vVERSION`. Keep the same signing key. The release job waits for build and TV tests, then publishes `30namaTV.apk`; branch artifacts alone do not trigger in-app updates.
 
-The updater reads `https://api.github.com/repos/soeleia/30namaTV/releases/latest`, skips drafts/prereleases and uses only the repository's `30namaTV.apk` asset. Checks are daily after opening, with a manual Settings check available. Android's Download Manager retains the download; Settings shows progress and opens the system installer after validating the APK. No account token is sent to GitHub. Update files stay in the app's own external files directory.
+The updater reads `https://api.github.com/repos/soeleia/30namaTV/releases/latest`, skips drafts/prereleases and uses only the repository's `30namaTV.apk` asset. Checks run when home opens, at most every six hours, with a manual Settings check available. Android's Download Manager retains the download; Settings shows progress and opens the system installer after validating the APK. No account token is sent to GitHub. Update files stay in the app's own external files directory.
 
 Android requires the user to approve installation. If unknown-source permission is needed, allow installation for 30namaTV and select Install again. A different signing key is rejected; never uninstall automatically or reset a user's account to force an update.
