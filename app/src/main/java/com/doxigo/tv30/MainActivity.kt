@@ -170,6 +170,8 @@ class HomeFragment : BrowseSupportFragment() {
     private var loaded = false
     /** The rows came in while the rail had another section up, home's view gone: they rise when it is back. */
     private var riseOnView = false
+    /** Why home failed, when it failed before its view was made (a warm start answers that fast): the note shows once it is. */
+    private var noteOnView: String? = null
     /** The TMDB key the trending row was fetched with: one saved in Settings since brings the row in on return. */
     private var trendingKey: String? = null
     /** The card focus rests on while a held D-pad races past, and its row: the billboard catches up on release. */
@@ -335,6 +337,8 @@ class HomeFragment : BrowseSupportFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         if (riseOnView) view.post { rise() }
+        noteOnView?.let { why -> view.post { showNote(why) } }
+        noteOnView = null
     }
 
     override fun onDestroyView() {
@@ -728,7 +732,7 @@ class HomeFragment : BrowseSupportFragment() {
     private fun showNote(why: String) {
         progressBarManager.hide()
         (activity as? MainActivity)?.homeReady()
-        val root = view as? ViewGroup ?: return
+        val root = view as? ViewGroup ?: return run { noteOnView = why }
         root.findViewById<ViewGroup>(androidx.leanback.R.id.browse_container_dock)?.apply {
             visibility = View.GONE
             // Gone is not enough: Leanback's onStart, say, still hands the rows the remote by requestFocus.
