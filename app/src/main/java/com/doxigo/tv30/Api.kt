@@ -149,13 +149,15 @@ object Api {
     /**
      * What a refusal says on screen. The server's `msg` is often a code ("CODE_NOT_USED", "login
      * required"), so it is shown only as a Persian sentence on a Persian screen, which is 30nama's
-     * own copy; anything else gets the app's words. Never an action name.
+     * own copy; anything else gets the app's words. Never an action name. Its Persian that is
+     * plumbing ("فایل M3U8 پیدا نشد", a stream whose video 30nama can't find) gets the app's words too.
      */
     private fun refusal(msg: String?) = ApiError(refusalText(msg, language, loggedIn, ::localized), msg)
 
     internal fun refusalText(msg: String?, language: String, loggedIn: Boolean, text: (Int) -> String): String = when {
         msg != null && msg.contains("login required", ignoreCase = true) ->
             text(if (loggedIn) R.string.error_session else R.string.error_sign_in)
+        msg != null && msg.contains("m3u8", ignoreCase = true) -> text(R.string.error_no_video)
         msg != null && language == "fa" && !msg.isLatin -> msg
         else -> text(R.string.error_server)
     }

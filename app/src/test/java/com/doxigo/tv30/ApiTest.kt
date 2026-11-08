@@ -23,6 +23,7 @@ class ApiTest {
                 R.string.error_session -> "session"
                 R.string.error_sign_in -> "sign in"
                 R.string.error_server -> "server"
+                R.string.error_no_video -> "no video"
                 else -> error("unexpected string $id")
             }
         }
@@ -36,6 +37,8 @@ class ApiTest {
         assertEquals("sign in", words("login required", loggedIn = false))
         assertEquals("اشتراک شما به پایان رسیده است.", words("اشتراک شما به پایان رسیده است."))
         assertEquals("server", words("اشتراک شما به پایان رسیده است.", language = "en")) // Persian on an English screen
+        assertEquals("no video", words("فایل M3U8 پیدا نشد")) // Black Clover's stream, 2026-11
+        assertEquals("no video", words("فایل M3U8 پیدا نشد", language = "en"))
     }
 
     @Test

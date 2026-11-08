@@ -5,5 +5,6 @@
     <string name="error_server">مشکلی از سمت ۳۰نما پیش آمد. کمی بعد دوباره امتحان کنید.</string>
     <string name="error_session">از حساب خود خارج شده‌اید. دوباره وارد شوید.</string>
     <string name="error_sign_in">برای این کار وارد حساب شوید.</string>
+    <string name="error_no_video">فایل ویدیوی این عنوان فعلاً روی ۳۰نما نیست. بعداً دوباره امتحان کنید.</string>
     <string name="login_code_failed">کد ورود دریافت نشد</string>
 </resources>
