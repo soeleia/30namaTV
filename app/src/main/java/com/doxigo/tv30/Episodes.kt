@@ -42,7 +42,7 @@ import kotlin.math.max
  * An entry of the `stream` answer's `hls` as its tile: the number set large, a real name when 30nama
  * has one (its names are nearly always «فصل 1 - قسمت 2», which the row and the number already say),
  * and its length. [watching] is `continue_watching` when it points at this file: that tile gets the
- * red bar and says so instead. Any other goes by this TV's history (Watched): seen through, it is
+ * red bar and says so instead, or «قسمت بعد» when it is `next`, the one after a finished episode. Any other goes by this TV's history (Watched): seen through, it is
  * marked so; started, it has its bar and the minutes left. The tile wears its own cut of the series'
  * [art] (see [slice]) until a frame of the episode itself is on disk (EpisodeFrames), found by the
  * [file] it carries as its source.
@@ -58,7 +58,7 @@ fun Context.episodeCard(file: JSONObject, watching: JSONObject?, art: String? = 
     return Card(
         own.orEmpty(),
         when {
-            watching != null -> getString(R.string.episode_watching)
+            watching != null -> getString(if (watching.optBoolean("next")) R.string.episode_next else R.string.episode_watching)
             left != null -> getString(R.string.time_left, getString(R.string.runtime_minutes, left))
             else -> minutes?.let { getString(R.string.runtime_minutes, it) }
         },

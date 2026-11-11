@@ -94,6 +94,8 @@ class WatchedTest {
         assertEquals(1 to 900L, Watched.resumePoint(ids, saved("e2", 900), "e1 2400"))
         // Either alone; neither, or a file no longer listed, is none.
         assertEquals(0 to 300L, Watched.resumePoint(ids, null, "e1 300"))
+        // With leave's mark of a point past the credits.
+        assertEquals(1 to 2_500L, Watched.resumePoint(ids, null, "e2 2500 1"))
         assertEquals(2 to 60L, Watched.resumePoint(ids, saved("e3", 60), null))
         assertNull(Watched.resumePoint(ids, null, "gone 300"))
         assertNull(Watched.resumePoint(ids, null, "e1 broken"))

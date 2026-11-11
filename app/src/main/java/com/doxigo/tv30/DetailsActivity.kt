@@ -413,11 +413,11 @@ class DetailsActivity : TvActivity() {
         val savedIndex = point?.first ?: -1
         val (playIndex, playAt) = Watched.upNext(this, all, savedIndex, point?.second ?: 0L)
         val resumeFile = all.getOrNull(playIndex)?.str("info", "file_id")
-        // The marked tile: how far in where Play resumes it, none where Play starts it.
+        // The marked tile: how far in where Play resumes it, none where Play starts it, which it says as the next one.
         val length = all.getOrNull(playIndex)?.let { Watched.of(this, it)?.duration }?.takeIf { it > 0 }
         // Nor is a tile marked that Play starts over, seen to its end (a finished series' finale): it keeps its check.
         val again = playIndex == savedIndex && playAt == 0L && all.getOrNull(playIndex)?.let { Watched.of(this, it)?.done } == true
-        val watching = resumeFile?.takeUnless { again }?.let { JSONObject().put("progress", if (playIndex == savedIndex && length != null) playAt * 100 / length else 0) }
+        val watching = resumeFile?.takeUnless { again }?.let { JSONObject().put("progress", if (playIndex == savedIndex && length != null) playAt * 100 / length else 0).put("next", playIndex != savedIndex) }
         playVerb = when {
             playIndex != savedIndex -> R.string.upnext_play
             playAt > 0 -> R.string.resume

@@ -743,7 +743,15 @@ class HomeFragment : BrowseSupportFragment() {
         mirror(context)
     }
 
-    private fun shown() = watching.objects().filter { it.titleId !in dismissed }
+    /**
+     * The row's titles: not the [dismissed] ones, nor a film this TV left in its credits, which is
+     * finished though 30nama's list keeps it with minutes to go. Played again, it is back.
+     */
+    // ponytail: by this TV's own point; a film finished on another device stays until 30nama's list says where credits start.
+    private fun shown(): List<JSONObject> {
+        val context = context
+        return watching.objects().filter { it.titleId !in dismissed && !(it.isMovie && context != null && Watched.leftSeen(context, it.titleId)) }
+    }
 
     /** The row as it shows, kept for the next launch and mirrored on the launcher's Play Next row (WatchNext). */
     private fun mirror(context: Context) {
@@ -758,10 +766,11 @@ class HomeFragment : BrowseSupportFragment() {
     private suspend fun showContinueWatching(posts: JSONArray) {
         val context = context ?: return
         watching = posts
-        // Here, not below: NewEpisodes is the main thread's.
+        // Here, not below: NewEpisodes and Watched are the main thread's.
         val news = posts.objects().filter { NewEpisodes.of(context, it) != null }.mapTo(HashSet()) { it.titleId }
+        val shown = shown()
         val cards = withContext(Dispatchers.Default) {
-            posts.objects().filter { it.titleId !in dismissed }.map { t ->
+            shown.map { t ->
                 // data: {episode_title: "فصل 1 - قسمت 4", display_time: "00:33:00", progress, ...}. The
                 // red bar already says how far in, so the line names only the episode: «فصل ۱، قسمت ۴».
                 // A series with an episode out says that instead of the time left.

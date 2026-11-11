@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="episode_watching">Watching</string>
+    <string name="episode_next">Next episode</string>
     <string name="episode_numbered">Episode %s</string>
     <string name="episode_watched">Watched</string>
     <string name="episodes_failed">Couldn\'t load the episodes</string>

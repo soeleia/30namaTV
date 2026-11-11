@@ -97,16 +97,27 @@ object Watched {
         record(context, file, at, length)
     }
 
-    /** Where this TV last left [postId]: [file], [at] seconds in. The player writes it as it reports progress. */
+    /**
+     * Where this TV last left [postId]: [file], [at] seconds in, and whether that is past where the
+     * file counts as seen ([line]), as "id seconds 1" (0 short of it). The player writes it as it
+     * reports progress, after [record], which has the length.
+     */
     // ponytail: a key per title ever played, a few bytes each; cap it as the history is if that ever matters.
     fun leave(context: Context, postId: Int, file: JSONObject, at: Long) {
         val id = file.str("info", "file_id") ?: return
-        prefs(context).edit().putString("left.$postId", "$id $at").apply()
+        val past = line(file.endMark, history(context)[id]?.duration ?: 0)?.let { at >= it } == true
+        prefs(context).edit().putString("left.$postId", "$id $at ${if (past) 1 else 0}").apply()
     }
 
-    /** Whether the file this TV last left [postId] in ([leave]) counts as seen. */
-    fun leftSeen(context: Context, postId: Int) =
-        prefs(context).getString("left.$postId", null)?.substringBefore(' ')?.let { history(context)[it]?.done } == true
+    /**
+     * Whether this TV last left [postId] past its file's credits ([leave]): a film left there is
+     * finished, and one started again is not. A point kept before that was written ("id seconds")
+     * goes by whether its file was ever seen through.
+     */
+    fun leftSeen(context: Context, postId: Int): Boolean {
+        val left = prefs(context).getString("left.$postId", null)?.split(' ') ?: return false
+        return left.getOrNull(2)?.let { it == "1" } ?: (history(context)[left[0]]?.done == true)
+    }
 
     /** [resumePoint] for [postId]'s [files], the server's [saved] point against this TV's own. */
     fun resumePoint(context: Context, postId: Int, files: List<JSONObject>, saved: JSONObject?) =
@@ -114,7 +125,7 @@ object Watched {
 
     /**
      * Where a title picks up, as an index into its file [ids] and a second: the server's [saved]
-     * `continue_watching` or where this TV [left] it ("fileId seconds"), whichever is further along (a
+     * `continue_watching` or where this TV [left] it ("fileId seconds", then [leave]'s mark), whichever is further along (a
      * later file, else a later second); null with neither. The server's point lags: its times all
      * land on 30 s and episodes left part-way can come back at 0, so the TV's own exact point goes,
      * unless another device has since moved the title further on. A film has one file, so either
@@ -123,7 +134,7 @@ object Watched {
     fun resumePoint(ids: List<String?>, saved: JSONObject?, left: String?): Pair<Int, Long>? {
         fun at(id: String?, seconds: Long) = (ids.indexOf(id).takeIf { id != null && it >= 0 } ?: 0.takeIf { ids.size == 1 })?.let { it to seconds }
         val server = saved?.let { at(it.str("file_id"), it.optLong("time")) }
-        val tv = left?.split(' ')?.takeIf { it.size == 2 }?.let { (id, seconds) -> seconds.toLongOrNull()?.let { at(id, it) } }
+        val tv = left?.split(' ')?.takeIf { it.size >= 2 }?.let { (id, seconds) -> seconds.toLongOrNull()?.let { at(id, it) } }
         return listOfNotNull(server, tv).maxWithOrNull(compareBy({ it.first }, { it.second }))
     }
 
