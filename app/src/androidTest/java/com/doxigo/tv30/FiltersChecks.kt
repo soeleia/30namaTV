@@ -115,9 +115,13 @@ object FiltersChecks {
                 // no further; Down to the grid.
                 fun upFromGrid() {
                     runOnMainSync { grid.selectedPosition = 0; grid.requestFocus() }
-                    await("Grid did not take focus") { grid.hasFocus() && grid.scrollState == 0 }
+                    // The first poster itself, not the grid ahead of its layout: Up lands on what is
+                    // above the poster it leaves (GridHeader), and one press is all it gets.
+                    await("The first poster did not take focus", detail = { "focus on ${focused()}" }) {
+                        grid.scrollState == 0 && grid.findViewHolderForAdapterPosition(0)?.itemView?.hasFocus() == true
+                    }
                     press(KeyEvent.KEYCODE_DPAD_UP)
-                    await("Up from the first column did not reach genre") { focusedId() == R.id.filter_genre }
+                    await("Up from the first column did not reach genre", detail = { "focus on ${focused()}" }) { focusedId() == R.id.filter_genre }
                 }
                 upFromGrid()
                 press(toEnd)

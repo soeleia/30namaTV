@@ -17,6 +17,8 @@ import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.json.JSONObject
 import java.util.Collections
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.Locale
 
 /**
@@ -39,6 +41,8 @@ object LogoChecks {
             JSONObject(context.assets.open("logos/home-$lang.json").bufferedReader().use { it.readText() })
         }
         val asked = Collections.synchronizedList(mutableListOf<String>())
+        /** Holds TMDB's answers until the round has seen the hero's words without a logo. */
+        var words = CountDownLatch(1)
         /** 30nama's `single` answer for a title the check has changed, by id. */
         val singles = Collections.synchronizedMap(mutableMapOf<String, JSONObject>())
         val originalClient = Api.http
@@ -56,6 +60,9 @@ object LogoChecks {
                 url.host == "api.themoviedb.org" -> {
                     val path = url.encodedPath.removePrefix("/3/")
                     asked += path
+                    // Not before the check has seen the hero's words: on a slow start it saw them
+                    // seconds after they were written, and the logo was already there.
+                    words.await(10, TimeUnit.SECONDS)
                     SystemClock.sleep(TMDB_LATE)
                     answer(request, (tmdb.optJSONObject(path) ?: JSONObject()).toString())
                 }
@@ -76,6 +83,7 @@ object LogoChecks {
         var activity: Activity? = null
         try {
             for (language in listOf("fa", "en")) {
+                words = CountDownLatch(1)
                 runOnMainSync {
                     clientField.set(Api, client)
                     Api.token = null
@@ -92,32 +100,39 @@ object LogoChecks {
                     .putExtra(MainActivity.EXTRA_GUEST, true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 val main = checkNotNull(activity)
                 lateinit var name: TextView
-                lateinit var words: List<View>
+                lateinit var lines: List<View>
                 var before = emptyList<Int>()
                 await("The hero did not show Cyberpunk: Edgerunners") {
                     name = main.findViewById(R.id.bb_title) ?: return@await false
-                    words = listOf(R.id.bb_title, R.id.bb_local, R.id.bb_meta, R.id.bb_plot).map { main.findViewById(it) }
+                    lines = listOf(R.id.bb_title, R.id.bb_local, R.id.bb_meta, R.id.bb_plot).map { main.findViewById(it) }
                     name.text.toString() == "Cyberpunk: Edgerunners" && name.isShown && name.height > 0
                 }
-                SystemClock.sleep(500) // the hero's own layout settles; TMDB is a second off yet
+                SystemClock.sleep(500) // the hero's own layout settles; TMDB has not answered yet
+                var bare = false
                 runOnMainSync {
-                    check(name.foreground == null && Color.alpha(name.currentTextColor) == 255) { "A logo was there before TMDB answered" }
-                    before = words.flatMap { listOf(it.top, it.height) }
+                    bare = name.foreground == null && Color.alpha(name.currentTextColor) == 255
+                    before = lines.flatMap { listOf(it.top, it.height) }
                 }
+                check(bare) { "A logo was there before TMDB answered" } // off the main thread, where it would crash the app
+                words.countDown()
                 val first = posts(home).first { it.imdbId == SERIES }
                 await("The logo never replaced the words", timeoutMs = 12_000, detail = {
                     "asked=$asked enabled=${Tmdb.enabled} backingOff=${Tmdb.backingOff} cached=${Logos.cached(first)} " +
                         "foreground=${name.foreground} words=${Color.alpha(name.currentTextColor)}"
                 }) { logoShown(name) }
                 runOnMainSync {
-                    check(words.flatMap { listOf(it.top, it.height) } == before) { "The words moved when the logo landed: $before" }
+                    check(lines.flatMap { listOf(it.top, it.height) } == before) { "The words moved when the logo landed: $before" }
                 }
                 check("find/$SERIES" in asked && "tv/105248/images" in asked) { "TMDB was not asked for the logo: $asked" }
                 SystemClock.sleep(400)
                 capture("logos-home-$language")
 
                 // The next page's logo was fetched with its art: the name never shows its words first.
-                runOnMainSync { main.findViewById<View>(R.id.promo_more).requestFocus() }
+                // Asked until it holds: the rows coming in can take the focus back to a poster,
+                // and the key then pages that row instead of the hero.
+                await("The hero's button did not take focus", detail = { "focus on ${main.currentFocus}" }) {
+                    main.findViewById<View>(R.id.promo_more).let { it.isFocused || (it.requestFocus() && false) }
+                }
                 SystemClock.sleep(300)
                 sendKeyDownUpSync(if (language == "fa") KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT)
                 await("The hero did not turn to The Odyssey", detail = { "showing ${name.text}, focus on ${main.currentFocus}" }) { name.text.toString() == "The Odyssey" }
@@ -203,6 +218,7 @@ object LogoChecks {
                 for (file in listOf("logos.json", "persian-names.json", "trending-fa.json", "trending-en.json")) targetContext.cacheDir.resolve(file).delete()
                 targetContext.filesDir.resolve("home").deleteRecursively()
             }
+            words.countDown()
             client.dispatcher.cancelAll()
         }
         finish(code, result)

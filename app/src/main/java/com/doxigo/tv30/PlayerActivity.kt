@@ -363,7 +363,9 @@ class PlayerFragment : VideoSupportFragment() {
         session.onScreen = true
         // Not a film that had ended: prepared at its end it ends again, and that played the next
         // episode on return (past a sleep timer set to this one's end, too). Play starts it.
-        if (file != null && !ended && player.playbackState == Player.STATE_IDLE) player.prepare()
+        // Nor a file that gave no playlist (setSource): prepared with nothing to play the player
+        // ends at once, and that closed it a beat later (leave).
+        if (file != null && !ended && player.mediaItemCount > 0 && player.playbackState == Player.STATE_IDLE) player.prepare()
     }
 
     /** The film had ended when the screen went (onStop). */
