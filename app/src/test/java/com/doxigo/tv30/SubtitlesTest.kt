@@ -26,6 +26,9 @@ class SubtitlesTest {
         assertEquals(text, Subtitles.decode(text.toByteArray(), "fa")) // UTF-8 without a mark is not taken for 1256
         assertEquals("Café", Subtitles.decode("Café".toByteArray(Charsets.UTF_16LE).let { byteArrayOf(0xFF.toByte(), 0xFE.toByte()) + it }, "en"))
         assertEquals("Café", Subtitles.decode("Café".toByteArray(Charsets.ISO_8859_1), "en")) // English falls back to 1252
+        // One stray byte in a UTF-8 file does not make it Windows-1256, every letter of it two wrong ones.
+        val long = "این یک زیرنویس فارسی است که با یوتی‌اف هشت نوشته شده و باید همان‌طور خوانده شود"
+        assertEquals("$long\uFFFD", Subtitles.decode(long.toByteArray() + 0x98.toByte(), "fa"))
     }
 
     @Test
@@ -126,6 +129,14 @@ class SubtitlesTest {
         val scene = zip("the.office.us.212.h.264-lol.srt" to "twelve", "the.office.us.213.hdtv-loki.srt" to "thirteen")
         assertEquals("the.office.us.213.hdtv-loki.srt" to "thirteen", Subtitles.open(scene, "z", 13, "en"))
         assertThrows(Subtitles.Unreadable::class.java) { Subtitles.open(scene, "z", 5, "en") }
+        // A fansub's pack, its files numbered bare: the one with the number, never the first for want of a match.
+        val fansub = zip("[Grp] Show - 01 [1080p].ass" to "one", "[Grp] Show - 05 [1080p].ass" to "five", "[Grp] Show - 10 [1080p].ass" to "ten")
+        assertEquals("[Grp] Show - 05 [1080p].ass" to "five", Subtitles.open(fansub, "z", 5, "en"))
+        assertEquals("[Grp] Show - 01 [1080p].ass" to "one", Subtitles.open(fansub, "z", 1, "en"))
+        assertThrows(Subtitles.Unreadable::class.java) { Subtitles.open(fansub, "z", 7, "en") }
+        // Two episodes in one file, found for the second as for the first; a "-720p" is no range's end.
+        assertEquals("Show.S01E05-06.srt" to "both", Subtitles.open(zip("Show.S01E04.srt" to "four", "Show.S01E05-06.srt" to "both"), "z", 6, "en"))
+        assertEquals("Show.S02E09-720p.srt" to "nine", Subtitles.open(zip("Show.S02E08-720p.srt" to "eight", "Show.S02E09-720p.srt" to "nine"), "z", 9, "en"))
         // Sent bare rather than zipped.
         assertEquals("film.srt" to "one", Subtitles.open("one".toByteArray(), "film.srt", 0, "en"))
     }

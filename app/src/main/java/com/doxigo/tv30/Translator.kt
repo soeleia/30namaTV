@@ -157,8 +157,11 @@ object Translator {
         val got = HashMap<Int, String>()
         repeat(2) {
             val wanted = part.filter { it !in got }
-            if (wanted.isNotEmpty()) got += parse(ask(model, key, prompt(lines, wanted, about))).mapKeys { it.key - 1 }.filterKeys { it in wanted }
+            if (wanted.isNotEmpty()) got += parse(ask(model, key, prompt(lines, wanted, about)), wanted.mapTo(HashSet()) { it + 1 }).mapKeys { it.key - 1 }
         }
+        // Not one cue in two answers (cut off at its token limit, only thoughts): the model failed,
+        // and the part must not be kept in English as the film's finished translation.
+        if (got.isEmpty()) throw Refused(model.provider.id, Why.DOWN)
         return part.map { got[it]?.let(::polish) ?: lines[it].text }
     }
 
@@ -181,8 +184,10 @@ object Translator {
     /**
      * The answer's cues by number: each "#n" line, or "#n: text" on one, and the lines under it up to
      * the next. Fences and blank lines go; a number the model wrote in Persian digits still counts.
+     * With [wanted], a "#n" that was not asked for is a cue's own line (a song's «# ۹۹ بادکنک قرمز #»),
+     * not a marker.
      */
-    internal fun parse(reply: String): Map<Int, String> {
+    internal fun parse(reply: String, wanted: Set<Int>? = null): Map<Int, String> {
         val out = HashMap<Int, String>()
         var id: Int? = null
         val text = ArrayList<String>()
@@ -194,9 +199,10 @@ object Translator {
             val line = raw.trim()
             if (line.isEmpty() || line.startsWith("```")) continue
             val marker = MARKER.matchEntire(line)
-            if (marker != null) {
+            val number = marker?.groupValues?.get(1)?.map { if (it in '۰'..'۹') '0' + (it - '۰') else it }?.joinToString("")?.toIntOrNull()
+            if (marker != null && number != null && (wanted == null || number in wanted)) {
                 flush()
-                id = marker.groupValues[1].map { if (it in '۰'..'۹') '0' + (it - '۰') else it }.joinToString("").toInt()
+                id = number
                 marker.groupValues[2].takeIf { it.isNotEmpty() }?.let(text::add)
             } else if (id != null) text += line
         }
@@ -320,8 +326,10 @@ object Translator {
     private fun retryAfter(header: String?, body: String): Long? =
         (header?.toDoubleOrNull() ?: Regex("\"retryDelay\"\\s*:\\s*\"([0-9.]+)s\"").find(body)?.groupValues?.get(1)?.toDoubleOrNull())?.let { (it * 1000).toLong() }
 
+    // Gemini's 400 is a key it does not know (API_KEY_INVALID) and also a viewer in Iran with the
+    // VPN off ("User location is not supported"): that one is Gemini out of reach, not a bad key.
     suspend fun checkGemini(key: String) = Subtitles.check(
-        Request.Builder().url("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1").header("x-goog-api-key", key).build(), 400, 401)
+        Request.Builder().url("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1").header("x-goog-api-key", key).build(), 400, 401, unreachable = REGION)
 
     suspend fun checkClaude(key: String) = Subtitles.check(
         Request.Builder().url("https://api.anthropic.com/v1/models?limit=1").header("x-api-key", key).header("anthropic-version", "2023-06-01").build(), 401)

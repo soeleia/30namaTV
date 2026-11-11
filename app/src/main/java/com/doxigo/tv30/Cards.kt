@@ -463,10 +463,10 @@ private class TileView(context: Context) : FrameLayout(context) {
         outlineProvider = ROUNDED
         clipToOutline = true
         scrim.setBackgroundResource(R.drawable.tile_scrim)
-        label.setTextAppearance(R.style.TextAppearance_App_Tile)
+        label.appearance(R.style.TextAppearance_App_Tile)
         label.maxLines = 2
         label.ellipsize = TextUtils.TruncateAt.END
-        caption.setTextAppearance(R.style.TextAppearance_App_Caption)
+        caption.appearance(R.style.TextAppearance_App_Caption)
         caption.maxLines = 1
         caption.ellipsize = TextUtils.TruncateAt.END
         label.widenSpaces()

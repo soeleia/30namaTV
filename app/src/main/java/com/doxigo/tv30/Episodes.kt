@@ -48,7 +48,8 @@ import kotlin.math.max
  * [file] it carries as its source.
  */
 fun Context.episodeCard(file: JSONObject, watching: JSONObject?, art: String? = null, onClick: () -> Unit): Card {
-    val own = file.str("info", "episode_name")?.takeUnless { it.isGenericEpisode }?.unescaped()?.localDigits()
+    // A name's own digits stay as written ("Part 2" in Persian digits would no longer read as Latin, and be set in Peyda).
+    val own = file.str("info", "episode_name")?.takeUnless { it.isGenericEpisode }?.unescaped()?.let { if (it.isLatin) it else it.localDigits() }
     // ponytail: the credits mark stands in for the length (a minute or two short); TMDB's runtime if that bothers anyone.
     val minutes = file.str("options", "end")?.split(':')?.fold(0) { total, part -> total * 60 + (part.toIntOrNull() ?: 0) }
         ?.let { (it + 30) / 60 }?.takeIf { it > 0 }
@@ -220,7 +221,7 @@ private class EpisodeView(context: Context) : FrameLayout(context) {
         frame.importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
         check.setImageResource(R.drawable.episode_watched)
         check.importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
-        numeral.setTextAppearance(R.style.TextAppearance_App_Numeral)
+        numeral.appearance(R.style.TextAppearance_App_Numeral)
         numeral.textSize = 48f
         numeral.includeFontPadding = false
         // Lifts the number off a bright still; on the bare tile it is lost in the grey.
@@ -231,8 +232,8 @@ private class EpisodeView(context: Context) : FrameLayout(context) {
             line.ellipsize = TextUtils.TruncateAt.END
             line.textAlignment = TEXT_ALIGNMENT_VIEW_START
         }
-        name.setTextAppearance(R.style.TextAppearance_App_Tile)
-        caption.setTextAppearance(R.style.TextAppearance_App_Caption)
+        name.appearance(R.style.TextAppearance_App_Tile)
+        caption.appearance(R.style.TextAppearance_App_Caption)
         // Built in code, so not through the inflater's: Peyda's narrow space would run a name's words together.
         name.widenSpaces()
         caption.widenSpaces()
@@ -375,7 +376,7 @@ class EpisodesNotePresenter : Presenter() {
         val context = parent.context
         val dp = context.resources.displayMetrics.density
         val why = TextView(context).apply {
-            setTextAppearance(R.style.TextAppearance_App_Body)
+            appearance(R.style.TextAppearance_App_Body)
             setTextColor(ContextCompat.getColor(context, R.color.text_dim))
             maxWidth = (520 * dp).toInt()
             widenSpaces()

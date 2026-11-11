@@ -20,6 +20,20 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # All of history, main's included: the next step asks whether a tagged commit is on main.
+          fetch-depth: 0
+      # A v* tag on any commit, a branch's or one never pushed to main, published a signed release.
+      # Checked before the keystore is restored: nothing off main is signed, and release needs this job.
+      - name: Require a release tag to be on main
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main'
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::$GITHUB_REF_NAME is not on main: releases are tagged on main's own commits"
+            exit 1
+          fi
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
@@ -113,6 +127,11 @@ jobs:
         with:
           name: instrumentation-apks
           path: app/build/outputs/apk/
+      # The APK that ships: the suites run the debug build, so the R8-shrunk one is started once after them.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: optimized-apk
+          path: dist/
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -129,7 +148,7 @@ jobs:
           heap-size: 128M
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           disable-animations: false
-          script: python3 scripts/tv-checks.py --serial emulator-5554
+          script: python3 scripts/tv-checks.py --serial emulator-5554 --release dist/30namaTV.apk
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

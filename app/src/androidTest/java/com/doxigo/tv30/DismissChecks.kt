@@ -2,9 +2,11 @@ package com.doxigo.tv30
 
 import android.app.Activity
 import android.app.Instrumentation
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
@@ -18,6 +20,8 @@ import org.json.JSONObject
 /**
  * Run the existing instrumentation runner with -e check dismiss. A title taken off Continue Watching
  * leaves the row as the sheet's button is pressed, and stays off while 30nama's list still sends it.
+ * Before that, the remote resting on the row for the first time on this TV is told, once, that held
+ * OK is the way there.
  */
 object DismissChecks {
     fun run(instrumentation: Instrumentation) = with(instrumentation) {
@@ -28,6 +32,9 @@ object DismissChecks {
         val originalToken = Api.token
         val originalUser = Api.user
         val originalIntro = Intro.shown
+        // HomeFragment's own: whether held OK has been said on this TV.
+        val hints = targetContext.getSharedPreferences("home", Context.MODE_PRIVATE)
+        val originalHint = hints.getBoolean("held_ok_said", false)
         val clientField = Api::class.java.getDeclaredField("http").apply { isAccessible = true }
         val kept = """{"id":21,"title":{"english":"Kept on"},"options":{"title_type":"movie"},"data":{"time":600,"progress":"20"}}"""
         val removed = """{"id":22,"title":{"english":"Taken off"},"options":{"title_type":"movie"},"data":{"time":900,"progress":"40"}}"""
@@ -58,6 +65,7 @@ object DismissChecks {
                 Api.user = null
                 Intro.shown = true
                 targetContext.filesDir.resolve("home").deleteRecursively()
+                hints.edit().remove("held_ok_said").commit()
             }
             homeActivity = startActivitySync(Intent(targetContext, MainActivity::class.java)
                 .putExtra(MainActivity.EXTRA_GUEST, true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
@@ -67,6 +75,15 @@ object DismissChecks {
                 val found = host.supportFragmentManager.findFragmentById(R.id.browse_host) as? HomeFragment ?: return@await false
                 (titles(found) == listOf("Kept on", "Taken off")).also { if (it) home = found }
             }
+            // With no hero the remote arrives on the first row; up to it, if the row landed above the remote instead.
+            val hint = host.getString(R.string.continue_hint)
+            fun notice() = texts(host.window.decorView).firstOrNull { it.text.toString() == hint }
+            if (runCatching { await("", 1_500) { notice()?.alpha == 1f } }.isFailure) {
+                sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP)
+                await("Resting on Continue Watching did not say held OK takes a title off it") { notice()?.alpha == 1f }
+            }
+            check(hints.getBoolean("held_ok_said", false)) { "Held OK was said without being remembered" }
+            await("The notice about held OK stayed up") { notice()?.alpha == 0f }
             runOnMainSync {
                 HomeFragment::class.java.getDeclaredMethod("confirmDismiss", JSONObject::class.java).apply { isAccessible = true }
                     .invoke(home, JSONObject(removed))
@@ -89,7 +106,7 @@ object DismissChecks {
             SystemClock.sleep(800) // the answer that still sends it lands
             runOnMainSync { check(titles(home) == listOf("Kept on")) { "30nama's lagging list brought it back: ${titles(home)}" } }
             capture("dismiss")
-            result.putString("stream", "PASS: off the row in $took ms, kept off while 30nama still sends it\n")
+            result.putString("stream", "PASS: held OK said once on the row and remembered; off the row in $took ms, kept off while 30nama still sends it\n")
         } catch (error: Throwable) {
             result.putString("stream", error.stackTraceToString())
             resultCode = Activity.RESULT_CANCELED
@@ -102,6 +119,7 @@ object DismissChecks {
                 Intro.shown = originalIntro
                 clientField.set(Api, originalClient)
                 targetContext.filesDir.resolve("home").deleteRecursively()
+                hints.edit().putBoolean("held_ok_said", originalHint).commit()
             }
             client.dispatcher.cancelAll()
         }

@@ -73,6 +73,8 @@ class GridFragment : VerticalGridSupportFragment() {
     private var choices: FilterChoices? = null
     /** The note in the grid's place says the titles didn't come, with Retry (see [showFailure]). */
     private var failed = false
+    /** How many titles the page holds, as its first page said; null while that is not known ([showCount]). */
+    private var total: Int? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -125,7 +127,7 @@ class GridFragment : VerticalGridSupportFragment() {
         }, onError = {
             // Cards up, they stay and the next move asks again; none yet, their place says why.
             if (items.size() == 0) showFailure(R.string.grid_failed, context.errorText(it)) else context.toast(it)
-        }, skeleton = Skeleton(12, 112, 168)) { page ->
+        }, skeleton = Skeleton(12, 112, 168), onFirst = ::showCount) { page ->
             // Read when the page is asked for: a new sort or filter resets the pager, and the pages
             // still in flight for the old ones are dropped.
             val order = sorts[sort].first
@@ -171,6 +173,7 @@ class GridFragment : VerticalGridSupportFragment() {
             view.findViewById<View>(R.id.grid_sort)?.visibility = View.GONE
             (activity as? GridActivity)?.rail?.ready()
         } else showSort()
+        showCount(total) // a view rebuilt over the same fragment
         if (type != null) {
             view.findViewById<View>(R.id.grid_filters).visibility = View.INVISIBLE
             if (choices != null) showFilters(reveal = false) // a view rebuilt over the same fragment
@@ -181,6 +184,26 @@ class GridFragment : VerticalGridSupportFragment() {
     override fun onStart() {
         super.onStart()
         if (failed) retry()
+    }
+
+    /**
+     * How big the page is, beside its name: «۸۴٬۸۰۶ عنوان», the count grouped and in the language's
+     * digits. A catalogue never said, and a filter's effect showed only in the posters. Gone while
+     * it is not known: a new filter until its first page lands, a page that failed or holds nothing.
+     */
+    private fun showCount(total: Int?) {
+        this.total = total
+        val count = view?.findViewById<TextView>(R.id.grid_count) ?: return
+        if (total == null) {
+            count.animate().cancel()
+            count.visibility = View.GONE
+            return
+        }
+        count.text = resources.getQuantityString(R.plurals.grid_count, total, total.grouped())
+        if (count.visibility == View.VISIBLE) return
+        count.alpha = 0f
+        count.visibility = View.VISIBLE
+        count.animate().alpha(1f).setInterpolator(Motion.easeOut).setDuration(Motion.ENTER).start()
     }
 
     /** The sort button names the order now, and tells TalkBack what it is for. */
@@ -263,6 +286,7 @@ class GridFragment : VerticalGridSupportFragment() {
         if (view?.findFocus()?.let { it.id == R.id.filter_clear || it.id == R.id.list_empty_action } == true) focus?.requestFocus()
         showFilters(reveal = false)
         hideEmpty()
+        showCount(null) // the catalogue's, not this filter's
         pager.reset()
     }
 
@@ -282,6 +306,7 @@ class GridFragment : VerticalGridSupportFragment() {
         button.setOnClickListener { onAction() }
         dock.addView(empty)
         rise(listOf(empty))
+        showCount(null)
         if (focus) button.requestFocus()
         // An empty grid would still take the remote (back down from the sort orb, say) and show
         // nothing. Hidden once the button has the remote, so a grid holding it hands it straight over.

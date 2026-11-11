@@ -41,8 +41,11 @@ object Trending {
     private suspend fun fetch(file: File): List<JSONObject> {
         val trending = runCatching { Tmdb.get("trending/all/week?language=en-US").optJSONArray("results").objects() }
             .getOrNull() ?: return emptyList()
-        val titles = Tmdb.match(trending.filter { it.optString("media_type") in setOf("movie", "tv") })
-        if (titles.isNotEmpty()) withContext(Dispatchers.IO) { runCatching { file.writeText(JSONArray(titles).toString()) } }
+        var whole = true
+        val titles = Tmdb.match(trending.filter { it.optString("media_type") in setOf("movie", "tv") }) { whole = false }
+        // A row some searches failed for is shown, not kept: a burst past 30nama's rate limit left
+        // 5 of 20, and kept, those were the whole row for six hours. Unkept, home's next fetch asks again.
+        if (whole && titles.isNotEmpty()) withContext(Dispatchers.IO) { runCatching { file.writeText(JSONArray(titles).toString()) } }
         return titles
     }
 }

@@ -90,7 +90,9 @@ import java.util.Locale
 //     and a spinner under the field, until onSave calls answer once: with a null note (nothing
 //     to try) it closes; with works true it says the note and closes 1.2 s later; false (refused,
 //     the note red) or null (out of reach) say it and leave the remote on the field to fix or
-//     send again. Back and Esc close without either, the check going on behind.
+//     send again. Back and Esc close without either, the check going on behind. On Android 17 the
+//     phone's page needs the viewer's leave to use the home network (KeyForm.allowed): the caller
+//     asks for it first, as Settings does, and without it the sheet is as with no home network.
 //
 //   FragmentActivity.quickActions(title: JSONObject)
 //     (context as? FragmentActivity)?.quickActions(t) // toCard's default hold, Cards.kt
@@ -483,12 +485,12 @@ fun FragmentActivity.quickActions(title: JSONObject) {
     more.setOnClickListener { sheet.close { openDetails(title) } }
     for ((group, toggle) in lists) toggle.setOnClickListener {
         // Library flips its state before it suspends, so the label and icon change at once (and
-        // TalkBack's click reads the new state). Api.scope: leaving the page straight after must
-        // not cut the write short.
-        Api.scope.launch(Dispatchers.Main.immediate) {
-            runCatching { Library.toggle(group, title.titleId) }
-                .onSuccess { (this@quickActions as? MainActivity)?.listsChanged() } // home's My List row
-                .onFailure { toast(it) }
+        // TalkBack's click reads the new state).
+        // Its label names the list and what a press now does, so only a failure needs the notice: one
+        // for a press that worked sat over the card's last action.
+        toggleList(group, title.titleId, quiet = true) { taken ->
+            if (taken) (this as? MainActivity)?.listsChanged() // home's My List row
+            mark() // a flip the server did not take is undone, one that waited for the lists is made
         }
         mark()
     }
@@ -509,6 +511,30 @@ private val LISTS = mapOf(
     "watchlist" to listOf(R.string.list_watchlist, R.string.quick_watchlist_add, R.string.quick_watchlist_remove, R.drawable.act_watchlist, R.drawable.act_watchlist_on),
     "notify" to listOf(R.string.list_notify, R.string.quick_notify_add, R.string.quick_notify_remove, R.drawable.act_notify, R.drawable.act_notify_on),
 )
+
+/**
+ * A press on one of a title's list toggles, here and on the title page: the flip, then, once 30nama
+ * has answered, what came of it in the notice, «به «لیست تماشا» اضافه شد.», or that it was not and
+ * why. The icon alone said neither which list nor that a press had failed. [quiet], only a failure
+ * is said (the poster's sheet, whose labels say the rest). [then] runs at the answer, told whether
+ * the server took it; the caller draws the flip itself, at once.
+ */
+internal fun Activity.toggleList(group: String, id: Int, quiet: Boolean = false, then: (taken: Boolean) -> Unit) {
+    val list = getString(LISTS.getValue(group)[0])
+    // What the press asked for, as the icon showed it: the words for one that failed.
+    val adding = !Library.has(group, id)
+    // Api.scope: leaving the page straight after must not cut the write short, with the flip made here and never there.
+    Api.scope.launch(Dispatchers.Main.immediate) {
+        val failure = runCatching { Library.toggle(group, id) }.exceptionOrNull()
+        if (failure != null || !quiet) toast(when {
+            failure != null -> getString(if (adding) R.string.list_add_failed else R.string.list_remove_failed, list, errorText(failure))
+            // By what the list holds now: lists not yet known at the press may have had the title in them.
+            Library.has(group, id) -> getString(R.string.list_added, list)
+            else -> getString(R.string.list_removed, list)
+        })
+        then(failure == null)
+    }
+}
 
 /**
  * The page dimmed under [content], holding the remote until [close]. The activity's own keys (the
@@ -677,7 +703,7 @@ private fun TextView.start() {
 }
 
 private fun Activity.text(value: CharSequence, style: Int) = TextView(this).apply {
-    setTextAppearance(style)
+    appearance(style)
     text = value
     gravity = Gravity.CENTER_HORIZONTAL
     ellipsize = TextUtils.TruncateAt.END

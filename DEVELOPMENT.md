@@ -39,10 +39,10 @@ Keys compiled into an APK can be extracted, so don't share an APK built with you
 
 ```sh
 ./gradlew :app:testDebugUnitTest :app:lintRelease :app:assembleDebug :app:assembleDebugAndroidTest
-python3 scripts/tv-checks.py --serial emulator-5554
+python3 scripts/tv-checks.py --serial emulator-5556
 ```
 
-Run `tv-checks.py` against a disposable emulator only: the suites replace local preferences and use mocked account data, and the runner refuses physical devices. `--check <name>` reruns one suite. Output, logcat and screenshots go to `app/build/reports/tv-checks/`.
+Give `--serial` your disposable emulator's serial (`emulator-5556` here; `adb devices` lists them), never an emulator or TV you are signed in on: the suites replace local preferences and use mocked account data, and the runner refuses physical devices. `--check <name>` reruns one suite. `--release <apk>` then replaces the debug build with that release APK and checks that it starts and stays up, which is how CI catches a crash only the R8-shrunk build has. Output, logcat and screenshots go to `app/build/reports/tv-checks/`.
 
 The suites cover startup and request cancellation, the motion logo, player controls and seeking, subtitle layout and direction, Make Persian subtitles, resume and Start from the beginning, watched episodes, removing from Continue Watching, poster captions in English, My Lists, search and the Persian keyboard, the genre page, catalogue filters, the updater (with home's notice and the Settings dot) and trailers. [docs/testing.md](docs/testing.md) has the details and the manual checklist for a physical TV.
 
@@ -50,13 +50,13 @@ The trailer suite tries the public Animals trailer. If its CDN is unreachable, t
 
 ## CI
 
-GitHub Actions builds and tests every push to `main`, every pull request and manual runs. It runs the instrumented debug APK on an Android 11 TV emulator (two cores, 1.5 GB RAM) and puts the optimized release APK through full lint, signature and ZIP alignment checks. Each run uploads the APKs (`optimized-apk` is the installable one), lint and test reports, logs and screenshots.
+GitHub Actions builds and tests every push to `main`, every pull request and manual runs. It runs the instrumented debug APK on an Android 11 TV emulator (two cores, 1.5 GB RAM) and puts the optimized release APK through full lint, signature and ZIP alignment checks, then installs that release APK on the same emulator and fails unless it starts and stays up without a fatal exception. Each run uploads the APKs (`optimized-apk` is the installable one), lint and test reports, logs and screenshots.
 
 Emulator timing says nothing about speed on a real TV; see [performance evidence](docs/performance.md).
 
 ## Release
 
-Bump `versionCode` and `versionName` in `app/build.gradle.kts`, push to `main`, and once Actions passes, tag that commit `vVERSION`. The tag build publishes `30namaTV.apk` to GitHub Releases, which is what the in-app updater installs. Full steps, signing secrets and the private font archive: [docs/setup.md](docs/setup.md).
+Bump `versionCode` and `versionName` in `app/build.gradle.kts`, push to `main`, and once Actions passes, tag that commit `vVERSION`. A tag on a commit that is not on `main` fails the build before anything is signed. The tag build publishes `30namaTV.apk` to GitHub Releases, which is what the in-app updater installs. Full steps, signing secrets and the private font archive: [docs/setup.md](docs/setup.md).
 
 ## Screenshots
 

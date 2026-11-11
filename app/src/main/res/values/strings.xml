@@ -24,12 +24,22 @@
     <string name="list_watchlist">لیست تماشا</string>
     <string name="list_notify">اطلاع‌رسانی</string>
     <string name="lists_empty">لیست‌هایتان هنوز خالی است.</string>
+    <!-- The notice after a press on a list's toggle, on the title page or a poster's sheet, once
+         30nama has answered. %1$s is the list by its name above; %2$s says why not, a sentence of its own. -->
+    <string name="list_added">به «%s» اضافه شد.</string>
+    <string name="list_removed">از «%s» حذف شد.</string>
+    <string name="list_add_failed">به «%1$s» اضافه نشد. %2$s</string>
+    <string name="list_remove_failed">از «%1$s» حذف نشد. %2$s</string>
 
     <string name="guest">مهمان</string>
     <string name="sign_in">ورود به حساب</string>
     <string name="sign_out">خروج از حساب</string>
     <string name="sign_out_confirm">از حساب خود خارج می‌شوید؟</string>
-    <string name="remaining_days">%d روز مانده</string>
+    <!-- A plural for English's sake ("1 day left"); Persian counts both the same way. -->
+    <plurals name="remaining_days">
+        <item quantity="one">%d روز مانده</item>
+        <item quantity="other">%d روز مانده</item>
+    </plurals>
     <string name="plan">اشتراک %s</string>
     <string name="titles_count">%s عنوان</string>
     <string name="language">زبان</string>

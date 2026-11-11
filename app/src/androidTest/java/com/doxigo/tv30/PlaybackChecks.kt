@@ -23,7 +23,7 @@ import org.json.JSONObject
 /**
  * Run the existing instrumentation runner with -e check playback: the screen lit only while video
  * plays, previous restarting first, the channel keys, the next episode offered without a credits
- * mark, and the sleep timer.
+ * mark, the sleep timer, and the last episode's end closing the player.
  */
 object PlaybackChecks {
     fun run(instrumentation: Instrumentation) = with(instrumentation) {
@@ -193,7 +193,16 @@ object PlaybackChecks {
             }
             press(KeyEvent.KEYCODE_CHANNEL_UP)
             await("The next episode lost the subtitle's timing") { playing() == "three" && call(fragment, "offset") == 250L }
-            runOnMainSync { host.finish() }
+
+            // The last episode's end, nothing after it: a beat on its last frame, then back to the page beneath.
+            check(press(KeyEvent.KEYCODE_BACK)) { "Back did not close the timer's page" } // the player stays under an open panel
+            runOnMainSync {
+                player.seekTo(299_000)
+                player.play()
+            }
+            await("The last episode did not end", 10_000) { player.playbackState == Player.STATE_ENDED || host.isFinishing }
+            runOnMainSync { check(!host.isFinishing) { "The player closed without a beat on the last frame" } }
+            await("The last episode's end did not close the player") { host.isFinishing }
             await("Player activity did not close", 20_000) { host.isDestroyed }
             val again = startActivitySync(PlayerActivity.intent(targetContext, POST, true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as PlayerActivity
             activity = again
@@ -202,7 +211,7 @@ object PlaybackChecks {
                 found != null && field(found, "glue") != null &&
                     (field(found, "player") as ExoPlayer).playbackParameters.speed == 1.5f && call(found, "offset") == 250L
             }
-            result.putString("stream", "PASS: screen lit only while playing, previous restarts first, channel keys, next episode without a credits mark, sleep timer end and time, a series' speed and subtitle timing kept\n")
+            result.putString("stream", "PASS: screen lit only while playing, previous restarts first, channel keys, next episode without a credits mark, sleep timer end and time, a series' speed and subtitle timing kept, the last episode's end closing the player\n")
         } catch (error: Throwable) {
             result.putString("stream", error.stackTraceToString())
             resultCode = Activity.RESULT_CANCELED

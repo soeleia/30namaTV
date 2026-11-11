@@ -207,6 +207,14 @@ object TrailerChecks {
                 check(field(host, "loadJob") !== firstLoad) { "Retry did not start a new load" }
             }
             await("Retry lost its error/focus state") { (field(host, "error") as View).visibility == View.VISIBLE && retry.hasFocus() }
+            // One ring, the player's, and none under the note.
+            runOnMainSync {
+                val ring = field(host, "loading") as View
+                check(ring.visibility == View.GONE && ring.layoutParams.width == (32 * host.resources.displayMetrics.density).toInt()) { "The loading ring is ${ring.layoutParams.width}px wide, or still turning under the note" }
+                check((field(host, "video") as PlayerView).findViewById<View>(androidx.media3.ui.R.id.exo_buffering)?.visibility != View.VISIBLE) { "PlayerView's own ring shows too" }
+            }
+            await("The note did not fade in") { (field(host, "error") as View).alpha == 1f }
+            capture("trailer-error")
             result.putString("stream", "PASS: ${if (publicPlayed) "real Animals HLS" else "public network unavailable, silence fixture"}; held metadata pause, forward resume, paused rewind, five-second controls, background/return, YouTube preload hand-off (page ready ahead: $readyAhead), invalid UID retry\n")
         } catch (error: Throwable) {
             result.putString("stream", error.stackTraceToString())

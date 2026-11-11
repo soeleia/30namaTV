@@ -114,7 +114,7 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
             itemAlignmentOffsetPercent = 0f
         }
         heading = TextView(context).apply {
-            setTextAppearance(R.style.TextAppearance_Leanback_Header)
+            appearance(R.style.TextAppearance_Leanback_Header)
             textAlignment = View.TEXT_ALIGNMENT_VIEW_START
             val inset = resources.getDimensionPixelSize(R.dimen.content_start)
             setPaddingRelative(inset, 0, inset, 0)
@@ -122,7 +122,12 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
         }
         content.addView(heading, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         presenter.setOnItemViewClickedListener(OnItemViewClickedListener { _, item, _, _ -> (item as? Card)?.onClick?.invoke() })
-        presenter.setOnItemViewSelectedListener(OnItemViewSelectedListener { _, item, _, _ -> pager?.onSelected(item) })
+        // Only while the remote is on the results: Leanback selects the first poster as it lays
+        // them out, focus or no focus, and the pager took that for the viewer reaching the list and
+        // fetched a second page for every query typed, one more search against a rate-limited host.
+        // ponytail: the remote arriving on the first poster selects nothing new, so page two starts
+        // with its first move; tell the pager on arrival if a held D-pad ever outruns that.
+        presenter.setOnItemViewSelectedListener(OnItemViewSelectedListener { _, item, _, _ -> if (grid.hasFocus()) pager?.onSelected(item) })
         gridHolder = presenter.onCreateViewHolder(content)
         grid = gridHolder.gridView.apply {
             isFocusable = false
@@ -165,10 +170,11 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
         root.onFocusSearchListener = BrowseFrameLayout.OnFocusSearchListener { focused, direction ->
             when {
                 keys.hasFocus() -> offKeys(focused, direction)
-                direction == View.FOCUS_UP && grid.hasFocus() && grid.selectedPosition < columns -> if (recentsShown) strip else box(focused)
+                direction == View.FOCUS_UP && (grid.hasFocus() && grid.selectedPosition < columns || note?.hasFocus() == true) ->
+                    if (recentsShown) strip else box(focused)
                 direction == View.FOCUS_UP && strip.hasFocus() -> box(focused)
                 direction == View.FOCUS_DOWN && bar.hasFocus() -> under()
-                direction == View.FOCUS_DOWN && strip.hasFocus() && grid.isFocusable -> grid
+                direction == View.FOCUS_DOWN && strip.hasFocus() -> results()
                 else -> null
             }
         }
@@ -218,7 +224,7 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
                 typeface = context.font(R.font.vazirmatn_medium)
                 setTextSize(TypedValue.COMPLEX_UNIT_PX, resources.getDimension(R.dimen.search_key_text))
                 setTextColor(context.getColorStateList(R.color.on_button))
-            } else setTextAppearance(R.style.TextAppearance_App_Button)
+            } else appearance(R.style.TextAppearance_App_Button)
             this.text = text
         }
         row().let { top ->
@@ -297,7 +303,7 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
         FocusFinder.getInstance().findNextFocus(keys, focused, direction) != null -> null
         direction == View.FOCUS_UP -> toggle
         direction == View.FOCUS_DOWN -> focused
-        direction == (if (rtl) View.FOCUS_LEFT else View.FOCUS_RIGHT) && !grid.isFocusable && !recentsShown -> focused
+        direction == (if (rtl) View.FOCUS_LEFT else View.FOCUS_RIGHT) && results() == null && !recentsShown -> focused
         else -> null
     }
 
@@ -340,14 +346,6 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
         val initial = savedInstanceState?.getString("query").orEmpty()
         bar.setSearchQuery(initial)
         bar.setSearchBarListener(this)
-        @Suppress("DEPRECATION")
-        bar.setSpeechRecognitionCallback {
-            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                .putExtra(RecognizerIntent.EXTRA_PROMPT, bar.hint)
-            runCatching { startActivityForResult(intent, VOICE) }.onFailure { requireContext().toast(it) }
-        }
         styleBar(view)
         search(initial, debounce = false)
         // On the keys if their button last brought them out, so they are never a trip past the field away.
@@ -359,15 +357,18 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
         outState.putString("query", bar.findViewById<TextView>(androidx.leanback.R.id.lb_search_text_editor).text.toString())
     }
 
-    override fun onPause() {
-        bar.stopRecognition()
-        super.onPause()
+    /** Coming back to the page while the results didn't come asks again on its own, as a catalogue does. */
+    override fun onStart() {
+        super.onStart()
+        if (failed) retry()
     }
 
     override fun onDestroyView() {
         pager?.cancel()
         presenter.onUnbindViewHolder(gridHolder)
         query = null
+        shown = null
+        note = null
         super.onDestroyView()
     }
 
@@ -390,6 +391,7 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
         // Ask for the UI's language on the keyboard, where the IME has it.
         if (Build.VERSION.SDK_INT >= 24) editor.imeHintLocales = LocaleList(Locale.getDefault())
         ContextCompat.getDrawable(context, R.drawable.search_mic)?.let(orb::setOrbIcon)
+        orb.setOnOrbClickedListener { listen() }
         val rest = orb.orbColors // the theme's, set as the orb is built
         val lit = SearchOrbView.Colors(context.getColor(R.color.text), context.getColor(R.color.text), context.getColor(R.color.ink))
         (if (orb.isFocused) lit else rest)?.let(orb::setOrbColors)
@@ -414,6 +416,22 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
         editor.setHintTextColor(editor.context.getColor(R.color.text_dim))
         val words: CharSequence = editor.text.ifEmpty { editor.hint ?: "" }
         editor.typeface = editor.context.font(if (words.isLatin) R.font.inter_regular else R.font.vazir)
+    }
+
+    /**
+     * The orb: the TV's speech recognizer, whose words come back to [onActivityResult]. Asked for
+     * here, not through the bar's recognition callback: Leanback blanks the field, its hint and so
+     * the results before it knows a recognizer will answer, and a viewer who then said nothing had
+     * lost the query. A TV with none says so in words of its own, where the failure was put down
+     * to 30nama.
+     */
+    private fun listen() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            .putExtra(RecognizerIntent.EXTRA_PROMPT, bar.hint)
+        @Suppress("DEPRECATION")
+        runCatching { startActivityForResult(intent, VOICE) }.onFailure { requireContext().toast(getString(R.string.search_no_voice)) }
     }
 
     @Deprecated("Fragment result API is overkill for one voice intent")
@@ -466,12 +484,11 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
 
     private val rtl get() = resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
 
-    /** Down from the box: the recent searches while they show, else the results once they can take the remote. */
-    private fun below(): View? = when {
-        recentsShown -> strip
-        grid.isFocusable -> grid
-        else -> null
-    }
+    /** Down from the box: the recent searches while they show, else [results]. */
+    private fun below(): View? = if (recentsShown) strip else results()
+
+    /** What stands under the heading for the remote: the results once they can take it, or the note's Retry in their place. */
+    private fun results(): View? = if (grid.isFocusable) grid else note?.findViewById(R.id.list_empty_action)
 
     private val editor: TextView get() = bar.findViewById(androidx.leanback.R.id.lb_search_text_editor)
 
@@ -496,7 +513,7 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
     private fun showRecents(show: Boolean) {
         val queries = if (show) Recents.read(requireContext()) else emptyList()
         if (queries.isEmpty()) {
-            if (strip.hasFocus()) (if (grid.isFocusable) grid else if (open) toggle else editor).requestFocus()
+            if (strip.hasFocus()) (results() ?: if (open) toggle else editor).requestFocus()
             recents.visibility = View.GONE
             return
         }
@@ -513,32 +530,47 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
         heading.typeface = requireContext().font(if (value.isLatin) R.font.inter_bold else R.font.peyda_bold)
     }
 
+    /** The first page of [query] failed: the note in the results' place says so until it is asked again. */
+    private var failed = false
+    /** In the results' place while their first page has failed ([showNote]). */
+    private var note: View? = null
+    /** The adapter the grid shows: the query before's, while this one's first page is on its way ([search]). */
+    private var shown: ArrayObjectAdapter? = null
+
     /**
      * Results for [text], or, until there are two letters to go on, the recent searches over
-     * 30nama's suggestions, so the page never opens on an empty screen. Either way the row stands at
-     * once, a skeleton until the first page lands; results head it as «نتایج», then with their count
-     * once it is known (never the query again: it is in the field just above, and Latin set in Peyda
-     * loses its spaces), or say there are none or that they failed. Opening a result keeps its
-     * query among the recent searches.
+     * 30nama's suggestions, so the page never opens on an empty screen. Over nothing the row stands
+     * at once, a skeleton until the first page lands. Over results it waits: they stay up, dim and
+     * out of the remote's reach, until this query's first page takes their place, where every
+     * letter typed used to swap them for the skeleton and back before the search had even been
+     * sent. Results head it as «نتایج», then with their count once it is known (never the query
+     * again: it is in the field just above, and Latin set in Peyda loses its spaces), or say there
+     * are none; a first page that fails leaves a note in their place ([showNote]). Opening a result
+     * keeps its query among the recent searches.
      */
     private fun search(text: String, debounce: Boolean) {
         val q = searchQuery(text)
         if (q == query) {
-            if (!debounce && waitingForTyping) {
+            // Submitted again after it failed, the same words are asked again: the search key did nothing, and only other words would.
+            if (!debounce && (waitingForTyping || failed)) {
                 waitingForTyping = false
-                pager?.reset()
+                if (failed) retry() else pager?.reset()
             }
             return
         }
         query = q
+        failed = false
         pager?.cancel()
         waitingForTyping = debounce && q.isNotEmpty()
         moveToResults = false
         grid.isFocusable = false
         // A recent search being run again keeps the remote until its results can take it.
         if (!strip.hasFocus()) showRecents(q.isEmpty())
+        hideNote() // the query before's
         val context = requireContext()
+        val name = getString(if (q.isEmpty()) R.string.suggested else R.string.search_results)
         val items = ArrayObjectAdapter(PosterPresenter(112, 168))
+        val stale = shown?.let { it.size() > 0 && it[0] is Card } == true
         val pager = Pager(viewLifecycleOwner.lifecycleScope, items, { t ->
             t.toCard(context) {
                 if (q.isNotEmpty()) Recents.add(context, q)
@@ -546,23 +578,31 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
             }
         }, onEmpty = {
             if (query == q) {
-                if (q.isNotEmpty()) title(getString(R.string.no_results))
+                show(items)
+                hideNote()
+                title(if (q.isEmpty()) name else getString(R.string.no_results))
                 showRecents(q.isEmpty())
             }
             moveToResults = false
         }, onError = {
             if (query == q) {
-                context.toast(it)
-                // A first page that failed leaves nothing under the heading, so it says so, the grid
-                // unfocusable as for no results; a later page's keeps the results and their heading.
-                if (items.size() == 0) title(getString(if (q.isEmpty()) R.string.suggestions_failed else R.string.search_failed))
+                // A later page's failure keeps the results and says why in the notice. A first
+                // page's leaves nothing to keep: the note in their place says it, Retry taking a
+                // remote that was waiting to go down to the results.
+                if (items.size() == 0) {
+                    show(items)
+                    showNote(if (q.isEmpty()) R.string.suggestions_failed else R.string.search_failed, context.errorText(it))
+                    if (moveToResults && bar.hasFocus()) focusResults()
+                } else context.toast(it)
                 showRecents(q.isEmpty())
             }
-        }, skeleton = Skeleton(12, 112, 168), onFirst = { total ->
+        }, skeleton = if (stale) null else Skeleton(12, 112, 168), onFirst = { total ->
             if (query == q) {
                 grid.isFocusable = true
+                show(items)
+                hideNote()
                 showRecents(q.isEmpty())
-                if (q.isNotEmpty() && total != null) title(resources.getQuantityString(R.plurals.search_count, total, total))
+                title(if (q.isNotEmpty() && total != null) resources.getQuantityString(R.plurals.search_count, total, total) else name)
                 // Only from the box: a remote that has gone on to the rail or the keys meanwhile stays there.
                 if (moveToResults && bar.hasFocus()) focusResults()
             }
@@ -575,15 +615,74 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
             else runCatching { Api.search(q, page) }.getOrElse { if (Api.tooShort(it)) JSONObject() else throw it }
         }
         this.pager = pager
-        title(getString(if (q.isEmpty()) R.string.suggested else R.string.search_results))
-        presenter.onBindViewHolder(gridHolder, items)
+        if (stale) {
+            // Leanback offers the selected poster to a focus search whatever the grid's own
+            // focusability says, so the search itself is switched off: Down must not land on a
+            // result that is about to go.
+            grid.setFocusSearchDisabled(true)
+            grid.animate().alpha(STALE).setStartDelay(0).setInterpolator(Motion.easeOut).setDuration(Motion.EXIT).withLayer().start()
+        } else {
+            title(name)
+            show(items)
+        }
         pager.reset()
+    }
+
+    /** [items] take the grid, whole and within the remote's reach: at once over nothing, else as their first page (or what came of it) is in. */
+    private fun show(items: ArrayObjectAdapter) {
+        if (shown === items) return
+        shown = items
+        presenter.onBindViewHolder(gridHolder, items)
+        grid.setFocusSearchDisabled(false)
+        grid.animate().alpha(1f).setStartDelay(0).setInterpolator(Motion.easeOut).setDuration(Motion.ENTER).withLayer().start()
+    }
+
+    /**
+     * The results' place when their first page fails: what failed over why, and Retry, as a
+     * catalogue's grid says it (layout/list_empty). The heading alone said it over an empty grid,
+     * which left the remote nowhere to go but back to the box. Retry reads «در حال بارگذاری» while
+     * it asks ([retry]), and the results, or the note's words again, take its place; coming back
+     * to the page asks on its own ([onStart]). It never takes the remote from someone typing.
+     */
+    private fun showNote(title: Int, why: CharSequence) {
+        val note = note ?: (layoutInflater.inflate(R.layout.list_empty, content, false) as LinearLayout).also {
+            it.gravity = Gravity.CENTER
+            it.findViewById<View>(R.id.list_empty_action).setOnClickListener { if (failed) retry() }
+            content.addView(it, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+            rise(listOf(it))
+            this.note = it
+        }
+        note.findViewById<TextView>(R.id.list_empty_title).setText(title)
+        note.findViewById<TextView>(R.id.list_empty_hint).text = why
+        note.findViewById<Button>(R.id.list_empty_action).setText(R.string.retry)
+        heading.visibility = View.GONE
+        grid.visibility = View.GONE
+        failed = true
+    }
+
+    /** The note gives the results their place back; a remote on its Retry goes on to them first, or with none there to the box. */
+    private fun hideNote() {
+        val note = note ?: return
+        heading.visibility = View.VISIBLE
+        grid.visibility = View.VISIBLE
+        if (note.hasFocus()) (if (grid.isFocusable) grid else if (open) toggle else editor).requestFocus()
+        content.removeView(note)
+        this.note = null
+    }
+
+    /** The first page asked again, the note standing by with its pill saying so. */
+    private fun retry() {
+        failed = false
+        note?.findViewById<Button>(R.id.list_empty_action)?.setText(R.string.intro_loading)
+        pager?.reset()
     }
 
     private companion object {
         const val VOICE = 1
         const val COLUMNS = 6
         const val KEY_COLUMNS = 7
+        /** How much of the query before's results shows while this one's are on their way: there still, plainly not the answer. */
+        const val STALE = 0.4f
         /** The keyboard's letters in the alphabet's order, its hamzas after ی, then the digits. */
         const val KEYS = "اآبپتثجچحخدذرزژسشصضطظعغفقکگلمنوهیءئؤ۱۲۳۴۵۶۷۸۹۰"
     }

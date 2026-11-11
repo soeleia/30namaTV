@@ -27,6 +27,10 @@ class TrailerTest {
         assertTrue(trailer("تریلر فیلم Animals به کارگردانی بن افلک", "Animals", 2026))
         assertFalse(trailer("تریلر فیلم American Animals 2018", "Animals", 2026))
         assertFalse(trailer("تریلر Party Animals", "Animals", 2026))
+        // Persian digits, as Aparat's titles often have them: a sequel's number, another film's year.
+        assertFalse(trailer("تریلر فیلم Dune ۲", "Dune", 2021))
+        assertFalse(trailer("تریلر فیلم The Lion King ۱۹۹۴", "The Lion King", 2019))
+        assertTrue(trailer("تریلر فیلم Dune ۲۰۲۱ (تل‌ماسه)", "Dune", 2021))
     }
 
     @Test

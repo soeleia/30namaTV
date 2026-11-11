@@ -80,7 +80,7 @@ private class SeeAllView(context: Context, width: Int, height: Int) : FrameLayou
         }
         // Dark enough that the sheet reads as texture and the words stay white on it.
         addView(View(context).apply { setBackgroundResource(R.color.scrim_mid) }, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-        label.setTextAppearance(R.style.TextAppearance_App_Tile)
+        label.appearance(R.style.TextAppearance_App_Tile)
         label.maxLines = 1
         label.gravity = Gravity.CENTER
         val words = LinearLayout(context).apply {

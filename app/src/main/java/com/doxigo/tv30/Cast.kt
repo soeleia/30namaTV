@@ -90,7 +90,7 @@ private class CastView(context: Context) : LinearLayout(context) {
         // their soft rim and the ring's own anti-aliasing meets the page, not the photo.
         val inside = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
         inside.setMargins(1, 1, 1, 1)
-        initials.setTextAppearance(R.style.TextAppearance_App_Initials)
+        initials.appearance(R.style.TextAppearance_App_Initials)
         initials.gravity = Gravity.CENTER
         initials.setBackgroundResource(R.drawable.cast_disc)
         photo.scaleType = ImageView.ScaleType.MATRIX
@@ -100,13 +100,13 @@ private class CastView(context: Context) : LinearLayout(context) {
         portrait.addView(initials, inside)
         portrait.addView(photo, FrameLayout.LayoutParams(inside))
         addView(portrait, LayoutParams(size, size))
-        name.setTextAppearance(R.style.TextAppearance_Leanback_ImageCardView_Title)
+        name.appearance(R.style.TextAppearance_Leanback_ImageCardView_Title)
         name.gravity = Gravity.CENTER_HORIZONTAL
         name.maxLines = 3
         name.ellipsize = TextUtils.TruncateAt.END
         // Peyda's own leading (1.26em) crowds a name stacked on two or three lines.
         TextViewCompat.setLineHeight(name, (name.textSize * 1.4f).roundToInt())
-        role.setTextAppearance(R.style.TextAppearance_Leanback_ImageCardView_Content)
+        role.appearance(R.style.TextAppearance_Leanback_ImageCardView_Content)
         role.gravity = Gravity.CENTER_HORIZONTAL
         role.isSingleLine = true
         role.ellipsize = TextUtils.TruncateAt.END

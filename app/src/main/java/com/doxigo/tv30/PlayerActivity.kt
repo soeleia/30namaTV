@@ -106,6 +106,8 @@ class PlayerActivity : TvActivity() {
         fun intent(context: Context, id: Int, free: Boolean, fileId: String? = null, title: JSONObject? = null): Intent =
             Intent(context, PlayerActivity::class.java).putExtra("id", id).putExtra("free", free).putExtra("file", fileId)
                 .putExtra("title", title?.playerFacts?.toString())
+                // An impatient second OK on a slow TV opened a second player over the first.
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
     }
 }
 
@@ -172,6 +174,8 @@ class PlayerFragment : VideoSupportFragment() {
             .setPriorityTaskManager(Buffering.priority)
             .setBandwidthMeter(bandwidth)
             .setAudioAttributes(AudioAttributes.Builder().setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).setUsage(C.USAGE_MEDIA).build(), true)
+            // Headphones that drop out mid-film pause it rather than send it to the TV's speakers.
+            .setHandleAudioBecomingNoisy(true)
             // DefaultDataSource reads the subtitles found on the subtitle sites from disk (Subtitles.kt)
             // and hands everything over http to Buffering's.
             .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(context, Buffering.dataSource(context))).setLoadErrorHandlingPolicy(Retry403)
@@ -191,8 +195,10 @@ class PlayerFragment : VideoSupportFragment() {
                 if (finds.picked != null) applyTrackPreferences()
             }
             override fun onPlaybackStateChanged(state: Int) {
+                if (state == Player.STATE_READY) hideNote() // playing again, however it came back
                 if (state != Player.STATE_ENDED) return
                 if (sleep == SLEEP_END) sleep = 0 // the sleep timer's end: nothing plays on
+                else if (nextFile() == null) leave()
                 else if (autoplays) autoplayNext()
             }
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -201,7 +207,7 @@ class PlayerFragment : VideoSupportFragment() {
                 if (!isPlaying) report()
                 syncCountdown()
             }
-            override fun onPlayerError(error: PlaybackException) = requireContext().toast(getString(errorMessage(error.errorCode)))
+            override fun onPlayerError(error: PlaybackException) = fail(error)
         })
         progressBarManager.show()
         lifecycleScope.launch { load() }
@@ -213,12 +219,22 @@ class PlayerFragment : VideoSupportFragment() {
                 }
             }
         }
-        // The disk read-ahead, while the screen shows: it follows the playhead (seeks included) on
-        // its own and stops with the screen, as the player does in onStop.
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) { Buffering.prefetch(context, player, ::upcoming) }
+        readAhead()
+    }
+
+    /**
+     * The disk read-ahead, while the screen shows: it follows the playhead (seeks included) on its
+     * own and stops with the screen, as the player does in onStop. Started over after [refresh]: on
+     * the old answer's dead signatures it had met its three 403s and ended for the sitting.
+     */
+    private fun readAhead() {
+        prefetching?.cancel()
+        prefetching = lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) { Buffering.prefetch(requireContext(), player, ::upcoming) }
         }
     }
+
+    private var prefetching: Job? = null
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -250,6 +266,9 @@ class PlayerFragment : VideoSupportFragment() {
         progressBarManager.setProgressBarView(spinner)
         panel = PlayerPanel(root, cues, ::uncover)
         preview = SeekPreview(root, player) { file }
+        // Last, so over everything else: while it is up, it is all there is to act on.
+        note = layoutInflater.inflate(R.layout.player_note, root, false)
+        root.addView(note)
         // The overlay shows and hides from many places (keys, auto-hide, pause), and so does the
         // panel; the overlay's flag flips as its fade starts, and the fade draws, so a pre-draw
         // check catches every change on time.
@@ -274,10 +293,12 @@ class PlayerFragment : VideoSupportFragment() {
     /**
      * The panel stands in for the controls while it shows. Leanback brings them back on its own (a
      * play state change, a tickle), so that is refused here rather than undone after. Each time the
-     * controls come up, the remote starts on play/pause.
+     * controls come up, the remote starts on play/pause. The note stands in for them too, and so
+     * does a `stream` answer on its way ([refresh]): playback stopping is a play state change, and
+     * the controls it brought up showed a bar at 0:00 for as long as the player stood idle.
      */
     override fun showControlsOverlay(runAnimation: Boolean) {
-        if (::panel.isInitialized && panel.isOpen) return
+        if (::panel.isInitialized && panel.isOpen || failed || refreshing?.isActive == true) return
         if (!isControlsOverlayVisible) focusControls()
         super.showControlsOverlay(runAnimation)
     }
@@ -328,6 +349,8 @@ class PlayerFragment : VideoSupportFragment() {
     // A paused ExoPlayer keeps buffering; off screen it must not hold a connection to the CDN.
     override fun onStop() {
         super.onStop()
+        session.onScreen = false
+        ended = player.playbackState == Player.STATE_ENDED
         player.stop()
         preview.close()
         // The timer is for this sitting: one left running would pause the film an hour later, on return.
@@ -337,8 +360,14 @@ class PlayerFragment : VideoSupportFragment() {
 
     override fun onStart() {
         super.onStart()
-        if (file != null && player.playbackState == Player.STATE_IDLE) player.prepare()
+        session.onScreen = true
+        // Not a film that had ended: prepared at its end it ends again, and that played the next
+        // episode on return (past a sleep timer set to this one's end, too). Play starts it.
+        if (file != null && !ended && player.playbackState == Player.STATE_IDLE) player.prepare()
     }
+
+    /** The film had ended when the screen went (onStop). */
+    private var ended = false
 
     override fun onDestroy() {
         super.onDestroy()
@@ -354,6 +383,13 @@ class PlayerFragment : VideoSupportFragment() {
      */
     fun onKey(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN) unattended = 0
+        // The note has the remote: OK is its pill's and Back leaves, as on any page. The remote's
+        // own Play is the pill too, where the session's would prepare the same dead URLs.
+        if (failed) {
+            val play = event.keyCode == KeyEvent.KEYCODE_MEDIA_PLAY || event.keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+            if (play && event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) note.findViewById<View>(R.id.player_note_action).performClick()
+            return play
+        }
         if (panel.isOpen) {
             if (event.keyCode != KeyEvent.KEYCODE_BACK) return session.onKey(event)
             if (event.action == KeyEvent.ACTION_UP) panel.back()
@@ -397,7 +433,8 @@ class PlayerFragment : VideoSupportFragment() {
         val args = requireActivity().intent
         postId = args.getIntExtra("id", 0)
         facts = args.getStringExtra("title")?.let { runCatching { JSONObject(it) }.getOrNull() } ?: JSONObject()
-        val loaded = runCatching { Api.stream(postId, args.getBooleanExtra("free", false)) }
+        // Back while it loads cancels this: not a failure to tell the next page of (parting).
+        val loaded = runCatching { Api.stream(postId, args.getBooleanExtra("free", false)) }.onFailure { if (it is CancellationException) throw it }
         val context = context ?: return // left while loading
         // A notice here would close with the player: the page beneath says why (parting).
         val stream = loaded.getOrElse {
@@ -466,8 +503,7 @@ class PlayerFragment : VideoSupportFragment() {
         reportedAt = -1
         qualities = qualities(next)
         quality = pickQuality(qualities)
-        // 30nama's own subtitles keep the title's timing: the next episode, or the next evening, starts shifted as this one was.
-        for (own in ownSubtitles(next)) prefs.getLong(timingPref(own), 0L).takeIf { it != 0L }?.let { offsets.getOrPut(timingKey(own)) { it } }
+        seedTimings(next)
         val info = next.optJSONObject("info")
         val season = info?.optInt("season") ?: 0
         val episode = info?.optInt("episode_number", info.optInt("episode")) ?: 0
@@ -479,7 +515,7 @@ class PlayerFragment : VideoSupportFragment() {
         val titleInfo = stream?.optJSONObject("info")
         val index = files.indexOf(next)
         session.nowPlaying(titleInfo?.englishName, episodeLine, stream?.cover, hasPrevious = index > 0, hasNext = index < files.lastIndex)
-        setSource(positionMs)
+        setSource(positionMs, play = true)
         // The line under the names: what plays, the score, the year (Meta.playerMeta).
         glue?.subtitle = facts.playerMeta(requireContext(), episodeLine, episodeName, year()?.localDigits())
         retitled = true
@@ -530,7 +566,11 @@ class PlayerFragment : VideoSupportFragment() {
         }.toList()
     }.orEmpty()
 
-    private fun setSource(positionMs: Long) {
+    /**
+     * [play] is true for a title or episode starting; a reload of what is on (another quality or
+     * audio, a subtitle found or made minutes later) leaves a paused film paused.
+     */
+    private fun setSource(positionMs: Long, play: Boolean = player.playWhenReady) {
         val f = file ?: return
         val url = playlist(f, qualities.getOrNull(quality)) ?: return
         val subtitles = ownSubtitles(f) + finds.added.values
@@ -539,8 +579,11 @@ class PlayerFragment : VideoSupportFragment() {
                 .setMediaMetadata(session.metadata).build(),
             positionMs,
         )
-        player.prepare()
-        player.playWhenReady = true
+        // Off screen (Home, while the stream was asked for or a subtitle was being made) nothing
+        // loads or sounds: onStart prepares it, as after any stop.
+        ended = false
+        if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) player.prepare()
+        player.playWhenReady = play
         retime() // another file, or a subtitle just found, starts at its own offset
     }
 
@@ -577,6 +620,117 @@ class PlayerFragment : VideoSupportFragment() {
             runCatching {
                 Api.observer(postId, f.obj("info")?.opt("file_id"), Api.user?.opt("user_id"), mark, duration, f.obj("options")?.opt("token"))
             }
+        }
+    }
+
+    // ---- Playback that stopped: the `stream` answer asked for again when its signatures have died,
+    // ---- a note over the video when that is not it or does not help, and the way out at a title's end. ----
+
+    /** The note over the video (player_note), and whether it is up: it then has the remote ([onKey]). */
+    private lateinit var note: View
+    private var failed = false
+    /** The `stream` answer on its way again ([refresh]), and when one was last asked for (elapsedRealtime). */
+    private var refreshing: Job? = null
+    private var refreshedAt = -REFRESH_GAP_MS
+    /** The beat before a title that ended with nothing after it closes ([leave]). */
+    private var leaving: Job? = null
+
+    /**
+     * Playback stopped on [error]. A 403 that outlived Retry403's tries is the `stream` answer's
+     * signatures gone dead, so it is asked for again without a word ([refresh]); another within
+     * [REFRESH_GAP_MS] of a fresh answer is not that, and like any other failure it is said in the
+     * note. It was a 3.5 s notice over a frozen frame, gone before it was read from the sofa.
+     */
+    private fun fail(error: PlaybackException) {
+        val forbidden = generateSequence<Throwable>(error) { it.cause }.any { (it as? HttpDataSource.InvalidResponseCodeException)?.responseCode == 403 }
+        if (forbidden && SystemClock.elapsedRealtime() - refreshedAt > REFRESH_GAP_MS) return refresh()
+        when (val why = errorMessage(error.errorCode)) {
+            // Asking again would fail the same way: the pill opens the qualities instead.
+            R.string.player_error_format -> showNote(getString(why), R.string.player_change_quality) { openPanel { qualityAndSpeed(onSpeed = false) } }
+            // The CDN's refusal: its URLs are what it refused, so Retry asks for new ones.
+            R.string.player_error_server -> showNote(getString(why), action = ::refresh)
+            else -> showNote(getString(why)) { player.prepare() }
+        }
+    }
+
+    /**
+     * The `stream` answer again, played on from where the film stands, paused if it was. Its URLs
+     * are signed for the IP that asked, until an expiry (Buffering.cacheKey), and [load] asked once:
+     * after a long pause, standby or a VPN's change of exit every prepare met 403, ten tries each,
+     * until the viewer left the player and came back in. What plays as the answer lands is found in
+     * it by its id, an episode picked meanwhile too. One at a time; leaving the screen cancels it.
+     */
+    private fun refresh() {
+        if (refreshing?.isActive == true) return
+        val free = activity?.intent?.getBooleanExtra("free", false) ?: return // the screen is gone
+        refreshedAt = SystemClock.elapsedRealtime()
+        progressBarManager.show()
+        refreshing = lifecycleScope.launch {
+            val asked = runCatching { Api.stream(postId, free) }.onFailure { if (it is CancellationException) throw it }
+            val context = context ?: return@launch
+            val fresh = asked.getOrNull()?.optJSONArray("hls").objects()
+            val id = file?.str("info", "file_id")
+            val now = fresh.firstOrNull { id != null && it.str("info", "file_id") == id }
+            if (now == null) {
+                progressBarManager.hide()
+                return@launch showNote(asked.exceptionOrNull()?.let(context::errorText) ?: getString(R.string.player_no_files), action = ::refresh)
+            }
+            stream = asked.getOrThrow()
+            if (skipFile === file) skipFile = now // the same file: its offer, and the marks auto-skip took, stand
+            files = fresh
+            file = now
+            qualities = qualities(now)
+            quality = pickQuality(qualities)
+            seedTimings(now) // 30nama's subtitles have new URLs too
+            setSource(player.currentPosition)
+            // Buffering, the player takes the ring from here; stopped (Home meanwhile), onStart prepares.
+            if (player.playbackState != Player.STATE_BUFFERING) progressBarManager.hide()
+            readAhead()
+        }
+    }
+
+    /**
+     * DESIGN.md's Note over the video: «پخش متوقف شد», [why], and one pill that takes the remote
+     * and does [action]: Retry, unless another way on is the one that works ([label]). The controls
+     * and the panel step aside for it, and it goes when playback is back ([hideNote]); Back leaves
+     * the player as it always does.
+     */
+    private fun showNote(why: CharSequence, label: Int = R.string.retry, action: () -> Unit) {
+        if (view == null) return
+        failed = true // first: the panel, closing, asks whether a note is due (uncover)
+        if (panel.isOpen) panel.close(controls = false)
+        hideControlsOverlay(true)
+        note.findViewById<TextView>(R.id.player_note_why).text = why
+        note.fadeNote(true)
+        note.findViewById<Button>(R.id.player_note_action).apply {
+            setText(label)
+            setOnClickListener {
+                hideNote()
+                action()
+            }
+            requestFocus()
+        }
+    }
+
+    /** The note away, the remote back on the controls, hidden as they are: OK brings them up as at any other moment. */
+    private fun hideNote() {
+        if (!failed) return
+        failed = false
+        if (note.hasFocus()) focusControls()
+        note.fadeNote(false)
+    }
+
+    /**
+     * A film, or a series' last episode, ran out with nothing after it: a beat on its last frame,
+     * then back to the page it was played from, as the trailer goes at its end. It stayed there
+     * under a play button. Not if the viewer did anything with the beat that took it off its end
+     * (Play, a seek back), nor under an open panel.
+     */
+    private fun leave() {
+        leaving?.cancel()
+        leaving = lifecycleScope.launch {
+            delay(END_BEAT_MS)
+            if (player.playbackState == Player.STATE_ENDED && !panel.isOpen) activity?.finish()
         }
     }
 
@@ -796,16 +950,20 @@ class PlayerFragment : VideoSupportFragment() {
 
     /**
      * The remote and the pill. While the controls are hidden, OK presses the pill (white for as long
-     * as it is held). Any other key stops a countdown, Back doing nothing else; volume doesn't, and
-     * play/pause only pauses it with the video. On the pill the remote is outside Leanback's rows,
-     * which then hear nothing: a key keeps the controls up, and Back hides them as it would anywhere else.
+     * as it is held), but not the start's: for ten seconds after a resume the habitual OK for the
+     * controls took the film back to 0:00, and the next report wrote that over the point it was
+     * picked up at. There OK brings the controls up as at any other moment, and the start is the
+     * pill's own click, with the remote on it. Any other key stops a countdown, Back doing nothing
+     * else; volume doesn't, and play/pause only pauses it with the video. On the pill the remote is
+     * outside Leanback's rows, which then hear nothing: a key keeps the controls up, and Back hides
+     * them as it would anywhere else.
      */
     private fun skipKey(event: KeyEvent): Boolean {
         if (offered == 0) return false
         val down = event.action == KeyEvent.ACTION_DOWN
         val code = event.keyCode
         val ok = code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER
-        if (ok && !isControlsOverlayVisible) {
+        if (ok && !isControlsOverlayVisible && offered != R.string.player_start_over) {
             skip.isPressed = down
             if (!down) skip.performClick()
             return true
@@ -843,7 +1001,7 @@ class PlayerFragment : VideoSupportFragment() {
      */
     private fun placeSkip(want: Int): Boolean {
         val root = view as? ViewGroup ?: return false
-        val now = if (offered == 0 || panel.isOpen) HIDDEN else want
+        val now = if (offered == 0 || panel.isOpen || failed) HIDDEN else want
         val berth = if (now == HIDDEN) 0 else (skip.layoutParams as FrameLayout.LayoutParams).marginEnd + skip.width + (24 * resources.displayMetrics.density).toInt()
         val berthChanged = berth != skipBerth
         skipBerth = berth
@@ -1032,6 +1190,8 @@ class PlayerFragment : VideoSupportFragment() {
         if (controls) tickle()
         if (opener?.requestFocus() != true) focusControls()
         opener = null
+        // Back out of the qualities the note opened, none picked: the note again, not a dead screen.
+        player.playerError?.takeIf { !failed && refreshing?.isActive != true }?.let(::fail)
     }
 
     /** Netflix's Audio & Subtitles: the audio and its channels beside the subtitles, where CC lands. */
@@ -1155,9 +1315,12 @@ class PlayerFragment : VideoSupportFragment() {
 
     /** One of the stream's audio tracks; its language is the one to prefer from then on. */
     private fun applyDub(group: Tracks.Group) {
-        prefs.edit().putString("dub", group.getTrackFormat(0).language).apply()
+        val language = group.getTrackFormat(0).language
+        prefs.edit().putString("dub", language).apply()
+        // The override holds for this file's own track group; the language carries to the next episode's.
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
             .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, 0))
+            .setPreferredAudioLanguage(language)
             .build()
     }
 
@@ -1494,6 +1657,11 @@ class PlayerFragment : VideoSupportFragment() {
     // ponytail: a key per title ever shifted, a few bytes each, as Watched.leave keeps.
     private fun timingPref(own: MediaItem.SubtitleConfiguration) = "timing.$postId.${own.id}"
 
+    /** 30nama's own subtitles keep the title's timing: the next episode, or the next evening, starts shifted as this one was. */
+    private fun seedTimings(f: JSONObject) {
+        for (own in ownSubtitles(f)) prefs.getLong(timingPref(own), 0L).takeIf { it != 0L }?.let { offsets.getOrPut(timingKey(own)) { it } }
+    }
+
     /** The subtitle showing, as ExoPlayer was given it; null with none. */
     private fun shownSubtitle(): MediaItem.SubtitleConfiguration? {
         val f = file ?: return null
@@ -1667,8 +1835,12 @@ class PlayerFragment : VideoSupportFragment() {
         val shelves = seasons.map { (season, list) ->
             getString(R.string.season_n, season) to list.map { f ->
                 context.episodeCard(f, watching.takeIf { f === playing }, art = stream?.cover) {
-                    panel.close(controls = f === playing)
-                    if (f !== playing) play(f, 0)
+                    // What plays as OK is pressed: an episode may have ended, or a channel key moved on, behind the sheet.
+                    // By id: a `stream` answer asked for again meanwhile (refresh) has other objects, and this one's URLs are dead.
+                    val id = f.str("info", "file_id")
+                    val picked = files.firstOrNull { it.str("info", "file_id") == id } ?: f
+                    panel.close(controls = picked === file)
+                    if (picked !== file) play(picked, 0)
                 }
             }
         }
@@ -1682,12 +1854,12 @@ class PlayerFragment : VideoSupportFragment() {
 
     /**
      * What stopped playback, and what to do about it, in place of ExoPlayer's own (English, for
-     * developers) message. Play re-prepares a failed player (LeanbackPlayerAdapter, PlayerSession),
-     * so most of them end there; a file that won't parse or decode may in another quality.
+     * developers) message: the note's why ([fail]), over the pill that does it. Retry prepares the
+     * player again where it stood; a file that won't parse or decode may play in another quality.
      */
     private fun errorMessage(code: Int) = when (code) {
         PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED, PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> R.string.player_error_network
-        // A 403 still there after Retry403's ten tries, or a file gone from the CDN.
+        // A 403 still there after Retry403's ten tries and a fresh `stream` answer, or a file gone from the CDN.
         PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS, PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND, PlaybackException.ERROR_CODE_IO_NO_PERMISSION -> R.string.player_error_server
         in 3000..4999 -> if (qualities.size > 1) R.string.player_error_format else R.string.player_error // parsing (3xxx), decoding (4xxx)
         else -> R.string.player_error
@@ -1705,6 +1877,10 @@ class PlayerFragment : VideoSupportFragment() {
         const val AUTO_SKIP_MS = 1_500L
         /** How long a title picked up part-way offers its start, in playing time. */
         const val START_OVER_MS = 10_000L
+        /** A 403 this soon after a fresh `stream` answer is not its signatures expiring: the note says so instead of asking again. */
+        const val REFRESH_GAP_MS = 60_000L
+        /** How long a title that ended with nothing after it holds its last frame before the player closes. */
+        const val END_BEAT_MS = 1_500L
         /** The connection's speed (bps) a TV's first viewing assumes until its segments measure it. */
         const val INITIAL_ESTIMATE = 6_000_000L
         /** Without a credits mark, how long before the end (s) the next episode is offered and counted down to. */
@@ -1738,8 +1914,14 @@ class PlayerFragment : VideoSupportFragment() {
         override fun getFallbackSelectionFor(options: LoadErrorHandlingPolicy.FallbackOptions, info: LoadErrorHandlingPolicy.LoadErrorInfo) =
             if (info.is403()) null else super.getFallbackSelectionFor(options, info)
 
+        /**
+         * Anything but a 403 gets the tries it always had (3), then fails for good, which the loader
+         * takes at once. [getMinimumLoadableRetryCount] is asked without the error, so its 10 held for
+         * every failure: with the network gone the spinner turned for over half a minute, each try
+         * waiting out its own timeout besides, before anything was said.
+         */
         override fun getRetryDelayMsFor(info: LoadErrorHandlingPolicy.LoadErrorInfo): Long {
-            if (!info.is403()) return super.getRetryDelayMsFor(info)
+            if (!info.is403()) return if (info.errorCount > super.getMinimumLoadableRetryCount(info.mediaLoadData.dataType)) C.TIME_UNSET else super.getRetryDelayMsFor(info)
             Buffering.cdn.connectionPool.evictAll() // the failed connection is idle again by now
             return 200L
         }
@@ -1766,6 +1948,8 @@ class PlayerFragment : VideoSupportFragment() {
         override fun onCreateRowPresenter(): PlaybackRowPresenter = object : PlaybackTransportRowPresenter() {
             override fun createRowViewHolder(parent: ViewGroup): RowPresenter.ViewHolder = super.createRowViewHolder(parent).also {
                 dress(it.view)
+                // In code: the layout's attribute is read only from Android 12, and the poster was square below it.
+                it.view.findViewById<View>(androidx.leanback.R.id.image)?.clipToOutline = true
                 it.view.post(::focusControls) // once attached: the first controls start on play/pause too
             }
 
@@ -1885,6 +2069,23 @@ private object PersianDigits : ReplacementTransformationMethod() {
 internal fun filmShape(decoder: Pair<Int, Int>, stream: Pair<Int, Int>?): Pair<Int, Int> {
     fun sixteenNine(s: Pair<Int, Int>) = abs(s.first * 9 - s.second * 16) <= s.second * 16 / 50 // within 2%
     return if (stream != null && stream.first > 0 && stream.second > 0 && sixteenNine(decoder) && !sixteenNine(stream)) stream else decoder
+}
+
+/**
+ * Fades a note over a video (player_note) in or out, scrim and all. Nothing travels, as it does
+ * for the app's other notes (reveal): the scrim fills the screen, and a rise would bare the
+ * picture along its foot.
+ */
+internal fun View.fadeNote(show: Boolean) {
+    animate().cancel()
+    if (show) {
+        if (visibility != View.VISIBLE) alpha = 0f
+        visibility = View.VISIBLE
+        animate().alpha(1f).setStartDelay(0).setInterpolator(Motion.easeOut).setDuration(Motion.ENTER).start()
+    } else if (visibility == View.VISIBLE) {
+        animate().alpha(0f).setStartDelay(0).setInterpolator(Motion.easeOut).setDuration(Motion.EXIT)
+            .withEndAction { visibility = View.GONE }.start()
+    }
 }
 
 private object Quiet : CharacterStyle() {

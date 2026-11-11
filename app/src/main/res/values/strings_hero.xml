@@ -11,4 +11,7 @@
     <string name="runtime_minutes">%d دقیقه</string>
     <!-- Over why and Retry in home's rows' place, when they could not be fetched and none were kept. -->
     <string name="home_failed">صفحهٔ اصلی بارگیری نشد</string>
+    <!-- Said once, in the notice, the first time the remote rests on a Continue Watching poster:
+         held OK is the only way to continue_remove, and nothing else on the page says so. -->
+    <string name="continue_hint">برای حذف یک عنوان از ادامهٔ تماشا، OK را نگه دارید.</string>
 </resources>

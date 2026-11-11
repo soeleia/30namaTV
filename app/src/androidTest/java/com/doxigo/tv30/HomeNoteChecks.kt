@@ -91,13 +91,11 @@ object HomeNoteChecks {
                     val homes = host.supportFragmentManager.fragments.filterIsInstance<HomeFragment>()
                     val home = homes.firstOrNull()
                     fun field(name: String) = home?.let { HomeFragment::class.java.getDeclaredField(name).apply { isAccessible = true }.get(it) }
-                    fun spinners(v: View): Int = (if (v is android.widget.ProgressBar && v.isShown) 1 else 0) +
-                        ((v as? android.view.ViewGroup)?.let { g -> (0 until g.childCount).sumOf { spinners(g.getChildAt(it)) } } ?: 0)
                     val dock = host.findViewById<View>(androidx.leanback.R.id.browse_container_dock)
                     seen = "focus ${host.currentFocus?.javaClass?.simpleName}#${host.currentFocus?.id?.takeIf { it != View.NO_ID }?.let(host.resources::getResourceEntryName)}, " +
                         "$notes Retry, note alpha ${host.findViewById<View>(R.id.home_note)?.alpha}; ${homes.size} home, view ${home?.view != null}, " +
                         "loaded ${field("loaded")}, riseOnView ${field("riseOnView")}, rows ${home?.adapter?.size()}, dock ${dock?.visibility} alpha ${dock?.alpha}, " +
-                        "${spinners(root)} spinner, ${host.lifecycle.currentState}, home ${home?.lifecycle?.currentState}, window focus ${host.hasWindowFocus()}, " +
+                        "skeleton ${field("bones") != null}, ${host.lifecycle.currentState}, home ${home?.lifecycle?.currentState}, window focus ${host.hasWindowFocus()}, " +
                         "at +${SystemClock.elapsedRealtime() - roundAt} ms; calls ${synchronized(calls) { calls.toList() }}"
                     host.findViewById<View>(R.id.home_note)?.alpha == 1f && retry()?.hasFocus() == true
                 }

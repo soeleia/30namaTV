@@ -47,9 +47,12 @@ class DetailsActivity : TvActivity() {
     private lateinit var rowsFragment: RowsSupportFragment
     /** Start-anchored rows that remember their card, as on home, by [rowIds]. */
     private val rows = ArrayObjectAdapter(CardRowPresenter())
+    /** What Play picks up, after its verb: a series' episode («فصل ۱، قسمت ۴»), a film's time left («۴۳ دقیقه مانده»). */
     private var resumeLabel: String? = null
-    /** What Play does with [resumeLabel]'s episode: resume it, start the next one (UpNext.kt), or start it over. */
-    private var playVerb = R.string.resume
+    /** What Play does with [resumeLabel]'s episode or film: resume it, start the next one (UpNext.kt), or start it over. */
+    private var playVerb = R.string.watch
+    /** The plan asked for again from Play (see [knowUser]); one at a time. */
+    private var userAsk: Job? = null
     /** The row and tile of the episode Play leads to: where Down first lands, in its season (and its stretch of a long one). */
     private var landing: Pair<Int, Int>? = null
     /** The seasons' rows of tiles, in order; coming back to the page their tiles catch up in place (see [onRestart]). */
@@ -93,10 +96,15 @@ class DetailsActivity : TvActivity() {
         val past = PastRows { fragment.verticalGridView }
         fragment.setOnItemViewSelectedListener { _, _, _, _ -> past.update() }
         fragment.setAlignment(waiting)
-        window.decorView.viewTreeObserver.addOnGlobalFocusChangeListener { old, _ ->
+        val page = findViewById<android.view.ViewGroup>(android.R.id.content).getChildAt(0)
+        fun onPage(view: View?) = generateSequence(view) { it.parent as? View }.any { it === page }
+        window.decorView.viewTreeObserver.addOnGlobalFocusChangeListener { old, new ->
             // Focus from nowhere fell from a view taken away (the seasons replacing their note), and
             // the grid gives it back in the same layout: not the remote moving, so nothing moves.
             if (old == null) return@addOnGlobalFocusChangeListener
+            // Nor is focus going to a sheet over the page and coming back (OK held on a poster): the
+            // rows slid down behind its scrim and up again as it closed, landing on Play's episode.
+            if (!onPage(old) || new != null && !onPage(new)) return@addOnGlobalFocusChangeListener
             val inRows = fragment.view?.hasFocus() == true
             if (inRows == risen) return@addOnGlobalFocusChangeListener
             risen = inRows
@@ -172,10 +180,13 @@ class DetailsActivity : TvActivity() {
         updateActions() // signed in, or a list changed, while we were away
     }
 
-    /** Back from the player, most likely: the server's point has moved and Watched with it, so Play and the tiles follow. */
+    /**
+     * Back from the player, most likely: the server's point has moved and Watched with it, so Play and
+     * the tiles follow, a film's Play too. A page with nothing to bring up to date answers at once.
+     */
     override fun onRestart() {
         super.onRestart()
-        if (episodeRows.isNotEmpty() || episodesNote != null) askEpisodes()
+        askEpisodes()
     }
 
     private fun askEpisodes() {
@@ -259,7 +270,17 @@ class DetailsActivity : TvActivity() {
             (parent as android.view.ViewGroup).clipChildren = false
         }
         watch = button(R.drawable.act_play, R.style.Widget_App_Button_Primary).also { bar.addView(it) }
-        watch.setOnClickListener { play(title) }
+        watch.setOnClickListener {
+            if (!Api.loggedIn || Api.user != null) return@setOnClickListener play(title)
+            // A session with no plan yet (knowUser): asked for first, or Play would say to upgrade a plan it never saw.
+            if (userAsk?.isActive != true) userAsk = lifecycleScope.launch {
+                runCatching { knowUser() }.onFailure {
+                    if (it is CancellationException) throw it
+                    return@launch toast(it)
+                }
+                play(title)
+            }
+        }
         // Icon and label, between Play and the round toggles; hidden until a trailer is found (showTrailer).
         trailer = button(R.drawable.act_trailer, R.style.Widget_App_Button_Icon).apply {
             text = getString(R.string.trailer)
@@ -279,7 +300,9 @@ class DetailsActivity : TvActivity() {
             }
             toggle.setOnClickListener {
                 // Library flips its state before suspending, so the button updates at once.
-                lifecycleScope.launch { runCatching { Library.toggle(group, title.titleId) }.onFailure { toast(it) } }
+                toggleList(group, title.titleId) {
+                    if (!isDestroyed) updateActions() // a flip the server did not take is undone, one that waited for the lists is made
+                }
                 updateActions()
             }
             toggles[group] = toggle
@@ -309,7 +332,8 @@ class DetailsActivity : TvActivity() {
             resumeLabel != null -> SpannableStringBuilder(if (playVerb == R.string.upnext_play) getString(R.string.upnext_play, "") else getString(playVerb) + "  ").append(resumeLabel, object : CharacterStyle() {
                 override fun updateDrawState(paint: TextPaint) { paint.alpha = paint.alpha * 7 / 10 }
             }, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            else -> getString(R.string.watch)
+            // Resumed with nothing to say after the verb (a film of unknown length): the verb alone.
+            else -> getString(if (playVerb == R.string.resume) R.string.resume else R.string.watch)
         }
         val labels = mapOf("favorite" to R.string.list_favorite, "watchlist" to R.string.list_watchlist, "notify" to R.string.list_notify)
         // Outline while the title is not in the list, filled once it is: drawn icons, not glyphs.
@@ -362,19 +386,24 @@ class DetailsActivity : TvActivity() {
      * files) fades in once it is on screen and extracted, or at once when it was before.
      * A season longer than fifty is a row per fifty, «فصل ۱، قسمت ۱ تا ۵۰», as the official app chunks
      * it: Down jumps fifty episodes, every header says where it is, and Leanback draws only the rows on screen.
-     * Called again once the rows are up, it only brings their tiles and Play up to date.
+     * Called again once the rows are up, it only brings their tiles and Play up to date, unless the
+     * rows themselves have changed. A film has no rows; the same answer says where its Play picks up.
      */
     private suspend fun loadEpisodes() {
-        if (title.isMovie || !title.streamable) return
+        // Not a failure to say: Play asks again and says why (buildActions).
+        runCatching { knowUser() }.onFailure { if (it is CancellationException) throw it }
+        if (!title.streamable) return
         val stream = runCatching { Api.stream(title.titleId, title.isFree) }.getOrElse {
             if (it is CancellationException) throw it
-            // Tiles already up keep what they show; none yet, their place says why.
-            if (episodeRows.isEmpty()) noteEpisodes(errorText(it))
+            // Tiles already up keep what they show; none yet, their place says why. A film's Play
+            // keeps its word, and the player says why if it can't play either.
+            if (!title.isMovie && episodeRows.isEmpty()) noteEpisodes(errorText(it))
             return
         }
+        val all = stream.optJSONArray("hls").objects()
+        if (title.isMovie) return resumeFilm(all, stream.optJSONObject("continue_watching"))
         // Play's episode by the player's own rule (UpNext.kt): saved in the credits, it is the next one
         // not yet seen, from its start (a finale starts over), so the button and the marked tile say what Play does.
-        val all = stream.optJSONArray("hls").objects()
         val seasons = all.groupBy { it.obj("info")?.optInt("season") ?: 0 }.filterKeys { it != 0 }.toSortedMap()
         if (seasons.isEmpty()) return run { if (episodeRows.isEmpty()) noteEpisodes(getString(R.string.episodes_none)) }
         val saved = stream.optJSONObject("continue_watching")
@@ -386,17 +415,18 @@ class DetailsActivity : TvActivity() {
         val resumeFile = all.getOrNull(playIndex)?.str("info", "file_id")
         // The marked tile: how far in where Play resumes it, none where Play starts it.
         val length = all.getOrNull(playIndex)?.let { Watched.of(this, it)?.duration }?.takeIf { it > 0 }
-        val watching = resumeFile?.let { JSONObject().put("progress", if (playIndex == savedIndex && length != null) playAt * 100 / length else 0) }
+        // Nor is a tile marked that Play starts over, seen to its end (a finished series' finale): it keeps its check.
+        val again = playIndex == savedIndex && playAt == 0L && all.getOrNull(playIndex)?.let { Watched.of(this, it)?.done } == true
+        val watching = resumeFile?.takeUnless { again }?.let { JSONObject().put("progress", if (playIndex == savedIndex && length != null) playAt * 100 / length else 0) }
         playVerb = when {
             playIndex != savedIndex -> R.string.upnext_play
             playAt > 0 -> R.string.resume
             else -> R.string.watch
         }
-        val episodes = EpisodePresenter(this)
-        val shown = episodeRows.toList()
         resumeLabel = null
         landing = null
-        var index = 0
+        // Every row the seasons make now, by its header: a season's own, or one per fifty of a long one.
+        val built = mutableListOf<Pair<String, List<Card>>>()
         seasons.forEach { (season, files) ->
             fun card(file: JSONObject): Card {
                 val fileId = file.str("info", "file_id")
@@ -409,30 +439,68 @@ class DetailsActivity : TvActivity() {
             val name = getString(R.string.season_n, season)
             val stretches = ranges(files.size)
             for (range in stretches.ifEmpty { listOf(files.indices) }) {
-                val at = index++
-                if (resumeAt in range) landing = at to resumeAt - range.first
-                val cards = files.slice(range).map(::card)
-                if (shown.isNotEmpty()) {
-                    shown.getOrNull(at)?.setItems(cards, SameEpisode) // a season out since then waits for the next visit
-                    continue
-                }
+                if (resumeAt in range) landing = built.size to resumeAt - range.first
                 val header = if (stretches.isEmpty()) name else getString(R.string.season_range, name, rangeLabel(files, range))
-                val row = ArrayObjectAdapter(episodes).apply { setItems(cards, null) }
-                val seasonRow = ListRow(HeaderItem(rowIds++, header), row)
-                // The note gives its place to the first season, so a remote on it stays in that row.
-                if (at == 0 && episodesNote != null) rows.replace(0, seasonRow) else rows.add(at, seasonRow)
-                episodeRows += row
+                built += header to files.slice(range).map(::card)
             }
         }
         updateActions()
-        if (episodesNote == null) return
+        // The rows as they stand: their tiles catch up in place, the one under the remote keeping it.
+        if (built.map { it.first } == episodeRows.indices.map { (rows[it] as ListRow).headerItem.name }) {
+            return built.forEachIndexed { at, (_, cards) -> episodeRows[at].setItems(cards, SameEpisode) }
+        }
+        // Else they are made again: the first time, in the note's place, or because a season came out
+        // or a long one ran into its next fifty while the page was open. Filled in by their old
+        // places, every row after such a change showed the stretch before its own under its old header.
+        val old = if (episodesNote != null) 1 else episodeRows.size
+        val among = rowsFragment.view?.hasFocus() == true && (rowsFragment.verticalGridView?.selectedPosition ?: old) < old
+        val episodes = EpisodePresenter(this)
+        val made = built.map { (header, cards) -> ListRow(HeaderItem(rowIds++, header), ArrayObjectAdapter(episodes).apply { setItems(cards, null) }) }
+        if (old == 0) rows.addAll(0, made) else {
+            // What was first gives its place to the first season, so a remote on it stays in that row.
+            rows.replace(0, made.first())
+            rows.removeItems(1, old - 1)
+            rows.addAll(1, made.drop(1))
+        }
+        episodeRows.clear()
+        made.mapTo(episodeRows) { it.adapter as ArrayObjectAdapter }
         episodesNote = null
-        // Asked again from the note, the remote is in the rows already: on to Play's episode.
-        if (rowsFragment.view?.hasFocus() == true) {
+        // The remote was among them (asked again from the note, say): on to Play's episode.
+        if (among) {
             val (row, tile) = landing ?: (0 to 0)
             landing = null
             rowsFragment.setSelectedPosition(row, false, ListRowPresenter.SelectItemViewHolderTask(tile).apply { isSmoothScroll = false })
         }
+    }
+
+    /**
+     * A film's Play, as a series' is: left part-way it reads «ادامهٔ تماشا  ۴۳ دقیقه مانده», where the
+     * player picks it up by its own rule (PlayerActivity.load) and in the words of home's continue
+     * card. Only series asked before, and a half-watched film said «تماشا».
+     */
+    private fun resumeFilm(files: List<JSONObject>, saved: JSONObject?) {
+        val point = Watched.resumePoint(this, title.titleId, files, saved)
+        Watched.seed(this, files, saved)
+        // Left in its credits, a film starts over (UpNext.kt), and Play says «تماشا» again.
+        val (index, at) = Watched.upNext(this, files, point?.first ?: -1, point?.second ?: 0L)
+        // Its length as this TV played it or the server's point implies it, else 30nama's own minutes.
+        val length = files.getOrNull(index)?.let { Watched.of(this, it)?.duration }?.takeIf { it > 0 }
+            ?: title.obj("info", "time")?.optInt("default")?.let { it * 60L } ?: 0L
+        playVerb = if (at > 0) R.string.resume else R.string.watch
+        resumeLabel = if (at <= 0 || at >= length) null
+        else JSONObject().put("data", JSONObject().put("time", at).put("progress", at * 100.0 / length)).shortTimeLeft(this)
+        updateActions()
+    }
+
+    /**
+     * Straight after a sign-in whose `user` answer never came (LoginActivity waits 5 s for it, home
+     * asks once more), the TV holds a session and no plan: every paid title then read as one the plan
+     * can't stream, a series without its episodes and Play saying to upgrade. Asked for again here,
+     * before either is decided. A session 30nama refuses is home's to end (MainActivity.loadUser).
+     */
+    private suspend fun knowUser() {
+        if (!Api.loggedIn || Api.user != null) return
+        Api.user().takeIf { it.optBoolean("success") }?.let { Api.user = it.optJSONObject("result") }
     }
 
     /**

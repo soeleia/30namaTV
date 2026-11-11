@@ -16,9 +16,9 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.widget.Button
 import android.widget.FrameLayout
-import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.lifecycleScope
@@ -51,7 +51,7 @@ class TrailerActivity : TvActivity() {
     private lateinit var video: PlayerView
     private lateinit var playPause: View
     private lateinit var loading: ProgressBar
-    private lateinit var error: LinearLayout
+    private lateinit var error: View
     private lateinit var retry: Button
     private var loadJob: Job? = null
     private var resumePlayback = true
@@ -65,6 +65,7 @@ class TrailerActivity : TvActivity() {
             .setMediaSourceFactory(DefaultMediaSourceFactory(OkHttpDataSource.Factory(Api.http)
                 .setDefaultRequestProperties(mapOf("Referer" to "https://www.aparat.com/"))))
             .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
+            .setHandleAudioBecomingNoisy(true)
             .setSeekBackIncrementMs(10_000)
             .setSeekForwardIncrementMs(10_000)
             .build()
@@ -72,40 +73,39 @@ class TrailerActivity : TvActivity() {
             player = this@TrailerActivity.player
             controllerShowTimeoutMs = 5_000
             controllerAutoShow = false
-            setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+            // [loading] is the one ring: PlayerView's own turned under it, out of step with it.
+            setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
             isFocusable = true
         }
         playPause = video.findViewById(androidx.media3.ui.R.id.exo_play_pause)
         // Above PlayerView's blank video surface, under its controls.
         (player as? YoutubePlayer)?.let { video.overlayFrameLayout?.addView(it.view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)) }
-        loading = ProgressBar(this)
-        retry = Button(this, null, 0, R.style.Widget_App_Button).apply {
-            text = getString(R.string.retry)
-            setOnClickListener { resumePlayback = true; load() }
-        }
-        error = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            visibility = View.GONE
-            addView(TextView(this@TrailerActivity).apply {
-                setTextAppearance(R.style.TextAppearance_App_Body)
-                setText(R.string.trailer_error)
-                gravity = Gravity.CENTER
-            })
-            addView(retry)
-        }
-        setContentView(FrameLayout(this).apply {
+        // The player's loading ring: 32dp, in 30nama's red. Mid-screen here, where no subtitle or
+        // title ever sits, for the load and for any wait after it (onPlaybackStateChanged).
+        val ring = (32 * resources.displayMetrics.density).toInt()
+        loading = ProgressBar(this).apply { indeterminateTintList = ContextCompat.getColorStateList(context, R.color.brand) }
+        val root = FrameLayout(this).apply {
             setBackgroundColor(Color.BLACK)
             addView(video, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-            addView(loading, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
-            addView(error, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
-        })
+            addView(loading, FrameLayout.LayoutParams(ring, ring, Gravity.CENTER))
+        }
+        // The player's note (player_note), under the trailer's own words: it was a bare line of text
+        // with Retry touching it.
+        error = layoutInflater.inflate(R.layout.player_note, root, false)
+        error.findViewById<TextView>(R.id.player_note_title).setText(R.string.trailer_error)
+        error.findViewById<TextView>(R.id.player_note_why).setText(R.string.trailer_error_hint)
+        retry = error.findViewById(R.id.player_note_action)
+        retry.setOnClickListener { resumePlayback = true; load() }
+        root.addView(error)
+        setContentView(root)
         player.addListener(object : Player.Listener {
             override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
                 if (reason == Player.DISCONTINUITY_REASON_SEEK && newPosition.positionMs > oldPosition.positionMs) player.play()
             }
 
+            // Idle leaves the ring as it is: load turns it on before there is anything to prepare.
             override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_BUFFERING) loading.visibility = View.VISIBLE
                 if (playbackState == Player.STATE_READY) loading.visibility = View.GONE
                 if (playbackState == Player.STATE_ENDED) finish() // back to the title, as Netflix does
             }
@@ -124,6 +124,7 @@ class TrailerActivity : TvActivity() {
         loadJob?.cancel()
         player.stop()
         player.playWhenReady = resumePlayback && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        error.animate().cancel()
         error.visibility = View.GONE
         loading.visibility = View.VISIBLE
         video.requestFocus()
@@ -146,7 +147,7 @@ class TrailerActivity : TvActivity() {
     private fun showError() {
         loading.visibility = View.GONE
         video.hideController()
-        error.visibility = View.VISIBLE
+        error.fadeNote(true)
         retry.takeFocus() // an id refused at once fails in onStart, before the window is up
     }
 

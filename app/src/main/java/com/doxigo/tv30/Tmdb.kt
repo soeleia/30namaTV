@@ -1,6 +1,7 @@
 package com.doxigo.tv30
 
 import android.content.Context
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -41,10 +42,13 @@ object Tmdb {
         if (!enabled || backingOff) throw IOException("TMDB off")
         val request = request(path, key)
         return try {
-            Api.run { client.newCall(request).await() }.use { response ->
-                if (response.code == 404) return JSONObject()
-                if (!response.isSuccessful) throw IOException("TMDB ${response.code}")
-                withContext(Dispatchers.IO) { JSONObject(response.body!!.string()) }
+            // Off the main thread, closing included (see check): a 404's body goes unread.
+            withContext(Dispatchers.IO) {
+                Api.run { client.newCall(request).await() }.use { response ->
+                    if (response.code == 404) return@use JSONObject()
+                    if (!response.isSuccessful) throw IOException("TMDB ${response.code}")
+                    JSONObject(response.body!!.string())
+                }
             }
         } catch (e: IOException) {
             failed = System.currentTimeMillis()
@@ -128,12 +132,19 @@ object Tmdb {
     /**
      * The streamable 30nama titles for TMDB [items], in their order and each once. An item's own
      * `media_type` says film or series; lists without one (`similar`) are all [kind]. 30nama sits
-     * behind Cloudflare's rate limit, so at most four searches at once.
+     * behind Cloudflare's rate limit, so at most four searches at once. A search that fails is no
+     * match, and [onFailed] hears of it (a page closed mid-search is not a failure): what comes
+     * back may then be short of the whole.
      */
-    suspend fun match(items: List<JSONObject>, kind: String? = null): List<JSONObject> {
+    suspend fun match(items: List<JSONObject>, kind: String? = null, onFailed: () -> Unit = {}): List<JSONObject> {
         val gate = Semaphore(4)
         return coroutineScope {
-            items.map { async { runCatching { match(it, it.optString("media_type").ifEmpty { kind }, gate) }.getOrNull() } }.awaitAll()
+            items.map {
+                async {
+                    runCatching { match(it, it.optString("media_type").ifEmpty { kind }, gate) }
+                        .onFailure { e -> if (e !is CancellationException) onFailed() }.getOrNull()
+                }
+            }.awaitAll()
         }.filterNotNull().distinctBy { it.titleId }
     }
 
@@ -202,7 +213,12 @@ class Answers(private val file: String, private val keep: Int = 4000) {
     private suspend fun save(context: Context) = disk.withLock {
         withContext(Dispatchers.IO) {
             val json = synchronized(map) { JSONObject(map).toString() }
-            runCatching { path(context).writeText(json) }
+            // Whole or not at all: a TV switched off mid-write would lose every kept answer.
+            runCatching {
+                val tmp = path(context).resolveSibling("$file.tmp")
+                tmp.writeText(json)
+                check(tmp.renameTo(path(context)))
+            }
         }
     }
 

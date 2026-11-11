@@ -92,7 +92,9 @@ object EpisodeFrames {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                failed += out.name
+                // Turned away for the player's turn on the connection (Buffering.priority), the file is
+                // not at fault: asked again on the next bind, where a real failure is not until a restart.
+                if (generateSequence<Throwable>(e) { it.cause }.none { it is androidx.media3.common.PriorityTaskManager.PriorityTooLowException }) failed += out.name
                 null
             } finally {
                 Buffering.priority.remove(PRIORITY)

@@ -25,7 +25,16 @@ class PlayerSession(context: Context, player: Player, private val previous: () -
     private var hasPrevious = false
     private var hasNext = false
     private val player = Episodic(player)
-    private val session = MediaSession.Builder(context.applicationContext, this.player).build()
+    // Its own id: media3 refuses a second session under one (the default, ""), and two player
+    // screens can be alive at once (one opening as the last one's onDestroy is still to come).
+    private val session = MediaSession.Builder(context.applicationContext, this.player).setId("player-${ids++}").build()
+
+    /**
+     * False while the screen is stopped. The session lives until the screen is destroyed, and a
+     * play key on the launcher, or Assistant's "resume", would start the film under it: its play,
+     * prepare, next and previous then do nothing.
+     */
+    var onScreen = true
 
     /** What plays now, for the MediaItem to carry: the session announces it as the item changes. */
     var metadata: MediaMetadata = MediaMetadata.EMPTY
@@ -79,13 +88,22 @@ class PlayerSession(context: Context, player: Player, private val previous: () -
             .build()
 
         override fun isCommandAvailable(command: Int) = availableCommands.contains(command)
+        override fun prepare() {
+            if (onScreen) super.prepare()
+        }
+        override fun play() {
+            if (onScreen) super.play()
+        }
+        override fun setPlayWhenReady(playWhenReady: Boolean) {
+            if (onScreen || !playWhenReady) super.setPlayWhenReady(playWhenReady)
+        }
         override fun seekToPrevious() = if (restarts(currentPosition, hasPrevious)) seekTo(0) else seekToPreviousMediaItem()
         override fun seekToPreviousMediaItem() {
-            if (hasPrevious) previous()
+            if (hasPrevious && onScreen) previous()
         }
         override fun seekToNext() = seekToNextMediaItem()
         override fun seekToNextMediaItem() {
-            if (hasNext) next()
+            if (hasNext && onScreen) next()
         }
         override fun seekBack() = seekTo((currentPosition - SEEK_MS).coerceAtLeast(0))
         override fun seekForward() {
@@ -98,6 +116,8 @@ class PlayerSession(context: Context, player: Player, private val previous: () -
     private companion object {
         /** The transport row's rewind and fast-forward step. */
         const val SEEK_MS = 10_000L
+        /** Main thread only, as the sessions are made. */
+        var ids = 0
     }
 }
 

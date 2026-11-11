@@ -73,7 +73,7 @@ class SeekPreview(private val root: ViewGroup, private val player: ExoPlayer, pr
         clipToOutline = true
     }
     private val time = TextView(context).apply {
-        setTextAppearance(R.style.TextAppearance_Leanback_PlaybackControlsTime) // the clock's own
+        appearance(R.style.TextAppearance_Leanback_PlaybackControlsTime) // the clock's own
     }
     /** The frame over its time; it fades in and out (View.reveal) inside [box], which follows the dot. */
     private val card = LinearLayout(context).apply {
@@ -279,7 +279,7 @@ class SeekPreview(private val root: ViewGroup, private val player: ExoPlayer, pr
             if (!network || ++misses >= 3) broken = url
             Api.scope.launch(Dispatchers.IO) { Buffering.cdn.connectionPool.evictAll() } // closing a TLS socket writes to it: on the main thread an older Android kills the app
             release()
-            if (broken == null) root.postDelayed(pump, RETRY_MS)
+            if (broken != url) root.postDelayed(pump, RETRY_MS)
         }
     }
 

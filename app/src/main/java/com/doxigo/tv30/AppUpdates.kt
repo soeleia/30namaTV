@@ -42,6 +42,8 @@ object AppUpdates {
     /** The least time between two checks: home checks each time it comes to the front, at most this often. */
     private const val EVERY = 6 * 60 * 60 * 1000L
     private const val MAX_APK_SIZE = 100L * 1024 * 1024
+    /** How long DownloadManager may leave a queued or paused download untouched before a forced check starts it over. */
+    private const val STALLED = 60 * 1000L
 
     sealed interface Status {
         data object Idle : Status
@@ -62,6 +64,9 @@ object AppUpdates {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lock = Mutex()
     private val checking = AtomicBoolean()
+    private val installing = AtomicBoolean()
+    /** The download in hand is not moving (see [downloadStalled]); written by refreshLocked, under [lock]. */
+    private var stalled = false
     private val current = MutableStateFlow<Status>(Status.Idle)
     val state = current.asStateFlow()
     private val http by lazy {
@@ -105,26 +110,39 @@ object AppUpdates {
             try {
                 lock.withLock {
                     refreshLocked()
-                    if (current.value is Status.Downloading || current.value is Status.Ready) return@withLock
+                    val previous = current.value
+                    if (previous is Status.Downloading) {
+                        // One that DownloadManager left queued or paused showed its percentage for good, and Settings'
+                        // row, which asks here, could do nothing about it: asked, a download that is not moving starts over.
+                        if (!force || !stalled) return@withLock
+                        clearDownload()
+                    }
                     val now = System.currentTimeMillis()
                     if (!force && !checkDue(now, prefs.getLong("last_check", 0))) return@withLock
-                    val previous = current.value
-                    current.value = Status.Checking
+                    // A ready update is not the end of looking: with 1.5.6 waiting to be installed, 1.5.7 was never
+                    // found. It stays on offer through the check (no Checking, no failure over it), and only a
+                    // release newer than it takes its place.
+                    val ready = (previous as? Status.Ready)?.version
+                    fun show(status: Status) { if (ready == null) current.value = status }
+                    show(Status.Checking)
                     prefs.edit().putLong("last_check", now).apply()
                     try {
                         val release = latest()
-                        if (release == null || !newerVersion(release.version, BuildConfig.VERSION_NAME)) {
-                            current.value = Status.Current
-                        } else if (!force && previous == Status.Failed(Failure.INCOMPATIBLE_SIGNATURE) &&
-                            release.version == prefs.getString("download_version", null)) {
-                            current.value = previous
+                        if (release == null || !newerVersion(release.version, ready ?: BuildConfig.VERSION_NAME)) {
+                            show(Status.Current)
+                        } else if (!force && release.version == prefs.getString("rejected_version", null)) {
+                            // Turned down once (see reject): not downloaded every six hours to be turned down again.
+                            show((previous as? Status.Failed)?.takeIf { it.reason == Failure.INCOMPATIBLE_SIGNATURE }
+                                ?: Status.Failed(Failure.INVALID_APK))
                         } else {
                             runCatching { enqueue(release) }.onFailure { current.value = Status.Failed(Failure.DOWNLOAD) }
                         }
                     } catch (error: IOException) {
-                        current.value = Status.Failed(Failure.NETWORK)
+                        // Not a check: the next start asks again rather than six hours on (a TV woken before its network).
+                        prefs.edit().remove("last_check").apply()
+                        show(Status.Failed(Failure.NETWORK))
                     } catch (error: Exception) {
-                        current.value = Status.Failed(Failure.INVALID_RELEASE)
+                        show(Status.Failed(Failure.INVALID_RELEASE))
                     }
                 }
             } finally {
@@ -143,28 +161,37 @@ object AppUpdates {
 
     fun openInstall(activity: Activity) {
         if (!::downloads.isInitialized) return
+        // Verifying takes a few hundred milliseconds with nothing to show for it: a second OK in that
+        // time queued a second pass, and a second installer over the first.
+        if (!installing.compareAndSet(false, true)) return
         scope.launch {
-            lock.withLock {
-                refreshLocked()
-                if (current.value !is Status.Ready) return@withLock
-                val file = updateFile(prefs.getString("download_version", null) ?: return@withLock)
-                    ?: return@withLock
-                withContext(Dispatchers.Main) {
-                    if (activity.isFinishing || activity.isDestroyed) return@withContext
-                    try {
-                        if (Build.VERSION.SDK_INT >= 26 && !app.packageManager.canRequestPackageInstalls()) {
-                            activity.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${app.packageName}")))
-                        } else {
-                            val uri = FileProvider.getUriForFile(app, "${app.packageName}.updates", file)
-                            activity.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
-                                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION).apply {
-                                    clipData = ClipData.newRawUri("30namaTV update", uri)
-                                })
+            try {
+                lock.withLock {
+                    refreshLocked()
+                    if (current.value !is Status.Ready) return@withLock
+                    val file = updateFile(prefs.getString("download_version", null) ?: return@withLock)
+                        ?: return@withLock
+                    withContext(Dispatchers.Main) {
+                        if (activity.isFinishing || activity.isDestroyed) return@withContext
+                        try {
+                            if (Build.VERSION.SDK_INT >= 26 && !app.packageManager.canRequestPackageInstalls()) {
+                                activity.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${app.packageName}")))
+                            } else {
+                                // Android 6's installer takes only file:// (content:// came with 7), and the file is
+                                // the download itself, in external files, which it can read (see updateFile).
+                                val uri = if (Build.VERSION.SDK_INT >= 24) FileProvider.getUriForFile(app, "${app.packageName}.updates", file) else Uri.fromFile(file)
+                                activity.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
+                                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION).apply {
+                                        clipData = ClipData.newRawUri("30namaTV update", uri)
+                                    })
+                            }
+                        } catch (error: Exception) {
+                            current.value = Status.Failed(Failure.INSTALLER_UNAVAILABLE)
                         }
-                    } catch (error: Exception) {
-                        current.value = Status.Failed(Failure.INSTALLER_UNAVAILABLE)
                     }
                 }
+            } finally {
+                installing.set(false)
             }
         }
     }
@@ -197,7 +224,7 @@ object AppUpdates {
     }
 
     private fun enqueue(release: Release) {
-        val file = updateFile(release.version) ?: throw IOException("Update storage is unavailable")
+        val file = downloadFile(release.version) ?: throw IOException("Update storage is unavailable")
         clearDownload()
         check(file.parentFile!!.mkdirs() || file.parentFile!!.isDirectory)
         if (file.exists()) check(file.delete())
@@ -208,7 +235,8 @@ object AppUpdates {
             .setDestinationInExternalFilesDir(app, Environment.DIRECTORY_DOWNLOADS, "updates/${file.name}")
         val id = downloads.enqueue(request)
         if (!prefs.edit().putLong("download_id", id).putString("download_version", release.version)
-                .putLong("download_size", release.size).putString("download_sha256", release.sha256).commit()) {
+                .putLong("download_size", release.size).putString("download_sha256", release.sha256)
+                .remove("rejected_version").commit()) {
             downloads.remove(id)
             throw IOException("Cannot retain update task")
         }
@@ -216,6 +244,7 @@ object AppUpdates {
     }
 
     private fun refreshLocked() {
+        stalled = false
         val id = prefs.getLong("download_id", -1)
         if (id < 0) return
         val version = prefs.getString("download_version", null)
@@ -236,12 +265,18 @@ object AppUpdates {
                 val status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
                 if (bytes > size || size !in 1..MAX_APK_SIZE) {
                     clearDownload()
+                    reject(version)
                     current.value = Status.Failed(Failure.INVALID_APK)
                 } else if (status == DownloadManager.STATUS_SUCCESSFUL) {
-                    current.value = verify(version, size, prefs.getString("download_sha256", null))
+                    val verified = verify(version, size, prefs.getString("download_sha256", null))
+                    // Not a download that could not be read (DOWNLOAD): that says nothing about the release.
+                    if (verified is Status.Failed && verified.reason != Failure.DOWNLOAD) reject(version)
+                    current.value = verified
                 } else if (status == DownloadManager.STATUS_FAILED) {
                     current.value = Status.Failed(Failure.DOWNLOAD)
                 } else {
+                    stalled = downloadStalled(status, System.currentTimeMillis(),
+                        cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_LAST_MODIFIED_TIMESTAMP)))
                     current.value = Status.Downloading(version, bytes.coerceAtLeast(0), size)
                 }
             }
@@ -250,8 +285,32 @@ object AppUpdates {
         }
     }
 
+    /**
+     * A release that failed verification (versionCode not raised, a name other than its tag's, another
+     * signer, an APK this device cannot read) is remembered, so that a due check does not download it
+     * again every six hours; only a signer's refusal was. A check the viewer asks for still tries it,
+     * and so does a newer release ([enqueue] forgets it).
+     */
+    private fun reject(version: String) {
+        if (prefs.getString("rejected_version", null) != version) prefs.edit().putString("rejected_version", version).apply()
+    }
+
     private fun verify(version: String, size: Long, hash: String?): Status {
         val file = updateFile(version) ?: return Status.Failed(Failure.DOWNLOAD)
+        // The finished download is brought into internal storage once, and everything below reads that
+        // copy: what is checked is then what is installed (see updateFile). Whole or not at all: a copy
+        // cut short would be turned down as the release's fault.
+        if (Build.VERSION.SDK_INT >= 24 && !file.isFile) {
+            val download = downloadFile(version) ?: return Status.Failed(Failure.DOWNLOAD)
+            if (download.length() != size) return Status.Failed(Failure.INVALID_APK)
+            val part = File("${file.path}.part")
+            try {
+                download.copyTo(part, overwrite = true)
+                if (!part.renameTo(file)) throw IOException("Cannot keep the update")
+            } finally {
+                part.delete()
+            }
+        }
         if (!file.isFile || file.length() != size) return Status.Failed(Failure.INVALID_APK)
         if (hash != null && file.inputStream().use { input ->
                 val digest = MessageDigest.getInstance("SHA-256")
@@ -272,15 +331,31 @@ object AppUpdates {
         return failure?.let { Status.Failed(it) } ?: Status.Ready(version)
     }
 
-    private fun updateFile(version: String): File? {
+    /** Where DownloadManager writes: the app's folder on shared storage, as it cannot write into internal files. */
+    private fun downloadFile(version: String): File? {
         if (versionParts(version) == null) return null
         return app.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)?.resolve("updates/30namaTV-$version.apk")
+    }
+
+    /**
+     * The file that is verified and handed to the installer: a copy of the download in internal
+     * storage ([verify] makes it), served by the FileProvider (xml/update_paths). The download itself
+     * was verified in and installed from shared storage, where up to Android 10 any app holding the
+     * storage permission can replace it between the check and the installer reading it.
+     * Android 6 (API 23) still installs the download itself: its installer takes only a file:// URI
+     * and cannot read this app's internal files, so that window stays open there.
+     */
+    private fun updateFile(version: String): File? {
+        if (Build.VERSION.SDK_INT < 24) return downloadFile(version)
+        if (versionParts(version) == null) return null
+        return app.filesDir.resolve("updates/30namaTV-$version.apk")
     }
 
     private fun clearDownload() {
         val id = prefs.getLong("download_id", -1)
         if (id >= 0) runCatching { downloads.remove(id) }
-        prefs.getString("download_version", null)?.let { updateFile(it)?.delete() }
+        prefs.getString("download_version", null)?.let { downloadFile(it)?.delete() }
+        app.filesDir.resolve("updates").deleteRecursively() // the copy verify made, and any an older download left
         prefs.edit().remove("download_id").remove("download_version").remove("download_size").remove("download_sha256").apply()
     }
 
@@ -304,6 +379,15 @@ object AppUpdates {
     private fun ByteArray.hex() = joinToString("") { "%02x".format(it) }
 
     internal fun checkDue(now: Long, last: Long) = last <= 0 || last > now || now - last >= EVERY
+
+    /**
+     * A download that is not moving: DownloadManager has it queued or paused ([status]), and last wrote
+     * to it ([touched], COLUMN_LAST_MODIFIED_TIMESTAMP) over a minute before [now], or after it, the
+     * clock having been set back. One that is running is never stalled, however slow: Android 6 does
+     * not stamp progress, so its running downloads all look untouched. Nor is one just queued.
+     */
+    internal fun downloadStalled(status: Int, now: Long, touched: Long) =
+        (status == DownloadManager.STATUS_PENDING || status == DownloadManager.STATUS_PAUSED) && now - touched !in 0..STALLED
 
     /** The ready version home's notice may show: none once the viewer has put that version's away (see [dismiss]). */
     fun notice(): String? = (current.value as? Status.Ready)?.version

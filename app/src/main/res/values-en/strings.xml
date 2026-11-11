@@ -18,12 +18,19 @@
     <string name="list_watchlist">Watchlist</string>
     <string name="list_notify">Notify me</string>
     <string name="lists_empty">Your lists are empty.</string>
+    <string name="list_added">Added to %s.</string>
+    <string name="list_removed">Removed from %s.</string>
+    <string name="list_add_failed">Couldn\'t add to %1$s. %2$s</string>
+    <string name="list_remove_failed">Couldn\'t remove from %1$s. %2$s</string>
 
     <string name="guest">Guest</string>
     <string name="sign_in">Sign in</string>
     <string name="sign_out">Sign out</string>
     <string name="sign_out_confirm">Sign out of your account?</string>
-    <string name="remaining_days">%d days left</string>
+    <plurals name="remaining_days">
+        <item quantity="one">%d day left</item>
+        <item quantity="other">%d days left</item>
+    </plurals>
     <string name="plan">%s plan</string>
     <string name="titles_count">%s titles</string>
     <string name="language">Language</string>
@@ -39,7 +46,7 @@
 
     <string name="login_qr_text">Scan the QR code to sign in.</string>
     <string name="login_qr_note">Or enter this address in your phone or computer\'s browser:</string>
-    <string name="login_instructions">After scanning the QR code and confirming the sign-in on the website, press Check now.</string>
+    <string name="login_instructions">Once you confirm the sign-in on the website, the TV signs in by itself. If it doesn\'t, press Check now.</string>
     <string name="check_now">Check now</string>
     <string name="checking">Checking…</string>
     <string name="login_code_rest">Press OK for a new code.</string>

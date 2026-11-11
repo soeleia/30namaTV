@@ -6,5 +6,7 @@
     <string name="trailer_youtube">یوتیوب</string>
     <string name="trailer_on_youtube">تریلر از یوتیوب</string>
     <string name="trailer_aparat">آپارات</string>
-    <string name="trailer_error">تریلر پخش نشد. دوباره امتحان کنید.</string>
+    <!-- A trailer that would not load or play: the note over it (player_note), its title over why. -->
+    <string name="trailer_error">تریلر پخش نشد</string>
+    <string name="trailer_error_hint">اتصال اینترنت را بررسی کنید یا کمی بعد دوباره امتحان کنید.</string>
 </resources>

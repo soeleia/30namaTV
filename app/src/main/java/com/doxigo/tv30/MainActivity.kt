@@ -5,11 +5,13 @@ import android.content.Intent
 import android.annotation.SuppressLint
 import android.os.Bundle
 import android.os.SystemClock
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.annotation.StringRes
 import androidx.leanback.app.BrowseSupportFragment
@@ -58,6 +60,16 @@ class MainActivity : TvActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // The launcher's icon over a task it did not start itself: one [restart] made (after sign-in,
+        // a language change), a Play Next entry's, the installer's Open. Their root intent is not
+        // the launcher's, so Android starts this second home on top of the task instead of bringing
+        // it forward, and Back from it showed the old player. It steps aside, and what was there
+        // shows. Either launcher's category: a TV's, or a phone launcher's on a sideloaded box.
+        if (!isTaskRoot && intent.action == Intent.ACTION_MAIN &&
+            (intent.hasCategory(Intent.CATEGORY_LEANBACK_LAUNCHER) || intent.hasCategory(Intent.CATEGORY_LAUNCHER))) {
+            finish()
+            return
+        }
         // Like the official app: without a session every launch opens on the QR login, which
         // offers to carry on as a guest.
         if (savedInstanceState == null && !Api.loggedIn && !intent.getBooleanExtra(EXTRA_GUEST, false)) {
@@ -73,9 +85,11 @@ class MainActivity : TvActivity() {
         // Back. The intro would only play unseen under them.
         val play = if (savedInstanceState == null) intent.getIntExtra(WatchNext.EXTRA_PLAY, 0) else 0
         val details = if (savedInstanceState == null) intent.getStringExtra(WatchNext.EXTRA_DETAILS) else null
+        // This activity is exported: an extra that is not JSON (another app's, a damaged row's) opens nothing rather than crashing the launch.
+        fun json(text: String?) = text?.let { runCatching { JSONObject(it) }.getOrNull() }
         if (play != 0) startActivity(PlayerActivity.intent(this, play, intent.getBooleanExtra(WatchNext.EXTRA_FREE, false),
-            intent.getStringExtra(WatchNext.EXTRA_FILE), intent.getStringExtra(WatchNext.EXTRA_TITLE)?.let(::JSONObject)))
-        else details?.let { openDetails(JSONObject(it)) }
+            intent.getStringExtra(WatchNext.EXTRA_FILE), json(intent.getStringExtra(WatchNext.EXTRA_TITLE))))
+        else json(details)?.let(::openDetails)
         if (play != 0 || details != null) Intro.shown = true
         // The first home of the process opens on the intro, which plays while home loads.
         if (!Intro.shown) {
@@ -172,6 +186,9 @@ class HomeFragment : BrowseSupportFragment() {
     private var riseOnView = false
     /** Why home failed, when it failed before its view was made (a warm start answers that fast): the note shows once it is. */
     private var noteOnView: String? = null
+    /** The rows' stand-in while home is fetched with nothing kept to draw ([showSkeleton]), and whether it is wanted, home's view made or not. */
+    private var bones: View? = null
+    private var awaiting = false
     /** The TMDB key the trending row was fetched with: one saved in Settings since brings the row in on return. */
     private var trendingKey: String? = null
     /** The card focus rests on while a held D-pad races past, and its row: the billboard catches up on release. */
@@ -233,7 +250,9 @@ class HomeFragment : BrowseSupportFragment() {
     // ponytail: neighbours in the row only; the rows above and below wait for their own rest.
     private fun follow(card: Card, row: ArrayObjectAdapter?) {
         hero?.follow(card)
-        val at = row?.indexOf(card) ?: -1
+        // By sameness, not identity: a card a refresh left unchanged is not bound again, so its
+        // view still hands over the Card of the load before, which the row no longer holds.
+        val at = row?.let { (0 until it.size()).indexOfFirst { i -> (it.get(i) as? Card)?.let { c -> c === card || SAME_CARD.areItemsTheSame(c, card) } == true } } ?: -1
         val step = if (row === restRow && at < restAt) -1 else 1
         restRow = row
         restAt = at
@@ -328,7 +347,13 @@ class HomeFragment : BrowseSupportFragment() {
             }
         }
         val scope = viewLifecycleOwner.lifecycleScope
-        hero = PromoHero(root, scope, Billboard(root, scope), browse).apply { onUp = { notice?.focus() } }
+        hero = PromoHero(root, scope, Billboard(root, scope), browse).apply {
+            onUp = { notice?.focus() }
+            if (!hints(root.context).getBoolean(HELD_OK, false)) onRows = {
+                root.removeCallbacks(hint)
+                root.postDelayed(hint, REST)
+            }
+        }
         // Back to the hero's button, or to the rows with no hero.
         notice = UpdateNotice(root, requireActivity(), viewLifecycleOwner) { jumpTo(TOP) }.apply { arrived = loaded }
         return root
@@ -337,14 +362,67 @@ class HomeFragment : BrowseSupportFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         if (riseOnView) view.post { rise() }
+        if (awaiting) showSkeleton()
         noteOnView?.let { why -> view.post { showNote(why) } }
         noteOnView = null
     }
 
     override fun onDestroyView() {
+        view?.removeCallbacks(hint)
         hero = null
         notice = null
+        bones = null
         super.onDestroyView()
+    }
+
+    /**
+     * Held OK is the only way to take a title off Continue Watching, and nothing said so. The first
+     * time the remote rests on one of that row's posters the app's notice says it, once on this TV,
+     * and never to a remote racing along the row: it waits out the rest the billboard's art waits.
+     */
+    private val hint = Runnable {
+        val row = rowsByKey[CONTINUE] ?: return@Runnable
+        val context = context ?: return@Runnable
+        if (Motion.fast || rowsGrid?.let { it.hasFocus() && it.selectedPosition == rows.indexOf(row) } != true) return@Runnable
+        context.toast(getString(R.string.continue_hint))
+        hints(context).edit().putBoolean(HELD_OK, true).apply()
+        hero?.onRows = {}
+    }
+
+    private fun hints(context: Context) = context.getSharedPreferences("home", Context.MODE_PRIVATE)
+
+    /**
+     * The rows' place while home is fetched with nothing kept to draw meanwhile (a first launch, a
+     * new account, Retry): a row of the grids' breathing bones (Pager.kt's Skeleton) where the first
+     * row's posters stand under the billboard's room, in place of Leanback's stock spinner. One
+     * row: the next one's posters would start under the 540dp screen's foot. Nothing the remote can
+     * reach; it goes as the rows rise ([rise]) or the note takes their place.
+     */
+    private fun showSkeleton() {
+        awaiting = true
+        val root = view as? ViewGroup ?: return
+        if (bones != null) return
+        val bone = Skeleton(7, 108, 162) // as many posters as the screen's width shows
+        val gap = resources.getDimensionPixelSize(R.dimen.lb_browse_item_horizontal_spacing)
+        val row = LinearLayout(root.context)
+        repeat(bone.count) {
+            row.addView(bone.presenter.onCreateViewHolder(row).view,
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { marginEnd = gap })
+        }
+        root.addView(row, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.START).apply {
+            topMargin = resources.getDimensionPixelSize(R.dimen.billboard_height) + resources.getDimensionPixelSize(R.dimen.rows_title_room)
+            marginStart = resources.getDimensionPixelSize(R.dimen.content_start)
+        })
+        row.alpha = 0f
+        row.animate().alpha(1f).setInterpolator(Motion.easeOut).setDuration(Motion.ENTER).start()
+        bones = row
+    }
+
+    private fun hideSkeleton() {
+        awaiting = false
+        val row = bones ?: return
+        bones = null
+        row.animate().alpha(0f).setInterpolator(Motion.easeOut).setDuration(Motion.EXIT).withEndAction { (row.parent as? ViewGroup)?.removeView(row) }.start()
     }
 
     override fun onStart() {
@@ -430,7 +508,7 @@ class HomeFragment : BrowseSupportFragment() {
                     arrive()
                 }
             }
-            if (arrival == null) progressBarManager.show()
+            if (arrival == null) showSkeleton()
             if (!Api.initialize()) {
                 if (arrival == null) return@launch showNote(getString(R.string.no_internet))
                 // Home from the last run stays up and says so quietly, once it is in; it fetches as
@@ -487,7 +565,7 @@ class HomeFragment : BrowseSupportFragment() {
         hero?.arrive(0)
         loaded = true
         notice?.arrived = true
-        progressBarManager.hide()
+        hideSkeleton()
     }
 
     /** Where this account's home is kept, in this language; null when it is no one's (HomeCache.key). */
@@ -615,9 +693,16 @@ class HomeFragment : BrowseSupportFragment() {
 
     private suspend fun loadUser() {
         val response = runCatching { Api.user() }.getOrNull() ?: return
-        // A refused session means it expired or was revoked elsewhere; a network error does not.
+        // A refused session means it expired or was revoked elsewhere; a network error does not,
+        // nor does 30nama failing in words of its own (Api.sessionEnded). Home would stay half
+        // signed in over a forgotten session (its My List row's «بیشتر» opened a page whose rail
+        // has no Lists), so it starts over, at the sign-in.
         if (response.optBoolean("success")) Api.user = response.optJSONObject("result")
-        else forgetSession(requireContext())
+        else if (Api.sessionEnded(response)) {
+            val activity = activity ?: return
+            forgetSession(activity)
+            MainActivity.restart(activity)
+        }
     }
 
     /** The continue row's last answer, as the server sent it; what shows leaves out [dismissed] titles. */
@@ -730,7 +815,7 @@ class HomeFragment : BrowseSupportFragment() {
      * would take the remote unseen. Home back in front while it is up asks again on its own (onStart).
      */
     private fun showNote(why: String) {
-        progressBarManager.hide()
+        hideSkeleton()
         (activity as? MainActivity)?.homeReady()
         val root = view as? ViewGroup ?: return run { noteOnView = why }
         root.findViewById<ViewGroup>(androidx.leanback.R.id.browse_container_dock)?.apply {
@@ -772,6 +857,7 @@ class HomeFragment : BrowseSupportFragment() {
         if (cards.isEmpty()) {
             if (old != null) rows.remove(old)
             rowsByKey.remove(key)
+            focusedRow = -1 // see below
             return
         }
         if (old != null) return (old.adapter as ArrayObjectAdapter).setItems(cards, SAME_CARD)
@@ -779,6 +865,9 @@ class HomeFragment : BrowseSupportFragment() {
         val row = ListRow(HeaderItem(key.toLong(), getString(name)), items)
         rows.add(rowsByKey.headMap(key).size, row)
         rowsByKey[key] = row
+        // A row landing above the focused one moves the grid's selection without a word, and
+        // fadePast, taking the next row for the one it had, left it at alpha 0 under the remote.
+        focusedRow = -1
     }
 
     companion object {
@@ -788,6 +877,8 @@ class HomeFragment : BrowseSupportFragment() {
         private const val REST = 350L
         /** How often home from the last run asks for a server again while none answers: Api's own wait between host searches. */
         private const val RETRY = 30_000L
+        /** Said once, in the "home" preferences: OK held on a Continue Watching poster takes it off the row ([hint]). */
+        private const val HELD_OK = "held_ok_said"
         /** Home's answers for the next launch: a folder in filesDir (HomeCache), written one at a time so the last fetched lands last. */
         private const val KEPT = "home"
         private val keeping = Dispatchers.IO.limitedParallelism(1)

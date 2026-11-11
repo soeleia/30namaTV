@@ -84,7 +84,7 @@ private class ListLink(context: Context) : FrameLayout(context) {
             marginEnd = dp(24)
             topMargin = dp(22)
         })
-        label.setTextAppearance(R.style.TextAppearance_App_Tile)
+        label.appearance(R.style.TextAppearance_App_Tile)
         label.setTextColor(ink)
         label.isDuplicateParentStateEnabled = true
         label.importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO

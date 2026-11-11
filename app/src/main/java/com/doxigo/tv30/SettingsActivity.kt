@@ -418,7 +418,7 @@ class SettingsActivity : TvActivity() {
 
     /** One of the values in the pane: the one now checked and bright, the rest faint, all lined up past the check's room. */
     private fun choice(name: CharSequence, now: Boolean) = TextView(this).apply {
-        setTextAppearance(R.style.TextAppearance_App_Body)
+        appearance(R.style.TextAppearance_App_Body)
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
         typeface = font(
             when {
@@ -717,9 +717,30 @@ class SettingsActivity : TvActivity() {
     }
 
     private fun keyRow(s: Service) =
-        Option(s.name, text(s.help), value = { keyValue(s) }, note = { keyNote(s) }, sub = s.unlocks, warn = { outcome(s) == Check.REJECTED }) {
-            ask(getString(s.name), Settings.savedKey(s.id), s.link) { key, answer -> save(s, key, answer) }
-        }
+        Option(s.name, text(s.help), value = { keyValue(s) }, note = { keyNote(s) }, sub = s.unlocks, warn = { outcome(s) == Check.REJECTED }) { askKey(s) }
+
+    /** The key sheet, held while Android asks the viewer about the home network (see [askKey]). */
+    private var afterNetwork: (() -> Unit)? = null
+
+    /**
+     * The key's sheet. Android 17 keeps the home network from an app until the viewer allows it:
+     * unasked, the sheet showed the phone's code and the phone's page never loaded. Android's own
+     * dialog asks first, the one surface here that is not the app's; whatever the answer (at once,
+     * with no dialog, once it has been no twice), the sheet then opens, with the typed key alone if
+     * it was no (KeyForm.open).
+     */
+    private fun askKey(s: Service) {
+        val open = { ask(getString(s.name), Settings.savedKey(s.id), s.link) { key, answer -> save(s, key, answer) } }
+        if (KeyForm.allowed(this)) return open()
+        afterNetwork = open
+        requestPermissions(arrayOf(KeyForm.NETWORK), 0)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        afterNetwork?.invoke()
+        afterNetwork = null
+    }
 
     private fun outcome(s: Service) = checks[s.id]?.takeIf { it.first == Settings.savedKey(s.id) }?.second
 
@@ -752,6 +773,8 @@ class SettingsActivity : TvActivity() {
      */
     private fun save(s: Service, typed: String, answer: (CharSequence?, Boolean?) -> Unit) {
         val key = typed.filter { it in '!'..'~' }
+        // Typed with the keyboard on Persian, nothing of it is a key: saving that would clear the one kept.
+        if (typed.isNotBlank() && key.isEmpty()) return answer(getString(R.string.key_page_bad), false)
         Settings.saveKey(s.id, key)
         if (key.isNotEmpty()) {
             checks[s.id] = key to Check.RUNNING
@@ -821,7 +844,7 @@ class SettingsActivity : TvActivity() {
         }
         // user_expire: {days, g: Gregorian date, j: Jalali date}; no days left reads as nothing.
         val left = user.obj("user_expire")?.optInt("days")?.takeIf { it > 0 }
-        days.text = left?.let { getString(R.string.remaining_days, it) }
+        days.text = left?.let { resources.getQuantityString(R.plurals.remaining_days, it, it) }
         days.typeface = medium(days.text)
         if (left != null && left < 7) days.setTextColor(getColor(R.color.settings_danger))
         return card
@@ -859,11 +882,13 @@ class SettingsActivity : TvActivity() {
     private fun signOut() {
         signingOut = true
         refresh()
-        lifecycleScope.launch {
+        // Api.scope: Back out of Settings during the wait must not leave the TV signed in after all.
+        val app = applicationContext
+        Api.scope.launch {
             // The server hears of it if it answers in time; a hanging VPN does not keep the TV signed in.
             withTimeoutOrNull(5_000) { runCatching { Api.logout() } }
-            forgetSession(this@SettingsActivity)
-            startActivity(Intent(this@SettingsActivity, LoginActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
+            forgetSession(app)
+            app.startActivity(Intent(app, LoginActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
         }
     }
 

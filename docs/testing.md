@@ -4,7 +4,7 @@
 
 `scripts/tv-checks.py` runs each native instrumentation suite independently and fails unless its final instrumentation result explicitly reports success. It saves raw output, logcat, emulator properties and PNG screenshots in `app/build/reports/tv-checks/`.
 
-Use `--check search`, for example, for a targeted rerun. The `performance` check holds ancillary requests to prove that home content can appear without waiting for menu/account extras; it also checks request cancellation and stable late-row order. This is a responsiveness regression test, not a network speed benchmark.
+Use `--check search`, for example, for a targeted rerun. With `--release <apk>` it finishes by uninstalling the debug build, installing that release APK and starting it, and fails unless the process is alive ten seconds on with no `FATAL EXCEPTION` of its own in logcat; CI passes the APK it is about to publish. The `performance` check holds ancillary requests to prove that home content can appear without waiting for menu/account extras; it also checks request cancellation and stable late-row order. This is a responsiveness regression test, not a network speed benchmark.
 
 The CI device is Android 11 TV (API 30), 1080p, two cores, 1536 MB RAM, 128 MB heap. It exercises the platform's real RTL layout and D-pad focus behavior. Software-rendered emulator results cannot represent Sony's decoder/GPU speed or the user's network.
 
@@ -23,7 +23,7 @@ Install the APK on the Android 11 Sony TV and verify:
 7. Persian/English player titles: `I`, `F` and `d` remain complete. Subtitle paragraphs stay centered across the screen while controls/title information are visible. Check punctuation with Persian and mixed English/numeric cues from the actual Friends subtitle file.
 8. Intro/recap skip buttons show a shrinking fill based on the marked segment's remaining playback time. It freezes while paused, updates after a seek and disappears when the segment ends. Automatic skip/next-episode settings retain their behavior.
 9. Audio/subtitle/quality/speed option labels share a consistent column edge in both interface languages. Test larger system font size and reduced motion.
-10. Updates: open Settings > App > App update. Check download progress, retry after a failed connection, allow this app as an installation source when Android asks, and confirm the system installer. Reject an APK from a different package/signing key or with an older version code. A main-branch artifact must not appear as a release update.
+10. Updates: open Settings > App > App update. Check download progress, retry after a failed connection, allow this app as an installation source when Android asks, and confirm the system installer. Reject an APK from a different package/signing key or with an older version code. A main-branch artifact must not appear as a release update. On an Android 6.0–7.1 TV, also confirm that the installer opens at all (Android 6 is handed the external file, 7 the internal copy) and that Persian titles and body text draw in the app's faces rather than the system's.
 11. Leave playback running for 20 minutes, switch episodes/quality/subtitles, then return home. Check for dropped frames, audio drift, memory growth and decoder failures in logcat.
 
 ## Collect evidence from the TV

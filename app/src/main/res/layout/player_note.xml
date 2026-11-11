@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DESIGN.md's Note over a video that stopped, the player's and the trailer's alike: the title,
+     why, and one pill 20dp below, which has the remote and keeps it (nothing leads off it: what
+     is under the note is not to be reached). The picture's last frame stays behind, so the words
+     stand on ink at 85% over the whole of it: over a white frame that still leaves the why's dim
+     grey 5.7:1, where the scrims' 70% left it 3.3:1. Gone until it fades in (fadeNote). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/player_note"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:accessibilityLiveRegion="polite"
+    android:background="@color/notice_glass"
+    android:clipChildren="false"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:visibility="gone">
+
+    <TextView
+        android:id="@+id/player_note_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/player_stopped"
+        android:textAppearance="@style/TextAppearance.App.DialogTitle" />
+
+    <TextView
+        android:id="@+id/player_note_why"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="center"
+        android:maxWidth="520dp"
+        android:textAppearance="@style/TextAppearance.App.Body"
+        android:textColor="@color/text_dim" />
+
+    <Button
+        android:id="@+id/player_note_action"
+        style="@style/Widget.App.Button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:nextFocusLeft="@id/player_note_action"
+        android:nextFocusRight="@id/player_note_action"
+        android:nextFocusUp="@id/player_note_action"
+        android:nextFocusDown="@id/player_note_action"
+        android:text="@string/retry" />
+</LinearLayout>

@@ -232,7 +232,7 @@ class PersonActivity : TvActivity() {
         findViewById<TextView>(R.id.person_note_hint).text = when (error) {
             null -> getString(R.string.person_empty_hint)
             is Api.ApiError -> error.message
-            else -> getString(R.string.no_internet)
+            else -> errorText(error) // 30nama failing is not the internet being out
         }
         val action = findViewById<Button>(R.id.person_note_action)
         action.setText(if (error == null) R.string.person_back else R.string.retry)

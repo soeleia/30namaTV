@@ -185,7 +185,9 @@ object Buffering {
                     // The player started loading mid-segment. The part on disk stays; the next turn resumes it.
                 } catch (e: IOException) {
                     if ((e as? HttpDataSource.InvalidResponseCodeException)?.responseCode == 403) {
-                        cdn.connectionPool.evictAll() // as the player does: the retry dials a fresh connection
+                        // As the player does: the retry dials a fresh connection. Off the main thread, which
+                        // this runs on: closing a TLS socket writes to it, and an older Android kills the app for it.
+                        withContext(Dispatchers.IO) { cdn.connectionPool.evictAll() }
                         if (++forbidden == 3) return
                     } else {
                         delay(minOf(++failures * 5_000L, 60_000L))

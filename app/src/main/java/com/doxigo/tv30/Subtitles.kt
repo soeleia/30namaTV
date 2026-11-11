@@ -115,7 +115,7 @@ object Subtitles {
      * first, ties in the sources' order (SubSource's, SubDL's, OpenSubtitles'). One source failing
      * leaves the others' answers; with nothing found, the first failure is what went wrong.
      */
-    suspend fun search(wanted: Wanted): List<Found> = coroutineScope {
+    suspend fun search(wanted: Wanted): List<Found> = withContext(Dispatchers.Default) { // the listings' JSON and each name's scoring, off the main thread mid-film
         val sources = listOfNotNull<suspend (Wanted) -> List<Found>>(
             // Up to four calls in a row: cut short, so a slow or blocked SubSource (from Iran) doesn't hold back the others.
             { w -> withTimeoutOrNull(8_000) { subSource(w) } ?: throw IOException("$SUBSOURCE timed out") },
@@ -133,7 +133,7 @@ object Subtitles {
     private val SOURCES = setOf("bluray", "web", "webrip", "hdtv", "dvdrip", "hdrip")
 
     /** An episode a release names: "S02E08", "S01EP08", "S01E01-E10", "S01E01E02", "2x08", "Eps 07", "E08"; not the 265 of "x265". */
-    private val EPISODE = Regex("(?i)(?<![a-z0-9])(?:s(\\d{1,2})[ ._-]?ep?|(\\d{1,2})x|(?:episode|eps|ep|e)[ ._-]*)(\\d{1,3})(?:(?:-e?|e)(\\d{1,3}))?(?!\\d)")
+    private val EPISODE = Regex("(?i)(?<![a-z0-9])(?:s(\\d{1,2})[ ._-]?ep?|(\\d{1,2})x|(?:episode|eps|ep|e)[ ._-]*)(\\d{1,3})(?:(?:-e?|e)(\\d{1,3})(?![a-z0-9]))?(?!\\d)")
 
     /** The scene's bare episode, "213" for S02E13 ([episodes]); not the number of "H.264", "x265", "720p" or a year. */
     private val SCENE = Regex("(?i)(?<![a-z0-9])(?<![hx][ ._-])([1-9])(\\d{2})(?![a-z0-9])")
@@ -356,11 +356,15 @@ object Subtitles {
     suspend fun checkOpenSubtitles(key: String): Boolean =
         check(openSubtitlesCall("https://api.opensubtitles.com/api/v1/utilities/guessit?filename=test.mkv", key).build(), 401, 403)
 
-    /** Off the main thread, closing included: an unread HTTP/2 body is cancelled with a write to the socket. */
-    internal suspend fun check(request: Request, vararg refused: Int): Boolean = withContext(Dispatchers.IO) {
+    /**
+     * Off the main thread, closing included: an unread HTTP/2 body is cancelled with a write to the
+     * socket. A refusal whose body matches [unreachable] is the service turning the place away, not the key.
+     */
+    internal suspend fun check(request: Request, vararg refused: Int, unreachable: Regex? = null): Boolean = withContext(Dispatchers.IO) {
         Api.run { client.newCall(request.newBuilder().header("User-Agent", AGENT).build()).await() }.use { response ->
             when {
                 response.isSuccessful -> true
+                response.code in refused && unreachable?.containsMatchIn(response.peekBody(64 * 1024).string()) == true -> throw IOException("${response.code}")
                 response.code in refused -> false
                 else -> throw IOException("${response.code}")
             }
@@ -389,6 +393,8 @@ object Subtitles {
         }
         return withContext(Dispatchers.IO) {
             val (file, text) = runCatching { open(bytes, name, episode, found.language) }.getOrElse { throw Unreadable() }
+            // A rar, a page answered in the file's place, nothing at all: no subtitle's lines, in any of its types.
+            if ("-->" !in text && "Dialogue:" !in text) throw Unreadable()
             // A SubSource or SubDL file sent bare, not zipped, is named after its zip or page: SubRip, as nearly all are.
             val type = file.substringAfterLast('.').lowercase().takeIf { it in TYPES } ?: "srt"
             File(dir.apply { mkdirs() }, "${found.source}-${found.ref.hashCode().toUInt()}.$type")
@@ -415,17 +421,30 @@ object Subtitles {
         // "S01E05", "1x05", "E05", "Episode 5", «قسمت ۵» spelt with Latin digits, the scene's "105"; not the 5 in "x265" or "Release 5".
         val names = Regex("(?i)(?<![a-z])(?:e|ep|episode|x|قسمت)[ ._-]*0*$episode(?!\\d)")
         var first: Pair<String, ByteArray>? = null
+        val files = ArrayList<String>()
         // Latin-1 names (7.0 and later take a charset): an old zip's Persian file name in some code
         // page must not fail the whole zip, as strict UTF-8 would.
-        val stream = bytes.inputStream()
-        (if (Build.VERSION.SDK_INT >= 24) ZipInputStream(stream, Charsets.ISO_8859_1) else ZipInputStream(stream)).use { zip ->
+        fun zip() = bytes.inputStream().let { if (Build.VERSION.SDK_INT >= 24) ZipInputStream(it, Charsets.ISO_8859_1) else ZipInputStream(it) }
+        fun subtitle(entry: java.util.zip.ZipEntry) =
+            !entry.isDirectory && "__MACOSX" !in entry.name && entry.name.substringAfterLast('.').lowercase() in TYPES
+        zip().use { zip ->
             for (entry in generateSequence { zip.nextEntry }) {
+                if (!subtitle(entry)) continue
                 val file = entry.name.substringAfterLast('/')
-                if (entry.isDirectory || "__MACOSX" in entry.name || file.substringAfterLast('.').lowercase() !in TYPES) continue
-                if (episode > 0 && (names.containsMatchIn(file) || episodes(file, 0)?.second == episode..episode)) {
+                if (episode > 0 && (names.containsMatchIn(file) || episodes(file, 0)?.second?.contains(episode) == true)) {
                     return entry.name to decode(zip.readAtMost(LIMIT), language)
                 }
+                files += entry.name
                 if (first == null) first = entry.name to zip.readAtMost(LIMIT)
+            }
+        }
+        // Several files and none says the episode in those words (a fansub's "[Grp] Show - 05 [1080p].ass"):
+        // the one file with the bare number, or none. The first would be episode 1's lines under episode 5.
+        if (episode > 0 && files.size > 1 && episodes(files[0].substringAfterLast('/'), 0) == null) {
+            val bare = Regex("(?<![0-9A-Za-z])0*$episode(?![0-9A-Za-z])")
+            val only = files.singleOrNull { bare.containsMatchIn(it.substringAfterLast('/').substringBeforeLast('.')) } ?: throw Unreadable()
+            zip().use { zip ->
+                for (entry in generateSequence { zip.nextEntry }) if (entry.name == only) return only to decode(zip.readAtMost(LIMIT), language)
             }
         }
         // A first file for another episode would load that one's lines: none, rather.
@@ -445,9 +464,13 @@ object Subtitles {
             starts(0xEF, 0xBB, 0xBF) -> String(bytes, 3, bytes.size - 3, Charsets.UTF_8)
             starts(0xFF, 0xFE) -> String(bytes, 2, bytes.size - 2, Charsets.UTF_16LE)
             starts(0xFE, 0xFF) -> String(bytes, 2, bytes.size - 2, Charsets.UTF_16BE)
-            // newDecoder() reports a malformed byte where String() would quietly replace it.
-            else -> runCatching { Charsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(bytes)).toString() }
-                .getOrElse { String(bytes, Charset.forName(if (language == "fa") "windows-1256" else "windows-1252")) }
+            // newDecoder() reports a malformed byte where String() would quietly replace it. A stray
+            // byte or two in a UTF-8 file (a bad cut, an editor's slip) does not make it a code page's:
+            // read as one, every Persian letter of it came out as two wrong ones.
+            else -> runCatching { Charsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(bytes)).toString() }.getOrElse {
+                String(bytes, Charsets.UTF_8).takeIf { utf8 -> utf8.count { it == '\uFFFD' } * 50 <= utf8.count { it > '\u007F' } }
+                    ?: String(bytes, Charset.forName(if (language == "fa") "windows-1256" else "windows-1252"))
+            }
         }
         return persianised(text)
     }

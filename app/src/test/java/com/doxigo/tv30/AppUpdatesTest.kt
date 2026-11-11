@@ -1,5 +1,6 @@
 package com.doxigo.tv30
 
+import android.app.DownloadManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -55,5 +56,20 @@ class AppUpdatesTest {
         assertFalse(AppUpdates.checkDue(hours * 2 - 1, hours))
         assertTrue(AppUpdates.checkDue(hours * 2, hours))
         assertTrue(AppUpdates.checkDue(hours - 1, hours))
+    }
+
+    @Test
+    fun onlyAQueuedOrPausedDownloadLeftAloneForAMinuteIsStalled() {
+        val now = 10 * 60 * 1000L
+        val minute = 60 * 1000L
+        for (status in listOf(DownloadManager.STATUS_PENDING, DownloadManager.STATUS_PAUSED)) {
+            assertTrue(AppUpdates.downloadStalled(status, now, now - minute - 1))
+            assertFalse(AppUpdates.downloadStalled(status, now, now - minute))
+            assertFalse(AppUpdates.downloadStalled(status, now, now))
+            assertTrue(AppUpdates.downloadStalled(status, now, now + 1)) // the clock was set back
+        }
+        // Running is never stalled, even untouched since 1970 (Android 6 stamps no progress); nor is anything finished.
+        for (status in listOf(DownloadManager.STATUS_RUNNING, DownloadManager.STATUS_SUCCESSFUL, DownloadManager.STATUS_FAILED))
+            assertFalse(AppUpdates.downloadStalled(status, now, 0))
     }
 }

@@ -26,8 +26,9 @@ import java.io.File
  * Run the existing instrumentation runner with -e check resume. An episode saved five minutes in, on
  * a public HLS stream: the player starts there, as from Continue Watching, offering its start on the
  * pill, the poster beside the title's names and facts. Left at seven minutes while the server's point
- * stays at 0 (as 30nama keeps some), opened again it picks up where this TV left it, and the pill
- * takes it back to the start. Last, the controls in English.
+ * stays at 0 (as 30nama keeps some), opened again it picks up where this TV left it; OK with the
+ * controls hidden only brings them up, and the pill, with the remote on it, takes it back to the
+ * start. Last, the controls in English.
  */
 object ResumeChecks {
     private const val HLS = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"
@@ -134,9 +135,22 @@ object ResumeChecks {
             opened = open()
             runOnMainSync { check(opened.exo.currentPosition in 421_000..430_000) { "Opened again at ${opened.exo.currentPosition} ms, not where it was left (421 s on)" } }
 
-            // ---- The pill: back to the start. ----
+            // ---- OK with the controls hidden brings them up, as at any other moment: the start is not its to take. ----
             await("The start was not offered again") { opened.offersStart() }
-            runOnMainSync { opened.skip.performClick() }
+            runOnMainSync { opened.fragment.hideControlsOverlay(false) }
+            await("The controls did not hide") { !opened.fragment.isControlsOverlayVisible }
+            sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
+            await("OK with the controls hidden did not show them") { opened.fragment.isControlsOverlayVisible }
+            runOnMainSync {
+                check(opened.exo.currentPosition >= 421_000) { "OK with the controls hidden took the film back to ${opened.exo.currentPosition} ms" }
+                check(opened.offersStart()) { "OK with the controls hidden took the start off the pill" }
+            }
+
+            // ---- The pill, with the remote on it: back to the start. ----
+            sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP) // play/pause, up to the bar
+            sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP) // and from the bar to the pill over the row
+            await("Up from the bar did not reach the pill") { opened.skip.isFocused }
+            sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
             await("The pill did not go back to the start", 15_000) { opened.exo.currentPosition < 5_000 && !opened.offersStart() }
             opened.close()
 
@@ -158,7 +172,7 @@ object ResumeChecks {
                 check(focused != null && generateSequence(focused) { it.parent as? View }.any { it === panels }) { "Right did not cross into the panels' buttons: $focused" }
             }
             opened.close()
-            result.putString("stream", "PASS: starts at the saved point offering the start, poster shown; again where this TV left it past a lagging server; the pill restarts\n")
+            result.putString("stream", "PASS: starts at the saved point offering the start, poster shown; again where this TV left it past a lagging server; OK with the controls hidden only shows them, the pill under the remote restarts\n")
         } catch (error: Throwable) {
             result.putString("stream", error.stackTraceToString())
             resultCode = Activity.RESULT_CANCELED

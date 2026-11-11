@@ -393,7 +393,7 @@ class PlayerPanel(private val root: ViewGroup, under: View, private val onClosed
     }
 
     private fun text(value: CharSequence, style: Int) = TextView(context).apply {
-        setTextAppearance(style)
+        appearance(style)
         textAlignment = View.TEXT_ALIGNMENT_VIEW_START
         widenSpaces()
         text = value

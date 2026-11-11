@@ -29,6 +29,27 @@ class ApiTest {
         }
 
     @Test
+    fun onlyARefusedSessionEndsIt() {
+        fun ended(json: String) = Api.sessionEnded(JSONObject(json))
+        assertTrue(ended("""{"success":false,"msg":"login required"}"""))
+        assertTrue(ended("""{"success":false,"message":"Login Required"}"""))
+        // 30nama failing in its own words must not sign the viewer out and take their watched episodes.
+        assertFalse(ended("""{"success":false,"msg":"internal error"}"""))
+        assertFalse(ended("""{"success":false}"""))
+        assertFalse(ended("""{"success":false,"msg":null}"""))
+        assertFalse(ended("""{"success":true,"result":{}}"""))
+    }
+
+    @Test
+    fun userAgentIsAHeaderOkHttpTakes() {
+        assertEquals("Mozilla/5.0 (Linux; Android 11; BRAVIA 4K)", Api.headerSafe("Mozilla/5.0 (Linux; Android 11; BRAVIA 4K)"))
+        // A model named outside ASCII: OkHttp throws on such a header, which failed every call.
+        assertEquals("Mozilla/5.0 (Linux; Android 9; TV )", Api.headerSafe("Mozilla/5.0 (Linux; Android 9; 电视TV 盒子)"))
+        assertEquals("Mozilla/5.0", Api.headerSafe("电视"))
+        okhttp3.Request.Builder().url("https://example.com").header("user-agent", Api.headerSafe("Mozilla/5.0 (Linux; Android 9; 电视\tTV\n)")).build()
+    }
+
+    @Test
     fun refusalsNeverShowCodesOrActions() {
         assertEquals("server", words(null))
         assertEquals("server", words("CODE_NOT_USED"))

@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 
 CHECKS = ("performance", "intro", "controls", "alignment", "subtitles", "translate", "skip", "title", "lists", "search", "genres", "trailer", "updates", "watched", "resume", "filters", "captions", "dismiss", "preview", "playback", "logos", "episodes", "seasons", "playernotice", "gridnote", "homenote", "searchnote")
 
@@ -18,7 +19,7 @@ def passed(output):
                 and re.search(r"^INSTRUMENTATION_RESULT: stream=PASS:", output, re.M))
 
 
-def extract_reports(payload, destination):
+def extract_reports(payload, destination, required=True):
     screenshots = 0
     with tarfile.open(fileobj=io.BytesIO(payload)) as archive:
         for member in archive:
@@ -36,9 +37,50 @@ def extract_reports(payload, destination):
                     raise ValueError(f"Invalid screenshot: {member.name}")
                 screenshots += 1
             target.write_bytes(data)
-    if screenshots == 0:
+    # A rerun of one suite may be of one that takes none (alignment, controls).
+    if screenshots == 0 and required:
         raise ValueError("No PNG screenshots were collected")
     return screenshots
+
+
+def crashed(log):
+    """Whether logcat holds an uncaught exception of the app's: AndroidRuntime names the process under FATAL EXCEPTION."""
+    return re.search(r"AndroidRuntime: Process: com\.doxigo\.tv30, PID:", log) is not None
+
+
+def launch_release(adb, apk, output):
+    """Starts the APK that ships. The suites run the debug build, so a class or member that only R8
+    strips (a missing keep rule) crashed in the release alone, and passed every check on its way out."""
+    report = []
+    try:
+        # The release has another signer than the debug pair, and would not install over them.
+        for package in ("com.doxigo.tv30.test", "com.doxigo.tv30"):
+            subprocess.run(adb + ["uninstall", package], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+        subprocess.run(adb + ["install", "-r", str(apk)], check=True, timeout=90)
+        subprocess.run(adb + ["logcat", "-c"], check=True, timeout=15)
+        start = subprocess.run(adb + ["shell", "am", "start", "-W", "-n", "com.doxigo.tv30/.MainActivity"],
+                               text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
+        report.append(start.stdout)
+        # Past home's first requests and the update check it makes five seconds in.
+        time.sleep(10)
+        pid = subprocess.run(adb + ["shell", "pidof", "com.doxigo.tv30"], text=True, stdout=subprocess.PIPE, timeout=15).stdout.strip()
+        log = subprocess.run(adb + ["logcat", "-d", "-v", "threadtime"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                             timeout=30).stdout.decode(errors="replace")
+        (output / "release-logcat.txt").write_text(log)
+        problems = []
+        if start.returncode != 0 or "Error" in start.stdout:
+            problems.append("am start failed")
+        if not pid:
+            problems.append("the process is not alive")
+        if crashed(log):
+            problems.append("FATAL EXCEPTION in logcat")
+        report.append(f"pid: {pid or 'none'}")
+    except (subprocess.SubprocessError, OSError) as error:
+        problems = [str(error)]
+    report.append("FAIL: " + ", ".join(problems) if problems else "PASS: the release APK installed, started and stayed up for ten seconds with no fatal exception")
+    (output / "release.txt").write_text("\n".join(report) + "\n")
+    print("\n".join(report), flush=True)
+    return not problems
 
 
 def main():
@@ -47,6 +89,8 @@ def main():
     parser.add_argument("--adb", default="adb")
     parser.add_argument("--output", type=Path, default=Path("app/build/reports/tv-checks"))
     parser.add_argument("--check", action="append", choices=CHECKS)
+    parser.add_argument("--release", type=Path, metavar="APK",
+                        help="after the suites, replace the debug build with this release APK and check that it starts")
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
     if args.self_test:
@@ -54,6 +98,10 @@ def main():
         assert not passed("INSTRUMENTATION_STATUS: stream=PUBLIC PASS: video\nINSTRUMENTATION_CODE: 0\n")
         assert not passed("INSTRUMENTATION_RESULT: stream=AssertionError\nINSTRUMENTATION_CODE: -1\n")
         assert not passed("INSTRUMENTATION_FAILED: Process crashed.\n")
+        fatal = "11-10 12:00:00.000  4321  4321 E AndroidRuntime: FATAL EXCEPTION: main\n11-10 12:00:00.000  4321  4321 E AndroidRuntime: Process: {}, PID: 4321\n"
+        assert crashed(fatal.format("com.doxigo.tv30"))
+        assert not crashed(fatal.format("com.android.tv.settings"))
+        assert not crashed("11-10 12:00:00.000  4321  4321 I ActivityTaskManager: Displayed com.doxigo.tv30/.MainActivity: +1s200ms\n")
         for name, safe in (("./fixture.png", True), ("../outside.png", False)):
             image = b"\x89PNG\r\n\x1a\nproof"
             payload = io.BytesIO()
@@ -75,12 +123,14 @@ def main():
                     pass
                 else:
                     raise AssertionError("Invalid or empty report archive was accepted")
-        print("PASS: instrumentation results, internal report extraction, PNG evidence and invalid archive rejection")
+        print("PASS: instrumentation results, release crash detection, internal report extraction, PNG evidence and invalid archive rejection")
         return 0
     if not args.serial:
         parser.error("--serial is required: choose a disposable emulator, never a signed-in TV")
     if not args.serial.startswith("emulator-"):
         parser.error("Fixture checks require a disposable emulator; they replace local preferences")
+    if args.release and not args.release.is_file():
+        parser.error(f"No release APK at {args.release}")
     args.output.mkdir(parents=True, exist_ok=True)
     adb = [args.adb, "-s", args.serial]
     subprocess.run(adb + ["wait-for-device"], check=True, timeout=60)
@@ -115,7 +165,7 @@ def main():
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
         if reports.returncode != 0:
             raise RuntimeError(f"Remote tar exited {reports.returncode}: {reports.stderr.decode(errors='replace').strip()}")
-        count = extract_reports(reports.stdout, screenshots)
+        count = extract_reports(reports.stdout, screenshots, required=not args.check)
         print(f"Collected {count} PNG screenshots", flush=True)
     except (subprocess.TimeoutExpired, tarfile.TarError, ValueError, OSError, RuntimeError) as error:
         message = f"Internal screenshot collection failed: {error}"
@@ -124,6 +174,9 @@ def main():
         failed.append("screenshots")
     with (args.output / "device.txt").open("w") as device:
         subprocess.run(adb + ["shell", "getprop"], stdout=device, check=True, timeout=15)
+    # Last: it uninstalls the debug build, and the screenshots above are read from that build's files.
+    if args.release and not launch_release(adb, args.release, args.output):
+        failed.append("release")
     if failed:
         print("Failed checks: " + ", ".join(failed), file=sys.stderr)
         return 1

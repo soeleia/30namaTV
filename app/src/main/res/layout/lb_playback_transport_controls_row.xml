@@ -38,7 +38,6 @@
                 android:adjustViewBounds="true"
                 android:layout_marginEnd="@dimen/lb_playback_transport_image_margin_end"
                 android:background="@drawable/player_poster"
-                android:clipToOutline="true"
                 android:importantForAccessibility="no"
                 android:scaleType="fitStart" />
 

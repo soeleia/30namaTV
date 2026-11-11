@@ -66,7 +66,8 @@ class Rail(private val activity: TvActivity, private val current: Section?, priv
     init {
         val sections = Section.entries.filter { it != Section.LISTS || Api.loggedIn }
         items = sections.map(::item)
-        landing = items[sections.indexOf(current ?: Section.HOME)].apply { isSelected = true }
+        // A page of the lists outliving its session (signed out elsewhere) has no item of its own: home's.
+        landing = items[sections.indexOf(current).takeIf { it >= 0 } ?: sections.indexOf(Section.HOME)].apply { isSelected = true }
         // Up and Down stay in the rail, stopping at either end.
         items.forEachIndexed { i, item ->
             item.nextFocusUpId = items[maxOf(i - 1, 0)].id

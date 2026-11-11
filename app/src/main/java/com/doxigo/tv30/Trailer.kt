@@ -196,7 +196,9 @@ object Trailer {
      * title whole: Persian, a year or "trailer" on either side of "Dune", not "Part Three" after
      * it or "Masha and" before "The Bear".
      */
-    internal fun isTrailer(hit: String, name: String, year: Int): Boolean {
+    internal fun isTrailer(title: String, name: String, year: Int): Boolean {
+        // Aparat's titles often write numbers in Persian digits: «Dune ۲» is a sequel's, «۱۹۹۴» a year.
+        val hit = title.map { c -> Character.digit(c, 10).let { if (it >= 0) '0' + it else c } }.joinToString("")
         val words = " ${hit.replace('ي', 'ی').replace('ك', 'ک').normalized()} "
         if (listOf("تریلر", "تیزر", "trailer", "teaser").none { " $it " in words } || " بازی " in words) return false
         val years = Regex("(?<!\\d)(19|20)\\d\\d(?!\\d)").findAll(hit).map { it.value.toInt() }.toList()

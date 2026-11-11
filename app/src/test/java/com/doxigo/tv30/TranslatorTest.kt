@@ -34,6 +34,15 @@ class TranslatorTest {
     }
 
     @Test
+    fun aLineThatLooksLikeAMarker() {
+        // A song's line starting "# 99": no marker when 99 was not asked for, so cue 2 keeps both its lines.
+        val reply = "#1\nسلام.\n#2\n# ۹۹ بادکنک قرمز #\nدر آسمان\n#3\nخداحافظ."
+        assertEquals(mapOf(1 to "سلام.", 2 to "# ۹۹ بادکنک قرمز #\nدر آسمان", 3 to "خداحافظ."), Translator.parse(reply, setOf(1, 2, 3)))
+        // A number no Int holds is text too, not a crash that fails the whole film.
+        assertEquals(mapOf(1 to "سلام.\n#12345678901234"), Translator.parse("#1\nسلام.\n#12345678901234", setOf(1)))
+    }
+
+    @Test
     fun prompt() {
         val lines = (1..20).map { Translator.Line(it * 1000L, it * 1000L + 900, "line $it") }
         val prompt = Translator.prompt(lines, listOf(9, 10, 11), about)

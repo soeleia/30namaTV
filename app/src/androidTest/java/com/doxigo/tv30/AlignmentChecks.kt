@@ -34,7 +34,10 @@ object AlignmentChecks {
                     .putExtra("row", 0).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 waitForIdleSync()
                 val host = checkNotNull(activity)
-                if (code == "fa") linesFit(host)
+                if (code == "fa") {
+                    linesFit(host)
+                    labelsWhole(host)
+                }
                 runOnMainSync {
                     playerColumns(host)
                     val choices = host.findViewById<LinearLayout>(R.id.settings_choices)
@@ -58,7 +61,7 @@ object AlignmentChecks {
                 }
                 activity = null
             }
-            result.putString("stream", "PASS: English/Persian player columns, headings, check gutters and Settings choices/notes in RTL and LTR, widened Persian lines and their ink within their width, ellipsized synopses cut at whole words\n")
+            result.putString("stream", "PASS: English/Persian player columns, headings, check gutters and Settings choices/notes in RTL and LTR, widened Persian lines and their ink within their width, labels sized to their text on one line, ellipsized synopses cut at whole words\n")
         } catch (error: Throwable) {
             result.putString("stream", error.stackTraceToString())
             resultCode = Activity.RESULT_CANCELED
@@ -139,19 +142,7 @@ object AlignmentChecks {
             }
             host.findViewById<ViewGroup>(android.R.id.content).addView(column, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         }
-        // Fit lays a line out again before it is drawn, a frame or two each: until none changes.
-        var layouts = emptyList<Layout?>()
-        var still = 0
-        val deadline = SystemClock.uptimeMillis() + 10_000
-        while (still < 3 && SystemClock.uptimeMillis() < deadline) {
-            waitForIdleSync()
-            SystemClock.sleep(32)
-            var now = emptyList<Layout?>()
-            runOnMainSync { now = views.map { it.layout } }
-            if (now.indices.all { now[it] != null && layouts.getOrNull(it) === now[it] }) still++ else still = 0
-            layouts = now
-        }
-        check(still >= 3) { "The synopses kept being laid out again" }
+        settle(views)
         runOnMainSync {
             try {
                 for (view in views) {
@@ -167,6 +158,60 @@ object AlignmentChecks {
                         check(past <= 0) { "Line $line of ${layout.lineCount}${if (ellipsized) ", ellipsized at two," else ""} draws $past px past the end of its ${view.width} px view" }
                     }
                 }
+            } finally {
+                (column.parent as ViewGroup).removeView(column)
+            }
+        }
+    }
+
+    /** Fit lays a line out again before it is drawn, a frame or two each: waits until none of [views] changes. */
+    private fun Instrumentation.settle(views: List<TextView>) {
+        var layouts = emptyList<Layout?>()
+        var still = 0
+        val deadline = SystemClock.uptimeMillis() + 10_000
+        while (still < 3 && SystemClock.uptimeMillis() < deadline) {
+            waitForIdleSync()
+            SystemClock.sleep(32)
+            var now = emptyList<Layout?>()
+            runOnMainSync { now = views.map { it.layout } }
+            if (now.indices.all { now[it] != null && layouts.getOrNull(it) === now[it] }) still++ else still = 0
+            layouts = now
+        }
+        check(still >= 3) { "The texts kept being laid out again" }
+    }
+
+    /**
+     * Every Persian string of the app that fits the screen's width, as a label sized to its own
+     * text: one line, whole. From Android 15 the line breaker read the tail of a first word (the ر
+     * of «در حال بررسی…») as ink past the start edge and broke the label in two.
+     */
+    private fun Instrumentation.labelsWhole(host: Activity) {
+        val views = ArrayList<TextView>()
+        lateinit var column: LinearLayout
+        runOnMainSync {
+            column = LinearLayout(host).apply { orientation = LinearLayout.VERTICAL }
+            val labels = R.string::class.java.fields.map { host.getString(it.getInt(null)) }.filter { ' ' in it && '\n' !in it }.distinct()
+            check(labels.size > 100) { "Only ${labels.size} strings to lay out" }
+            for (label in labels) for (lines in listOf(Int.MAX_VALUE, 1)) {
+                val view = TextView(host).apply {
+                    setTextAppearance(R.style.TextAppearance_App_Caption)
+                    widenSpaces()
+                    maxLines = lines
+                    text = label
+                }
+                column.addView(view, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+                views += view
+            }
+            host.findViewById<ViewGroup>(android.R.id.content).addView(column, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+        settle(views)
+        runOnMainSync {
+            try {
+                val broken = views.filter { view ->
+                    val layout = checkNotNull(view.layout)
+                    Layout.getDesiredWidth(view.text, view.paint) < column.width - 8 && (layout.lineCount > 1 || layout.getLineEnd(0) < layout.text.length)
+                }.map { "«${it.text}»" }.distinct()
+                check(broken.isEmpty()) { "${broken.size} labels sized to their text broke onto a second line: ${broken.take(12)}" }
             } finally {
                 (column.parent as ViewGroup).removeView(column)
             }

@@ -98,9 +98,9 @@ GEMINI_KEY=… ./gradlew :app:testDebugUnitTest --tests 'com.doxigo.tv30.Transla
 1. Increase `versionCode` and `versionName` in `app/build.gradle.kts`.
 2. Run local checks and test playback/navigation on the TV.
 3. Commit and push to `main`; wait for the Actions build to pass.
-4. Replace `VERSION` with the new `versionName`, then tag the tested commit: `git -c tag.gpgsign=false tag -a vVERSION -m "30namaTV VERSION"` and `git push origin vVERSION`. Use a new tag for every release.
+4. Replace `VERSION` with the new `versionName`, then tag the tested commit: `git -c tag.gpgsign=false tag -a vVERSION -m "30namaTV VERSION"` and `git push origin vVERSION`. Use a new tag for every release. The tagged commit must be on `main`: the workflow fails a tag anywhere else before it restores the signing key.
 
-Actions uploads the optimized APK and SHA-256 checksum to the tag's GitHub release after emulator checks pass. The SHA file uses `dist/30namaTV.apk` as its path; verify from a folder containing `dist/30namaTV.apk` using `sha256sum -c SHA256SUMS`, or compare the hash directly.
+Actions uploads the optimized APK and SHA-256 checksum to the tag's GitHub release after emulator checks pass, the last of which installs and starts that same APK. The SHA file uses `dist/30namaTV.apk` as its path; verify from a folder containing `dist/30namaTV.apk` using `sha256sum -c SHA256SUMS`, or compare the hash directly.
 
 The workflow pins actions to verified commit SHAs and excludes Gradle's local build cache, which can contain private font resources. APK tests, reports and screenshots are retained as workflow artifacts; tagged releases keep the installable APK. Forks should use their own signing key and remove/change the encrypted font input if they do not have its password.
 
@@ -108,6 +108,6 @@ The workflow pins actions to verified commit SHAs and excludes Gradle's local bu
 
 Increment both `versionCode` and `versionName` in `app/build.gradle.kts`, commit and push, then tag that tested commit as `vVERSION`. Keep the same signing key. The release job waits for build and TV tests, then publishes `30namaTV.apk`; branch artifacts alone do not trigger in-app updates.
 
-The updater reads `https://api.github.com/repos/soeleia/30namaTV/releases/latest`, skips drafts/prereleases and uses only the repository's `30namaTV.apk` asset. Checks run when home opens, at most every six hours, with a manual Settings check available. Android's Download Manager retains the download; Settings shows progress and opens the system installer after validating the APK. No account token is sent to GitHub. Update files stay in the app's own external files directory.
+The updater reads `https://api.github.com/repos/soeleia/30namaTV/releases/latest`, skips drafts/prereleases and uses only the repository's `30namaTV.apk` asset. Checks run when home opens, at most every six hours, with a manual Settings check available; they go on while a downloaded update waits to be installed, and a newer release replaces it. Android's Download Manager retains the download; Settings shows progress, starts a download over if it has sat queued or paused for a minute when the row is selected, and opens the system installer after validating the APK. A release that fails validation is not downloaded again until the row is selected or a newer release appears. No account token is sent to GitHub. The download lands in the app's own external files directory and is copied into the app's internal storage, where it is validated and from where it is installed, so another app cannot swap the file in between; Android 6, whose installer reads only `file://` paths, installs the external file.
 
 Android requires the user to approve installation. If unknown-source permission is needed, allow installation for 30namaTV and select Install again. A different signing key is rejected; never uninstall automatically or reset a user's account to force an update.

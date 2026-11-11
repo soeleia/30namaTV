@@ -12,7 +12,9 @@
     <string name="search_key_space">فاصله</string>
     <string name="search_key_delete">حذف</string>
     <string name="search_key_close">بستن</string>
-    <!-- The results' heading when their first page fails (the notice says why): a query's, then the suggestions'. -->
+    <!-- The voice orb on a TV with no speech recognizer: what is missing, and the way that works. -->
+    <string name="search_no_voice">این تلویزیون جست‌وجوی صوتی ندارد. با صفحه‌کلید بنویسید.</string>
+    <!-- Over why and «تلاش دوباره» in the results' place when their first page fails: a query's, then the suggestions'. -->
     <string name="search_failed">جست‌وجو انجام نشد</string>
     <string name="suggestions_failed">پیشنهادها بارگیری نشد</string>
 </resources>

@@ -7,6 +7,7 @@ import android.webkit.WebSettings
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
@@ -87,13 +88,16 @@ object Api {
     val loggedIn get() = !token.isNullOrEmpty()
 
     // The official app sends the device's WebView user agent. Computing it loads WebView, which is
-    // slow on these TVs, so it is done once and kept.
+    // slow on these TVs, so it is done once and kept. It names the device's model, and OkHttp
+    // throws on a header with a letter outside ASCII, which would fail every call: those are dropped.
     val userAgent: String by lazy {
-        prefs.getString("ua", null) ?: (runCatching { WebSettings.getDefaultUserAgent(appContext) }
+        headerSafe(prefs.getString("ua", null) ?: (runCatching { WebSettings.getDefaultUserAgent(appContext) }
             .getOrNull() ?: System.getProperty("http.agent") ?: "Mozilla/5.0").also {
             prefs.edit().putString("ua", it).apply()
-        }
+        })
     }
+
+    internal fun headerSafe(value: String) = value.filter { it in ' '..'~' }.ifBlank { "Mozilla/5.0" }
 
     /** The server said no. Its message is always words for the screen, in the app's language; [reason] is the server's own. */
     class ApiError(message: String, val reason: String? = null) : IOException(message)
@@ -161,6 +165,14 @@ object Api {
         msg != null && language == "fa" && !msg.isLatin -> msg
         else -> text(R.string.error_server)
     }
+
+    /**
+     * A refused `user` answer that says the session is over (expired, or revoked elsewhere). Any
+     * other refusal is 30nama failing ("internal error"), and must not sign the viewer out and
+     * take their watched episodes with it.
+     */
+    internal fun sessionEnded(answer: JSONObject) =
+        !answer.optBoolean("success") && answer.message()?.contains("login required", ignoreCase = true) == true
 
     /** The application context speaks the system's language; errors speak the app's. */
     private fun localized(id: Int): String = appContext.createConfigurationContext(
@@ -297,7 +309,10 @@ object Api {
         cont.invokeOnCancellation { cancel() }
         enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) = cont.resumeWithException(e)
-            override fun onResponse(call: Call, response: Response) = cont.resume(response) { _, r, _ -> r.close() }
+            // Cancelled as the answer came: closing a body still arriving writes to its socket,
+            // and this may run on the main thread (NetworkOnMainThreadException).
+            override fun onResponse(call: Call, response: Response) =
+                cont.resume(response) { _, r, _ -> scope.launch(Dispatchers.IO) { runCatching { r.close() } } }
         })
     }
 
@@ -344,7 +359,9 @@ object Api {
     suspend fun advancedSearch(params: JSONObject, page: Int, orderBy: String) =
         result("advanced_search", "parameters" to params.toString(), "page" to page, "orderby" to orderBy, "order" to "DESC") as JSONObject
     suspend fun continueWatching() = result("continue_watching")
-    suspend fun dismissContinueWatching(id: Int) = call("continue_watching_dismiss", "id" to id)
+    suspend fun dismissContinueWatching(id: Int) = call("continue_watching_dismiss", "id" to id).also {
+        if (it.opt("success") == false) throw refusal(it.message())
+    }
     suspend fun stream(id: Int, free: Boolean) =
         result("stream", "post_id" to id, "free_stream" to free) as JSONObject
     /**
@@ -358,14 +375,18 @@ object Api {
     suspend fun myLists() = result("user_mylist") as JSONObject
     suspend fun userList(group: String, page: Int, orderBy: String) =
         result("user_list", "action" to "list", "group" to group, "page" to page, "orderby" to orderBy, "order" to "DESC") as JSONObject
+    /** Flips [postId]'s membership of [group]. An answer that says no outright is a failure; one that says nothing is taken as done. */
     suspend fun toggleList(group: String, postId: Int) =
-        call("user_list", "action" to "add", "group" to group, "post_id" to postId)
+        call("user_list", "action" to "add", "group" to group, "post_id" to postId).also {
+            if (it.opt("success") == false) throw refusal(it.message())
+        }
 }
 
 /** Which titles sit in the user's three lists; the details page shows and flips membership. */
 object Library {
     val GROUPS = listOf("favorite", "watchlist", "notify")
     private val ids = HashMap<String, MutableSet<Int>>()
+    private var loaded = false
 
     suspend fun load() {
         val lists = Api.myLists()
@@ -373,6 +394,7 @@ object Library {
             val posts = lists.optJSONObject(group)?.optJSONArray("post")
             ids[group] = (0 until (posts?.length() ?: 0)).mapTo(HashSet()) { posts!!.optInt(it) }
         }
+        loaded = true
     }
 
     fun has(group: String, id: Int) = ids[group]?.contains(id) == true
@@ -384,15 +406,29 @@ object Library {
     var changes = 0
         private set
 
-    /** Flips locally first, as the official app does, then tells the server. */
+    /**
+     * Flips locally first, as the official app does, then tells the server. The server's call flips
+     * too, so it only goes out once the lists are known (a title already in one would be taken out
+     * while the page showed it added), and a flip the server did not take is undone: by asking
+     * what it holds, as a lost answer may have landed, else by flipping back.
+     */
     suspend fun toggle(group: String, id: Int) {
+        if (!loaded) load()
         val set = ids.getOrPut(group) { HashSet() }
         if (!set.remove(id)) set.add(id)
-        Api.toggleList(group, id)
+        try {
+            Api.toggleList(group, id)
+        } catch (e: Throwable) {
+            withContext(NonCancellable) { runCatching { load() }.onFailure { if (!set.remove(id)) set.add(id) } }
+            throw e
+        }
         changes++
     }
 
-    fun clear() = ids.clear()
+    fun clear() {
+        ids.clear()
+        loaded = false
+    }
 }
 
 /**

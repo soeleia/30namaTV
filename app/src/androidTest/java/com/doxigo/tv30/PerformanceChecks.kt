@@ -78,6 +78,9 @@ class PerformanceChecks : Instrumentation() {
         "gridnote" -> return GridNoteChecks.run(this)
         "homenote" -> return HomeNoteChecks.run(this)
         "searchnote" -> return SearchNoteChecks.run(this)
+            "performance", null -> Unit // below
+            // A name the runner knows and this does not must not pass as the performance suite.
+            else -> return finish(Activity.RESULT_CANCELED, Bundle().apply { putString("stream", "FAIL: unknown check $requestedCheck\n") })
         }
         val result = Bundle()
         try {

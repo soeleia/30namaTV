@@ -49,6 +49,8 @@ class PromoHero(
     var onDetails: (JSONObject) -> Unit = { root.context.openDetails(it) }
     /** Up from the button, where nothing of the hero's is: home's update notice, when there is one. */
     var onUp: () -> Unit = {}
+    /** The remote is on the rows, a frame after it got there or moved along them ([react]). */
+    var onRows: () -> Unit = {}
 
     /** While true the hero holds the billboard and the rows sit low, their selections kept for later. */
     var active = false
@@ -142,7 +144,10 @@ class PromoHero(
                 aside = false
                 idle()
             }
-            rows.hasFocus() -> if (active) hold(false)
+            rows.hasFocus() -> {
+                if (active) hold(false)
+                onRows()
+            }
             // Elsewhere on home (the update notice above it): the hero waits as it is, button and all.
             root.hasFocus() -> timer?.cancel()
             // The rail opened over the hero, which waits as it is, its button out from under the panel's edge.

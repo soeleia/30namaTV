@@ -4,22 +4,30 @@ import android.app.Activity
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.Configuration
+import android.content.res.TypedArray
+import android.graphics.Typeface
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.AttributeSet
 import android.view.Gravity
 import android.view.KeyEvent
+import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
 import android.view.inputmethod.InputMethodManager
+import android.widget.Button
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.annotation.StyleRes
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import java.io.InterruptedIOException
+import java.lang.reflect.Constructor
 import java.net.SocketException
 import java.net.UnknownHostException
 import java.util.Locale
@@ -40,6 +48,7 @@ open class TvActivity : FragmentActivity() {
     /** Reduce motion: pages change with a plain fade, the opening one no longer rising into place. */
     override fun onCreate(savedInstanceState: Bundle?) {
         layoutInflater.widenSpaces() // before anything is inflated: see TextSpacing.kt
+        layoutInflater.styleFonts() // Android 6 to 7.1 only, where widenSpaces sets no factory: see below
         super.onCreate(savedInstanceState)
         if (Motion.reduced) window.setWindowAnimations(R.style.Animation_App_Screen_Fade)
     }
@@ -100,6 +109,93 @@ open class TvActivity : FragmentActivity() {
     }
 }
 
+// ---- The pinned faces on Android 6.0 to 7.1 (API 23 to 25). type.xml and a few layouts name them
+// ---- as android:fontFamily="@font/…", which the platform's TextView reads as a font only from
+// ---- Android 8: before it the value is a family *name*, the font's file path names no family, and
+// ---- every text styled that way fell back to the system's face (only faces set in code showed).
+// ---- AppCompat's TextView is what usually fills this in, and the app has none. So below API 26
+// ---- every inflated TextView is given the font its own attributes, its style or its text appearance
+// ---- names ([styleFonts]), and [appearance] does the same for a text appearance set in code;
+// ---- ResourcesCompat loads font files and font-family XML there. From API 26 none of this runs.
+
+/** android:textAppearance and android:fontFamily, in the ascending order obtainStyledAttributes needs. */
+private val TEXT_FONT = intArrayOf(android.R.attr.textAppearance, android.R.attr.fontFamily)
+private val FONT = intArrayOf(android.R.attr.fontFamily)
+
+/** The font [array] names at [index], if it is one of res/font's: a family name ("sans-serif") is the platform's own business. */
+private fun Context.fontAt(array: TypedArray, index: Int): Typeface? {
+    val id = array.getResourceId(index, 0)
+    if (id == 0 || resources.getResourceTypeName(id) != "font") return null
+    return runCatching { font(id) }.getOrNull()
+}
+
+/** The font the text appearance [style] names, if any. */
+private fun Context.appearanceFont(style: Int): Typeface? {
+    if (style == 0) return null
+    val array = obtainStyledAttributes(style, FONT)
+    try { return fontAt(array, 0) } finally { array.recycle() }
+}
+
+/** Sets [font], keeping the bold or italic the view worked out from its own textStyle. */
+private fun TextView.styled(font: Typeface) = setTypeface(font, typeface?.style ?: Typeface.NORMAL)
+
+/**
+ * setTextAppearance for every Android the app runs on: below Android 8 the platform's own drops the
+ * style's font (see above), and this puts it back. Use it wherever a view built in code takes one of
+ * type.xml's appearances.
+ */
+fun TextView.appearance(@StyleRes style: Int) {
+    setTextAppearance(style)
+    if (Build.VERSION.SDK_INT < 26) context.appearanceFont(style)?.let { styled(it) }
+}
+
+/**
+ * Below Android 8, gives every TextView this inflater (and each clone of it) inflates the font its
+ * XML asks for. Call before the first inflation. TextSpacing's factory is for API 29 and up, so the
+ * two are never on one inflater.
+ */
+fun LayoutInflater.styleFonts() {
+    if (Build.VERSION.SDK_INT < 26 && factory2 == null) factory2 = StyledFonts()
+}
+
+private class StyledFonts : LayoutInflater.Factory2 {
+    // Tag → its (Context, AttributeSet) constructor if it names a TextView, else null. Main thread only, as inflation is here.
+    private val texts = HashMap<String, Constructor<out View>?>()
+
+    /**
+     * The view is made here rather than by the inflater: LayoutInflater.createView with a context came
+     * with API 29, and before it a factory cannot ask the inflater for a view in the right (themed) one.
+     */
+    @SuppressLint("ResourceType") // TEXT_FONT is this file's own attribute array: its indexes are no styleable's.
+    override fun onCreateView(parent: View?, name: String, context: Context, attrs: AttributeSet): View? {
+        if (name !in texts) texts[name] = runCatching {
+            // A bare tag is a platform widget, as the inflater resolves it ("TextView", "Button").
+            Class.forName(if ('.' in name) name else "android.widget.$name", false, context.classLoader)
+                .takeIf { TextView::class.java.isAssignableFrom(it) }?.asSubclass(View::class.java)
+                ?.getConstructor(Context::class.java, AttributeSet::class.java)
+        }.getOrNull()
+        // Anything else, or a view that would not be made, is left to the inflater (and its own error).
+        val view = runCatching { texts[name]?.newInstance(context, attrs) as? TextView }.getOrNull() ?: return null
+        // The widget's default style is read as its constructor reads it; a subclass with a default of its own
+        // (Leanback's row header) names that style in its layout, which is read first.
+        val array = context.obtainStyledAttributes(attrs, TEXT_FONT, when (view) {
+            is EditText -> android.R.attr.editTextStyle
+            is Button -> android.R.attr.buttonStyle
+            else -> android.R.attr.textViewStyle
+        }, 0)
+        // The view's own fontFamily wins over its text appearance's, as in TextView.
+        val font = try {
+            if (array.hasValue(1)) context.fontAt(array, 1) else context.appearanceFont(array.getResourceId(0, 0))
+        } finally {
+            array.recycle()
+        }
+        font?.let { view.styled(it) }
+        return view
+    }
+
+    override fun onCreateView(name: String, context: Context, attrs: AttributeSet): View? = onCreateView(null, name, context, attrs)
+}
+
 /**
  * Focus for a page still being built, and the page's default whenever its window looks for one.
  * Until the window is attached, a view takes the device's default touch mode (Android 16 here; 9
@@ -124,7 +220,7 @@ fun Context.toast(message: CharSequence?) {
     val dp = resources.displayMetrics.density
     val notice = root.findViewWithTag(NOTICE) ?: TextView(activity).apply {
         tag = NOTICE
-        setTextAppearance(R.style.TextAppearance_App_Body)
+        appearance(R.style.TextAppearance_App_Body)
         widenSpaces()
         background = ContextCompat.getDrawable(activity, R.drawable.notice_bg)
         setPadding((24 * dp).toInt(), (12 * dp).toInt(), (24 * dp).toInt(), (12 * dp).toInt())

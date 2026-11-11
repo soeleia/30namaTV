@@ -14,6 +14,7 @@ import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.Shader
+import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.os.SystemClock
@@ -149,7 +150,7 @@ object UpdatesChecks {
                 activity = null
             }
             for (code in listOf("fa", "en")) homeNotice(code, state, prefs, opened)
-            result.putString("stream", "PASS: App update row in Persian/English, D-pad/About navigation, live status/progress/notes without focus loss, release-guide action, private narrow FileProvider, install permission, invalid APK rejection and matching nonempty archive signers; home's notice in Persian/English (never takes the remote, end corner over bright art, Up/Down from the hero, Back remembered per version, waits while home is behind) and the rail's Settings dot leading to the update row\n")
+            result.putString("stream", "PASS: App update row in Persian/English, D-pad/About navigation, live status/progress/notes without focus loss, release-guide action, private FileProvider serving only the verified internal copy (never the download on shared storage), install permission, invalid APK rejection and matching nonempty archive signers; home's notice in Persian/English (never takes the remote, end corner over bright art, Up/Down from the hero, Back remembered per version, waits while home is behind) and the rail's Settings dot leading to the update row\n")
         } catch (error: Throwable) {
             result.putString("stream", error.stackTraceToString())
             resultCode = Activity.RESULT_CANCELED
@@ -393,24 +394,35 @@ object UpdatesChecks {
         check(provider.metaData.getInt("android.support.FILE_PROVIDER_PATHS") == R.xml.update_paths)
         val packageInfo = pm.getPackageInfo(targetContext.packageName, PackageManager.GET_PERMISSIONS)
         check("android.permission.REQUEST_INSTALL_PACKAGES" in packageInfo.requestedPermissions.orEmpty())
+        // A download as DownloadManager leaves it, in the app's folder on shared storage.
         val directory = checkNotNull(targetContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)).resolve("updates")
         check(directory.mkdirs() || directory.isDirectory)
         val version = "99.99.${SystemClock.elapsedRealtime() % 1_000_000}"
-        val invalid = directory.resolve("30namaTV-$version.apk")
-        check(!invalid.exists()) { "Update fixture would replace an existing file" }
+        val download = directory.resolve("30namaTV-$version.apk")
+        val copy = targetContext.filesDir.resolve("updates/${download.name}")
+        check(!download.exists() && !copy.exists()) { "Update fixture would replace an existing file" }
         val outside = File.createTempFile("updates-outside-", ".txt", targetContext.filesDir)
         try {
             val bytes = "Invalid APK fixture".toByteArray()
-            invalid.writeBytes(bytes)
-            val uri = FileProvider.getUriForFile(targetContext, authority, invalid)
-            check(uri.scheme == "content")
-            check(targetContext.contentResolver.openInputStream(uri)?.use { it.readBytes().contentEquals(bytes) } == true)
-            check(runCatching { FileProvider.getUriForFile(targetContext, authority, outside) }.exceptionOrNull() is IllegalArgumentException) { "Provider exposed files outside the update directory" }
+            download.writeBytes(bytes)
             val verify = AppUpdates::class.java.getDeclaredMethod("verify", String::class.java, Long::class.javaPrimitiveType, String::class.java)
                 .apply { isAccessible = true }
-            check(verify.invoke(AppUpdates, version, invalid.length(), null) == AppUpdates.Status.Failed(AppUpdates.Failure.INVALID_APK)) { "Invalid APK was accepted" }
+            check(verify.invoke(AppUpdates, version, download.length(), null) == AppUpdates.Status.Failed(AppUpdates.Failure.INVALID_APK)) { "Invalid APK was accepted" }
+            // Android 6 installs the download itself by file://; from 7 only the internal copy is verified and served.
+            if (Build.VERSION.SDK_INT >= 24) {
+                check(copy.isFile && copy.readBytes().contentEquals(bytes)) { "The download was not verified from a copy in internal storage" }
+                // What was verified is what is installed: the download changing afterwards changes nothing.
+                download.writeBytes("Swapped after the check".toByteArray())
+                check(verify.invoke(AppUpdates, version, bytes.size.toLong(), null) == AppUpdates.Status.Failed(AppUpdates.Failure.INVALID_APK))
+                check(copy.readBytes().contentEquals(bytes)) { "A download swapped after verification replaced the verified copy" }
+                val uri = FileProvider.getUriForFile(targetContext, authority, copy)
+                check(uri.scheme == "content")
+                check(targetContext.contentResolver.openInputStream(uri)?.use { it.readBytes().contentEquals(bytes) } == true)
+                for (file in listOf(download, outside)) check(runCatching { FileProvider.getUriForFile(targetContext, authority, file) }.exceptionOrNull() is IllegalArgumentException) { "Provider exposed $file, outside the internal update directory" }
+            }
         } finally {
-            invalid.delete()
+            download.delete()
+            copy.delete()
             outside.delete()
         }
     }

@@ -1,6 +1,10 @@
 package com.doxigo.tv30
 
+import android.Manifest
 import android.app.Activity
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.text.TextUtils
@@ -80,8 +84,21 @@ class KeyForm private constructor(
         private const val ALPHABET = "abcdefghijkmnpqrstuvwxyz23456789"
         private val random = SecureRandom()
 
-        /** A form on the TV's address in the home network, or null when it has none (Wi-Fi off, no cable). */
+        /**
+         * Android 17's permission for the home network, a phone's connection to this form included:
+         * asked of the viewer by an app that targets it (SettingsActivity.askKey), unknown to Android before.
+         */
+        const val NETWORK = Manifest.permission.ACCESS_LOCAL_NETWORK
+
+        /** Whether this Android lets the form be reached: any before 17, and 17 once the viewer has said so. */
+        fun allowed(context: Context) = Build.VERSION.SDK_INT < 37 || context.checkSelfPermission(NETWORK) == PackageManager.PERMISSION_GRANTED
+
+        /**
+         * A form on the TV's address in the home network, or null when it has none (Wi-Fi off, no
+         * cable) or may not use it ([allowed]): a code no phone could open is worse than none.
+         */
         fun open(activity: Activity, service: CharSequence, link: String, onKey: (String) -> Unit): KeyForm? {
+            if (!allowed(activity)) return null
             val address = runCatching {
                 // A VPN's tun is point to point, and its address no phone at home can reach; Wi-Fi and
                 // Ethernet first, ahead of anything else up (the emulator's radio).

@@ -235,6 +235,9 @@ private class Fit(private val view: TextView, private val inner: TransformationM
     /** Where each kept-together word space is, and where the text shown stops before «…» (-1: nowhere). */
     private val keeps = ArrayList<Int>()
     private var end = -1
+    /** The text is shown without its Spaces, as one line (see onPreDraw). */
+    private var whole = false
+    private val edited get() = keeps.isNotEmpty() || end >= 0 || whole
     /** The text, width and line count the edits are for, and the text shown for them. */
     private var basis: List<Any>? = null
     private var shown: CharSequence = ""
@@ -244,8 +247,9 @@ private class Fit(private val view: TextView, private val inner: TransformationM
 
     override fun getTransformation(source: CharSequence, view: View): CharSequence {
         val text = inner?.getTransformation(source, view) ?: source
-        if ((keeps.isNotEmpty() || end >= 0) && basis?.first() != source.toString()) clear()
-        shown = if (keeps.isEmpty() && end < 0) text else SpannableStringBuilder(text).apply {
+        if (edited && basis?.first() != source.toString()) clear()
+        shown = if (!edited) text else SpannableStringBuilder(text).apply {
+            if (whole && Build.VERSION.SDK_INT >= 29) getSpans(0, length, Space::class.java).forEach(::removeSpan)
             for (at in keeps) if (at < length && this[at] == ' ') replace(at, at + 1, "\u00A0") // its Space stays on it
             if (end in 0 until length) replace(end, length, "\u2026")
         }
@@ -265,8 +269,11 @@ private class Fit(private val view: TextView, private val inner: TransformationM
         if (layout == null || layout === checked || view.transformationMethod !== this) return true
         checked = layout
         val now = listOf(view.text.toString(), layout.width, view.maxLines)
+        // A text shown whole stays so at any width that holds it on one line: its own, measured
+        // without the Spaces, may differ by a pixel, and laying it out afresh would never end.
+        if (whole && now.first() == basis?.first() && layout.lineCount == 1) basis = now
         if (now != basis) {
-            val edited = keeps.isNotEmpty() || end >= 0
+            val edited = edited
             clear()
             basis = now
             if (edited) return redo() // laid out whole again, then read afresh
@@ -284,8 +291,19 @@ private class Fit(private val view: TextView, private val inner: TransformationM
                 return redo()
             }
         }
+        if (Build.VERSION.SDK_INT < 35) return true
+        // The same join reads the tail of a line's first word (the ر of «در حال بررسی…») as ink past
+        // the start edge, so a label as wide as its own text was a few px short for the breaker and
+        // broke in two, one of a single line losing its other words. A text whose words fit the
+        // width is one line, and is shown without its Spaces: the breaker then measures one run,
+        // with the font's own narrow spaces, and the line is drawn with the paint's wordSpacing
+        // (fitSpaces) at the same advances as before.
+        if (last > 0 && '\n' !in shown && Layout.getDesiredWidth(shown, view.paint) <= layout.width) {
+            whole = true
+            return redo()
+        }
         // A line's last word goes down only while the view has a line to spare, or cuts its own «…».
-        if (Build.VERSION.SDK_INT < 35 || last + 1 >= view.maxLines && !cuts) return true
+        if (last + 1 >= view.maxLines && !cuts) return true
         for (line in 0 until last) {
             val past = if (layout.getParagraphDirection(line) == Layout.DIR_RIGHT_TO_LEFT) -layout.getLineLeft(line) else layout.getLineRight(line) - layout.width
             if (past < 0.5f) continue
@@ -303,6 +321,7 @@ private class Fit(private val view: TextView, private val inner: TransformationM
     private fun clear() {
         keeps.clear()
         end = -1
+        whole = false
         edits = 0
         basis = null
     }

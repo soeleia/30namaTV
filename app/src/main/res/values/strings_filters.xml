@@ -17,6 +17,12 @@
     <string name="filter_clear">حذف فیلترها</string>
     <string name="filter_empty_title">با این فیلترها عنوانی پیدا نشد</string>
     <string name="filter_empty_hint">یکی از فیلترها را بردارید یا همه را با هم حذف کنید.</string>
+    <!-- Beside a catalogue's name, how many titles it holds, narrowed or not: «۸۴٬۸۰۶ عنوان». %s is
+         the count, grouped and in Persian digits by the app (Int.grouped). -->
+    <plurals name="grid_count">
+        <item quantity="one">%s عنوان</item>
+        <item quantity="other">%s عنوان</item>
+    </plurals>
     <!-- In a catalogue's place (a genre, My List…) when its first page failed, over why and «تلاش دوباره». -->
     <string name="grid_failed">فهرست عنوان‌ها بارگیری نشد</string>
     <!-- …and when the plain archive came back with nothing in it, over grid_empty_hint. -->

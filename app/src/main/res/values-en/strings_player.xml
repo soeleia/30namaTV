@@ -19,10 +19,12 @@
     <string name="player_skip_recap">Skip recap</string>
     <string name="player_start_over">Start from the beginning</string>
 
-    <string name="player_error_network">The internet connection dropped. Once it\'s back, press Play again.</string>
-    <string name="player_error_server">This video isn\'t available right now. Press Play again in a moment.</string>
+    <string name="player_stopped">Playback stopped</string>
+    <string name="player_error_network">The internet connection dropped. Try again once it\'s back.</string>
+    <string name="player_error_server">This video isn\'t available right now. Try again in a moment.</string>
     <string name="player_error_format">This file won\'t play on this TV. Try another quality.</string>
-    <string name="player_error">Playback stopped. Press Play to try again.</string>
+    <string name="player_error">Something went wrong while playing. Try again.</string>
+    <string name="player_change_quality">Change quality</string>
     <string name="player_no_files">30nama sent no video for this title. Try again in a moment.</string>
 
     <string name="subtitle_find">Find subtitles</string>

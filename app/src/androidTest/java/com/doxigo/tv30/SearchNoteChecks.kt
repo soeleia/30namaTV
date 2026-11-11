@@ -19,10 +19,11 @@ import java.util.Locale
 
 /**
  * Run the existing instrumentation runner with -e check searchnote. A search whose first page
- * fails heads its empty grid with what failed rather than «نتایج» over nothing, the grid out of the
- * remote's way as for no results: a query's «جست‌وجو انجام نشد» (Persian), the suggestions' on
- * opening (English). A new query puts its results and their count back, and a later page failing
- * under them keeps that heading.
+ * fails says so in a note in the results' place, with why and Retry, rather than «نتایج» over
+ * nothing: a query's «جست‌وجو انجام نشد» (Persian), the suggestions' on opening (English), the
+ * heading and the grid out of the way and the remote left in the box. Retry brings the results and
+ * their count, and stops at their first page while the remote is not on them. A new query does the
+ * same, and a later page failing under the remote keeps that heading.
  */
 object SearchNoteChecks {
     /** What 30nama answers the search and the suggestions: "fail", or a first page of posts (a second always fails). */
@@ -88,8 +89,14 @@ object SearchNoteChecks {
                 }
                 val heading = { (field(fragment, "heading") as TextView).text.toString() }
                 val cards = { (field(fragment, "pager") as Pager).adapter.size() }
-                fun failed(note: Int) = await({ "The heading did not say the search failed ($language): «${heading()}», ${cards()} cards, focusable ${grid.isFocusable}" }) {
-                    heading() == host.getString(note) && cards() == 0 && !grid.isFocusable
+                fun said(id: Int) = host.findViewById<TextView>(id)?.takeIf { it.isShown }?.text?.toString()
+                fun failed(note: Int) = await({
+                    "No note said the search failed ($language): «${said(R.id.list_empty_title)}» «${said(R.id.list_empty_hint)}» «${said(R.id.list_empty_action)}», " +
+                        "heading shown ${(field(fragment, "heading") as TextView).isShown}, ${cards()} cards, focusable ${grid.isFocusable}, focus ${host.currentFocus}"
+                }) {
+                    said(R.id.list_empty_title) == host.getString(note) && said(R.id.list_empty_hint) == host.getString(R.string.error_server) &&
+                        said(R.id.list_empty_action) == host.getString(R.string.retry) && !(field(fragment, "heading") as TextView).isShown &&
+                        cards() == 0 && !grid.isFocusable && editor.hasFocus()
                 }
                 if (language == "fa") {
                     await("The suggestions did not load") { grid.isFocusable && heading() == host.getString(R.string.suggested) }
@@ -98,9 +105,15 @@ object SearchNoteChecks {
                     keyboardDown(host, editor)
                     capture("search-note-fa")
                     search = "ok"
+                    val count = host.resources.getQuantityString(R.plurals.search_count, 48, 48)
+                    runOnMainSync { host.findViewById<android.view.View>(R.id.list_empty_action).performClick() }
+                    await({ "Retry did not bring the results in the note's place: «${heading()}», ${cards()} cards, note «${said(R.id.list_empty_title)}»" }) {
+                        heading() == count && cards() == 24 && grid.isFocusable && host.findViewById<android.view.View>(R.id.list_empty) == null
+                    }
+                    SystemClock.sleep(500)
+                    check(!secondPage) { "Results the remote is not on fetched their second page" }
                     text(editor, "باران")
                     runOnMainSync { fragment.onSearchQuerySubmit("باران") }
-                    val count = host.resources.getQuantityString(R.plurals.search_count, 48, 48)
                     await({ "A new query did not bring back the results' count: «${heading()}», ${cards()} cards" }) {
                         heading() == count && cards() == 24 && grid.hasFocus()
                     }
@@ -121,7 +134,7 @@ object SearchNoteChecks {
                 await("Search did not close") { host.isDestroyed }
                 activity = null
             }
-            result.putString("stream", "PASS: a failed first page heads search with «جست‌وجو انجام نشد» (Persian) or \"Couldn't load suggestions\" (English), the grid unfocusable; a new query brings back the count, which a later page's failure keeps\n")
+            result.putString("stream", "PASS: a failed first page leaves a note in the results' place, «جست‌وجو انجام نشد» (Persian) or \"Couldn't load suggestions\" (English) over why and Retry, the remote still in the box; Retry brings the results and stops at their first page; a new query brings back the count, which a later page's failure keeps\n")
         } catch (error: Throwable) {
             code = Activity.RESULT_CANCELED
             capture("search-note-failure")

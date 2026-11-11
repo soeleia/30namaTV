@@ -67,6 +67,8 @@ class Billboard(
     /** The art last asked for, and how strongly it shows: whole under a title, dim under a tile's own picture, not at all under a tile without one. */
     private var art: String? = null
     private var strength = 1f
+    /** The art on screen: not [art] while that is still on its way, or never came. */
+    private var showing: String? = null
     private var pending: Job? = null
     /** The fetch under way for [art], dropped the moment other art is asked for. */
     private var loading: Disposable? = null
@@ -121,8 +123,10 @@ class Billboard(
     fun show(card: Card, turn: Float? = null) {
         // Only titles speak here. A tile (a list, a genre, "see all") quiets the words rather than
         // posing as a title, and the last title's art steps back with them: a category or genre
-        // shows its own picture, dimmed, and a list or "see all" leaves bare ink.
-        if (card.backdrop == null && card.plot == null) {
+        // shows its own picture, dimmed, and a list or "see all" leaves bare ink. A tile has no
+        // 30nama title behind it; a title with neither cover nor synopsis (announced, not yet
+        // streaming) does, and went without its name on its own page when only those two were asked.
+        if (card.source == null && card.backdrop == null && card.plot == null) {
             text.animate().alpha(0f).setInterpolator(Motion.easeOut).setDuration(Motion.EXIT).start()
             stage(card.image, if (card.image == null) 0f else TILE_ART)
             return
@@ -153,7 +157,13 @@ class Billboard(
      */
     private fun stage(url: String?, level: Float, turn: Float? = null) {
         strength = level
-        if (url == null || url == art) return light()
+        // The same art asked for again before it is in has nothing of its own to light: lighting
+        // raised the title before's art, faded out for it, back under this title's words. It takes
+        // its level as it lands.
+        if (url == null || url == art) {
+            if (url == null || url == showing) light()
+            return
+        }
         art = url
         loading?.dispose()
         pending?.cancel()
@@ -164,6 +174,7 @@ class Billboard(
             // Coil's own ImageView target would blank the art as the fetch starts and skip the crossfade for a memory hit.
             val request = ImageRequest.Builder(root.context).data(url).size(1280, 720).scale(Scale.FILL).target(onSuccess = { image ->
                 landed = true
+                showing = url
                 val new = image.asDrawable(root.resources)
                 val old = backdrop.drawable?.takeIf { backdrop.alpha > 0.05f }
                 when {
@@ -188,10 +199,17 @@ class Billboard(
         }
     }
 
-    /** Fades the art on screen out while new art downloads. */
+    /**
+     * Fades the art on screen out while new art downloads, and lets go of it once it is out: kept
+     * in the view, the next [light] brought it back under another title's words. Art landing (or a
+     * tile's level) mid-fade takes the alpha over, which drops this ending with the fade.
+     */
     private fun dim() {
         backdrop.animate().alpha(0f).setStartDelay(0).setInterpolator(Motion.easeOut)
-            .setDuration(if (Motion.reduced) Motion.FADE else REST).start()
+            .setDuration(if (Motion.reduced) Motion.FADE else REST).withEndAction {
+                backdrop.setImageDrawable(null)
+                showing = null
+            }.start()
     }
 
     /**

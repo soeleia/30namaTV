@@ -20,10 +20,12 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 
 /**
@@ -46,6 +48,8 @@ class LoginActivity : TvActivity() {
     private var backdrop: Job? = null
     private var checking = false
     private var polling: Job? = null
+    /** [polling] has an ask on the wire, 30nama's answer to it on its way (see [poll]). */
+    private var asking = false
     /** When the page last appeared or heard a key, on the uptime clock: the asking slows, then rests, from it. */
     private var heard = 0L
     /** Waiting out a slow pause, which a key cuts short. */
@@ -110,6 +114,7 @@ class LoginActivity : TvActivity() {
     override fun onStop() {
         if (!Api.loggedIn) {
             polling?.cancel()
+            asking = false // its answer is let go with it; back in front, the asking starts over
             code = null
             showChecking(false)
         }
@@ -117,6 +122,9 @@ class LoginActivity : TvActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // Signed in, home is a moment away: Back here would close the page and leave the one beneath
+        // as a guest's over a session, and OK on Guest would start home twice.
+        if (welcoming) return true
         val leaving = event.keyCode == KeyEvent.KEYCODE_BACK || event.keyCode == KeyEvent.KEYCODE_ESCAPE
         if (event.action != KeyEvent.ACTION_DOWN || leaving || Api.loggedIn) return super.dispatchKeyEvent(event)
         // At rest a key's one job is a fresh code: it neither presses nor moves anything.
@@ -146,6 +154,10 @@ class LoginActivity : TvActivity() {
      */
     private fun poll(now: Boolean) {
         if (Api.loggedIn) return // a press during the welcome would cancel the way home
+        // An ask on the wire is already what «بررسی دوباره» wants. Cancelled there, the answer that
+        // carried the phone's approval was dropped with its code spent (Api.sendsOnce), and the
+        // viewer was left on a code that could never sign in.
+        if (asking) return
         polling?.cancel()
         slow = false
         polling = lifecycleScope.launch {
@@ -248,7 +260,9 @@ class LoginActivity : TvActivity() {
     private suspend fun signIn(): Boolean {
         // The code on the plate, then the one it replaced: an approval of either signs in.
         val token = QrCode.asked(code, previous, issued, SystemClock.elapsedRealtime()).firstNotNullOfOrNull { asked ->
-            val response = runCatching { Api.qrLogin(asked) }.getOrNull() ?: return@firstNotNullOfOrNull null
+            asking = true
+            val answer = try { runCatching { Api.qrLogin(asked) }.getOrNull() } finally { asking = false }
+            val response = answer ?: return@firstNotNullOfOrNull null
             if (QrCode.expired(response)) {
                 if (asked == code) code = null // the next turn asks for a fresh one
                 else previous = null // it has had its say
@@ -256,8 +270,10 @@ class LoginActivity : TvActivity() {
             response.takeIf { it.optBoolean("success") }?.str("result", "token")
         } ?: return false
         Api.token = token
-        runCatching { Api.user() }.getOrNull()?.takeIf { it.optBoolean("success") }?.let { Api.user = it.optJSONObject("result") }
-        // The code turns into a check where the phone was pointed, held a moment, then home.
+        welcoming = true
+        // The code turns into a check where the phone was pointed as soon as the approval lands:
+        // waiting for the account first, the plate kept its code and «در حال بررسی…» for up to
+        // five seconds more, with nothing to say the phone had been heard.
         showChecking(false)
         findViewById<View>(R.id.qr).animate().alpha(0f).setInterpolator(Motion.easeOut).setDuration(Motion.EXIT).start()
         findViewById<View>(R.id.done).apply {
@@ -265,11 +281,19 @@ class LoginActivity : TvActivity() {
             scaleY = if (Motion.reduced) 1f else .9f
             animate().alpha(1f).scaleX(1f).scaleY(1f).setInterpolator(Motion.easeOut).setDuration(Motion.ENTER).start()
         }
-        delay(Motion.ENTER + WELCOME)
+        // Home once both are done: the check held a moment, and the account fetched behind it.
+        coroutineScope {
+            // Home asks again if this one is slow: the remote is held (welcoming) only this long.
+            launch { withTimeoutOrNull(5_000) { runCatching { Api.user() }.getOrNull() }?.takeIf { it.optBoolean("success") }?.let { Api.user = it.optJSONObject("result") } }
+            delay(Motion.ENTER + WELCOME)
+        }
         MainActivity.restart(this)
         finish()
         return true
     }
+
+    /** The phone's approval has landed: the check shows, then home (signIn). */
+    private var welcoming = false
 
     private fun showChecking(checking: Boolean) {
         if (checking == this.checking) return // the light keeps its breath
