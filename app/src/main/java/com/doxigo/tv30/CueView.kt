@@ -73,15 +73,35 @@ internal class CueView(context: Context) : TextView(context) {
     }
 }
 
-/**
- * What a subtitle shows at [positionUs] of the video once moved [offsetUs] later (earlier when
- * negative): every cue from its start up to, not including, its end, stacked as ExoPlayer stacks
- * overlapping ones (the earliest start on top, then the longest).
- */
+/** Sorted cue starts for seeks, and the next start or end for a playing subtitle. */
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
-internal fun cuesAt(timed: List<CuesWithTiming>, positionUs: Long, offsetUs: Long): List<Cue> {
-    val at = positionUs - offsetUs
-    return timed.filter { at >= it.startTimeUs && at < it.endTimeUs }
-        .sortedWith(compareBy({ it.startTimeUs }, { -it.durationUs }))
-        .flatMap { it.cues }
+internal class CueTimeline(groups: List<CuesWithTiming>) {
+    private val cues = groups.sortedWith(compareBy({ it.startTimeUs }, { -it.durationUs }))
+    private val starts = LongArray(cues.size) { cues[it].startTimeUs }
+    private val ends = LongArray(cues.size) { cues[it].endTimeUs }.apply { sort() }
+    private val latestEnd = LongArray(cues.size).apply {
+        for (i in indices) this[i] = maxOf(cues[i].endTimeUs, if (i == 0) Long.MIN_VALUE else this[i - 1])
+    }
+
+    fun at(time: Long): List<Cue> {
+        val end = after(starts, time)
+        val first = after(latestEnd, time)
+        return buildList {
+            for (i in first until end) if (cues[i].endTimeUs > time) addAll(cues[i].cues)
+        }
+    }
+
+    fun next(time: Long): Long? = listOfNotNull(
+        starts.getOrNull(after(starts, time)), ends.getOrNull(after(ends, time)),
+    ).minOrNull()
+
+    private fun after(times: LongArray, time: Long): Int {
+        var low = 0
+        var high = times.size
+        while (low < high) {
+            val mid = (low + high) ushr 1
+            if (times[mid] <= time) low = mid + 1 else high = mid
+        }
+        return low
+    }
 }

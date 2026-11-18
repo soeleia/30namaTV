@@ -8,13 +8,6 @@
          writes with it and grants no exception for watch_next_program, unlike channels; it is a
          normal permission, so declaring it is enough. -->
     <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" />
-    <!-- A service key sent from a phone (KeyForm.kt): the TV serves a one-page form on its home
-         network address while Settings' key sheet is open. From Android 17 an app targeting it
-         reaches that network, a phone's connection coming in included, only with this, asked of the
-         viewer before the sheet opens (SettingsActivity.askKey); refused, the sheet has the typed
-         key alone.
-         Unknown to Android before 17, where it changes nothing. -->
-    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
 
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />

@@ -121,7 +121,7 @@ object WatchNext {
             wanted[t.titleId.toString()] = next(context, t).fold(
                 onSuccess = { next ->
                     if (next == null) t.resume(context, engaged)
-                    else t.next(context, next.file, nextType(next.file, next.files, NewEpisodes.of(context, t, now) != null), engaged)
+                    else t.next(context, next, nextType(next.last, NewEpisodes.of(context, t, now) != null), engaged)
                 },
                 // Not known: where it was left, for a title without a row yet; one it has stands (see [fate]).
                 onFailure = { t.resume(context, engaged).let { Program(it.key, it.values, known = false) } },
@@ -136,17 +136,11 @@ object WatchNext {
         return wanted
     }
 
-    /**
-     * The launcher's type for a series' next [file] of its [files]: new for the last one out while
-     * the series has [news], the episode just aired; next otherwise, as is one caught up on from
-     * further back, whatever has come out since.
-     */
-    // ponytail: the last file stands for the aired episode; two out on the same day offer the first as next.
-    internal fun nextType(file: JSONObject, files: List<JSONObject>, news: Boolean) =
-        if (news && file === files.lastOrNull()) WatchNextPrograms.WATCH_NEXT_TYPE_NEW else WatchNextPrograms.WATCH_NEXT_TYPE_NEXT
+    internal fun nextType(last: Boolean, news: Boolean) =
+        if (news && last) WatchNextPrograms.WATCH_NEXT_TYPE_NEW else WatchNextPrograms.WATCH_NEXT_TYPE_NEXT
 
-    /** [next]'s file, and the series' [files] it is one of. */
-    private class Next(val file: JSONObject, val files: List<JSONObject>)
+    private class Next(val id: String?, val name: String?, val season: String?, val episode: Int, val last: Boolean)
+    private class Cached(val point: String, val at: Long, val answer: Result<Next?>)
 
     /**
      * A series' next file after a finished episode, by the `stream` answer and this TV's history, as
@@ -161,22 +155,28 @@ object WatchNext {
         // not seen through where this TV left it, it is still being watched.
         if (title.isMovie) return Result.success(null)
         if ((title.str("data", "progress")?.toDoubleOrNull() ?: 0.0) < FINISHING && !Watched.leftSeen(context, title.titleId)) return Result.success(null)
-        val point = "${title.titleId} ${title.watchingAt}"
-        nexts[point]?.takeIf { (at, answer) -> SystemClock.elapsedRealtime() - at < if (answer.isSuccess) HOUR else RETRY }?.let { return it.second }
+        val point = title.watchingAt
+        nexts[title.titleId]?.let { cached ->
+            if (cached.point == point && SystemClock.elapsedRealtime() - cached.at < (if (cached.answer.isSuccess) HOUR else RETRY)) return cached.answer
+        }
         return runCatching {
             val stream = Api.stream(title.titleId, title.isFree)
             // Signed out while it was asked: the history was just cleared, and the old account's point must not land in it.
             check(Api.loggedIn) { "signed out" }
             val files = stream.optJSONArray("hls").objects()
-            Watched.next(context, title.titleId, files, stream.optJSONObject("continue_watching"))?.let { Next(it, files) }
-        }.also { nexts[point] = SystemClock.elapsedRealtime() to it }
+            Watched.next(context, title.titleId, files, stream.optJSONObject("continue_watching"))?.let { file ->
+                Next(file.str("info", "file_id"), file.str("info", "episode_name"), file.str("info", "season"), file.episodeNumber, file === files.lastOrNull())
+            }
+        }.also { nexts[title.titleId] = Cached(point, SystemClock.elapsedRealtime(), it) }
     }
 
     private const val FINISHING = 80.0
     private const val HOUR = 3_600_000L
     private const val RETRY = 5 * 60_000L
     /** [next]'s answers by title and point: when asked, and the answer. Main thread only. */
-    private val nexts = HashMap<String, Pair<Long, Result<Next?>>>()
+    private val nexts = object : LinkedHashMap<Int, Cached>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, Cached>?) = size > 64
+    }
 
     /**
      * Where Continue Watching left it. data: {episode_title: "فصل 1 - قسمت 4", season: 1, episode: 4,
@@ -196,14 +196,14 @@ object WatchNext {
     }
 
     /** The episode after a finished one, of [type] ([nextType]): no bar, and straight into [file]. The same entry while it is that file. */
-    private fun JSONObject.next(context: Context, file: JSONObject, type: Int, engaged: Long) =
-        program("file ${file.str("info", "file_id")}", engaged, play(context).putExtra(EXTRA_FILE, file.str("info", "file_id"))) {
+    private fun JSONObject.next(context: Context, file: Next, type: Int, engaged: Long) =
+        program("file ${file.id}", engaged, play(context).putExtra(EXTRA_FILE, file.id)) {
             put(WatchNextPrograms.COLUMN_TYPE, WatchNextPrograms.TYPE_TV_EPISODE)
             put(WatchNextPrograms.COLUMN_WATCH_NEXT_TYPE, type)
             // A real name, else 30nama's own «فصل 1 - قسمت 5», as the continue row has it.
-            put(WatchNextPrograms.COLUMN_EPISODE_TITLE, file.str("info", "episode_name")?.unescaped()?.episodeLabel())
-            put(WatchNextPrograms.COLUMN_SEASON_DISPLAY_NUMBER, file.str("info", "season"))
-            put(WatchNextPrograms.COLUMN_EPISODE_DISPLAY_NUMBER, file.episodeNumber.takeIf { it > 0 }?.toString())
+            put(WatchNextPrograms.COLUMN_EPISODE_TITLE, file.name?.unescaped()?.episodeLabel())
+            put(WatchNextPrograms.COLUMN_SEASON_DISPLAY_NUMBER, file.season)
+            put(WatchNextPrograms.COLUMN_EPISODE_DISPLAY_NUMBER, file.episode.takeIf { it > 0 }?.toString())
             putNull(WatchNextPrograms.COLUMN_LAST_PLAYBACK_POSITION_MILLIS)
             putNull(WatchNextPrograms.COLUMN_DURATION_MILLIS)
         }

@@ -80,19 +80,7 @@ import java.util.Locale
 //   Activity.ask(title, value: String, link: String,
 //                onSave: (key: String, answer: (note: CharSequence?, works: Boolean?) -> Unit) -> Unit)
 //     ask(getString(s.name), Settings.savedKey(s.id), s.link) { key, answer -> save(s, key, answer) }
-//     An API key, the viewer's from [link], three ways in, on confirm's card. A QR code and its
-//     address open a page this TV serves its home network while the sheet is open (KeyForm): it
-//     links to [link] and sends the key back, saved as Save saves it; with no home network, the
-//     code is [link] itself. OK on the field, under the remote with [value] in it, asks for the
-//     TV's keyboard, which the Google TV app on a phone can type or paste into. Paste, beside it,
-//     takes the TV's clipboard. Save (or the keyboard's Done) hands onSave the text as it stands;
-//     Clear, there only when [value] is not empty, hands it "". The sheet stays, «در حال بررسی…»
-//     and a spinner under the field, until onSave calls answer once: with a null note (nothing
-//     to try) it closes; with works true it says the note and closes 1.2 s later; false (refused,
-//     the note red) or null (out of reach) say it and leave the remote on the field to fix or
-//     send again. Back and Esc close without either, the check going on behind. On Android 17 the
-//     phone's page needs the viewer's leave to use the home network (KeyForm.allowed): the caller
-//     asks for it first, as Settings does, and without it the sheet is as with no home network.
+//     The QR opens the provider's key page. Enter the key with the TV keyboard or paste it.
 //
 //   FragmentActivity.quickActions(title: JSONObject)
 //     (context as? FragmentActivity)?.quickActions(t) // toCard's default hold, Cards.kt
@@ -201,9 +189,6 @@ fun Activity.choose(title: CharSequence, options: List<CharSequence>, current: I
 
 fun Activity.ask(title: CharSequence, value: String, link: String, onSave: (key: String, answer: (note: CharSequence?, works: Boolean?) -> Unit) -> Unit) {
     val dp = resources.displayMetrics.density
-    // A key from the phone goes in as a typed one would and is saved by Save; set once Save is.
-    var send: (String) -> Unit = {}
-    val phone = KeyForm.open(this, title, link) { send(it) }
     // The form down the start side, as confirm's column but read from its start edge.
     val form = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
@@ -214,7 +199,7 @@ fun Activity.ask(title: CharSequence, value: String, link: String, onSave: (key:
         typeface = font(if (title.isLatin) R.font.inter_bold else R.font.peyda_bold)
         start()
     }, linear(MATCH, WRAP))
-    val question = getString(if (phone != null) R.string.sheet_key_phone else R.string.sheet_key_page)
+    val question = getString(R.string.sheet_key_page)
     form.addView(text(latin(this, question, R.font.inter_regular), R.style.TextAppearance_App_Body).apply {
         maxLines = 3
         start()
@@ -275,10 +260,6 @@ fun Activity.ask(title: CharSequence, value: String, link: String, onSave: (key:
     val clear = if (value.isEmpty()) null else button(getString(R.string.sheet_clear))
     clear?.let { form.addView(it, linear(MATCH, WRAP).apply { topMargin = px(8) }) }
 
-    // The phone's page (else the key's own) on the white plate the sign-in code wears, its address
-    // under it for a phone that can't scan: on one line at the caption's size, to be typed from
-    // the sofa, the column as wide as it needs ("192.168.100.123:45678/…" is 20 em).
-    val target = phone?.url ?: link
     val page = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER_HORIZONTAL
@@ -288,10 +269,10 @@ fun Activity.ask(title: CharSequence, value: String, link: String, onSave: (key:
         setBackgroundResource(R.drawable.qr_plate)
         val pad = px(12)
         setPadding(pad, pad, pad, pad)
-        setImageBitmap(qr(target, px(QR)))
+        setImageBitmap(qr(link, px(QR)))
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }, linear(px(QR + 24), px(QR + 24)))
-    page.addView(text(target.substringAfter("://").removePrefix("www."), R.style.TextAppearance_App_Caption).apply {
+    page.addView(text(link.substringAfter("://").removePrefix("www."), R.style.TextAppearance_App_Caption).apply {
         typeface = font(R.font.inter_medium)
         textDirection = View.TEXT_DIRECTION_LTR
         isSingleLine = true
@@ -307,8 +288,6 @@ fun Activity.ask(title: CharSequence, value: String, link: String, onSave: (key:
         val pad = px(CARD_PAD)
         setPadding(pad, pad, pad, pad)
         clipToPadding = false // a focused button lifts into it, past the form's edge
-        // Getting a key on the phone takes minutes; the screensaver would stop the page and the form with it.
-        keepScreenOn = phone != null
     }
     card.addView(form, linear(px(360), WRAP))
     card.addView(page, linear(WRAP, WRAP).apply { marginStart = px(32) })
@@ -321,7 +300,7 @@ fun Activity.ask(title: CharSequence, value: String, link: String, onSave: (key:
         if (ink == 0) note.setTextColor(quiet) else note.setTextColor(getColor(ink))
         busy.visibility = if (trying) View.VISIBLE else View.GONE
     }
-    // A key being tried, or one that worked and is on its way out: Save, Clear and a phone's key wait.
+    // Ignore another save while checking or closing.
     var waiting = false
     fun done(text: String) {
         if (waiting) return
@@ -346,12 +325,6 @@ fun Activity.ask(title: CharSequence, value: String, link: String, onSave: (key:
     }
     save.setOnClickListener { done(field.text.toString()) }
     clear?.setOnClickListener { done("") }
-    send = { key ->
-        if (!waiting) {
-            field.setText(key)
-            save.performClick()
-        }
-    }
     paste.setOnClickListener {
         val copied = getSystemService(ClipboardManager::class.java).primaryClip?.takeIf { it.itemCount > 0 }
             ?.getItemAt(0)?.coerceToText(this)?.toString()?.trim().orEmpty()
@@ -388,12 +361,10 @@ fun Activity.ask(title: CharSequence, value: String, link: String, onSave: (key:
         if (action == EditorInfo.IME_ACTION_DONE || event?.keyCode == KeyEvent.KEYCODE_ENTER) save.performClick()
         true
     }
-    // The phone's form lives only while the sheet does: it goes with it, and the sheet goes when the
-    // page stops (Home), the keyboard first, which forced would stay up over whatever comes next.
+    // Hide the forced keyboard when the viewer leaves the sheet.
     val life = (this as? LifecycleOwner)?.lifecycle
     val stop = LifecycleEventObserver { _, event ->
         if (event != Lifecycle.Event.ON_STOP) return@LifecycleEventObserver
-        phone?.close()
         keys.hideSoftInputFromWindow(field.windowToken, 0)
         sheet.close()
     }
@@ -401,7 +372,6 @@ fun Activity.ask(title: CharSequence, value: String, link: String, onSave: (key:
     card.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
         override fun onViewAttachedToWindow(view: View) = Unit
         override fun onViewDetachedFromWindow(view: View) {
-            phone?.close()
             life?.removeObserver(stop)
         }
     })

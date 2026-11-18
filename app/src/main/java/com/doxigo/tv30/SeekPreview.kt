@@ -113,6 +113,9 @@ class SeekPreview(private val root: ViewGroup, private val player: ExoPlayer, pr
     private var at: Long? = null
     private val opener = Runnable { open() }
     private val pump = Runnable { next() }
+    var decoderName: String? = null
+        private set
+
     /**
      * The film itself decodes in software, a device or emulator with no hardware decoder for it: a
      * preview's decoder would then take the film's CPU, so there are none (see [softwareOnly]).
@@ -134,8 +137,12 @@ class SeekPreview(private val root: ViewGroup, private val player: ExoPlayer, pr
         })
         player.addAnalyticsListener(object : AnalyticsListener {
             override fun onVideoDecoderInitialized(eventTime: AnalyticsListener.EventTime, decoderName: String, initializedTimestampMs: Long, initializationDurationMs: Long) {
+                this@SeekPreview.decoderName = decoderName
                 filmInSoftware = softwareOnly(decoderName)
                 if (filmInSoftware) close()
+            }
+            override fun onVideoDecoderReleased(eventTime: AnalyticsListener.EventTime, decoderName: String) {
+                if (this@SeekPreview.decoderName == decoderName) this@SeekPreview.decoderName = null
             }
         })
     }

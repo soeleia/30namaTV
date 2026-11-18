@@ -81,7 +81,7 @@
     <string name="subtitle_translate_region">سرویس %s از این منطقه در دسترس نیست. با VPN دوباره امتحان کنید.</string>
     <string name="subtitle_translate_blocked">سرویس %s ترجمهٔ این زیرنویس را نپذیرفت. با کلید سرویس دیگری امتحان کنید.</string>
     <string name="subtitle_translate_down">سرویس %s فعلاً پاسخ نمی‌دهد. کمی بعد دوباره امتحان کنید.</string>
-    <string name="subtitle_translate_network">ارتباط با %s برقرار نشد. اتصال اینترنت را بررسی کنید.</string>
+    <string name="subtitle_translate_network">ارتباط با %s برقرار نشد. پس از اتصال، دوباره تلاش کنید. بخش‌های ترجمه‌شده ذخیره شده‌اند.</string>
 
     <!-- Subtitle timing: the Subtitles column's entry, under it what it is set to, and the page it
          opens, whose rows move the shown subtitle a quarter second a press. %s is the seconds,
@@ -107,4 +107,8 @@
         <item quantity="other">%d دقیقه</item>
     </plurals>
     <string name="sleep_paused">پخش با تایمر خواب متوقف شد.</string>
+    <string name="playback_diagnostics">اطلاعات فنی پخش</string>
+    <string name="player_unknown">نامشخص</string>
+    <string name="player_bitrate_mbps">%1$.2f مگابیت‌برثانیه</string>
+    <string name="playback_diagnostic_values">وضوح تصویر: %1$s\nنرخ بیت ویدیو: %2$s\nزمان بافرشده: %3$d ثانیه\nرمزگشای ویدیو: %4$s\nفریم‌های ازدست‌رفته: %5$s</string>
 </resources>

@@ -2,7 +2,9 @@ package com.doxigo.tv30
 
 import android.app.Activity
 import android.app.Instrumentation
+import android.content.ContentResolver
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Bundle
@@ -141,6 +143,7 @@ class PerformanceChecks : Instrumentation() {
         var activity: MainActivity? = null
         val client = OkHttpClient.Builder().addInterceptor { chain ->
             val action = chain.request().url.pathSegments.last()
+            if (action == "test") check(chain.request().header("c-token") == null) { "Discovery sent a session token" }
             val body = when (action) {
                 "test" -> "{}"
                 "home_stream" -> """{"movies":{"posts":[{"id":1,"title":{"english":"Performance test"},"options":{"title_type":"movie"}}]}}"""
@@ -190,6 +193,18 @@ class PerformanceChecks : Instrumentation() {
                 val home = activity.supportFragmentManager.findFragmentById(R.id.browse_host) as HomeFragment
                 val ids = (0 until home.adapter.size()).map { (home.adapter[it] as ListRow).id }
                 check(ids == ids.sorted()) { "Late rows changed the catalogue order" }
+                if (signedIn) {
+                    val isolated = object : ContextWrapper(targetContext) {
+                        override fun getApplicationContext(): Context = this
+                        override fun getFilesDir() = baseContext.cacheDir.resolve("session-test")
+                        override fun getSharedPreferences(name: String, mode: Int) = baseContext.getSharedPreferences("session-test-$name", mode)
+                        override fun getContentResolver(): ContentResolver = throw UnsupportedOperationException("No launcher provider in this fixture")
+                    }
+                    Recents.add(isolated, "previous account")
+                    forgetSession(isolated)
+                    Api.token = "another-test-account"
+                    check(Recents.read(isolated).isEmpty()) { "The next account inherited a search" }
+                }
             }
         } finally {
             releaseMenu.countDown()

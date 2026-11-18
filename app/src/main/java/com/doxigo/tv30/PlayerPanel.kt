@@ -109,6 +109,12 @@ class PlayerPanel(private val root: ViewGroup, under: View, private val onClosed
         scroll?.let { it.post { it.scrollTo(0, y) } }
     }
 
+    fun updateNote(value: String) {
+        val text = side.findViewWithTag<TextView>("panelNote") ?: return
+        (text.parent as View).accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE
+        if (text.text != value) text.text = value
+    }
+
     /** Back: a page at a time, then the panel. */
     fun back() {
         if (showing === side && stack.size > 1) {
@@ -371,7 +377,8 @@ class PlayerPanel(private val root: ViewGroup, under: View, private val onClosed
             indeterminateTintList = ContextCompat.getColorStateList(context, R.color.brand)
         }, linear(px(18), px(18)))
         addView(text(value, R.style.TextAppearance_App_Body).apply {
-            maxLines = 4
+            tag = "panelNote"
+            maxLines = Int.MAX_VALUE
             setPaddingRelative(px(if (busy) 10 else 28), 0, 0, 0)
         }, linear(0, WRAP, 1f))
     }

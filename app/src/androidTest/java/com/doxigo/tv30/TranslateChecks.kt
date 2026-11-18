@@ -17,12 +17,14 @@ import okio.Buffer
 import org.json.JSONObject
 import java.io.File
 import java.util.Locale
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Make Persian subtitles with no network: the stream and its English subtitle from a fixture, and
  * the provider the player picks (a fixture Gemini key, or the developer's own built in ahead of it)
- * answered cue for cue by a fake in that provider's shape, one part a second so the page counts up;
- * nothing reaches a provider. Then a refused key, which must say so on the page and offer a retry.
+ * answered by a fake in that provider's shape. Fail after the first part, then reopen and resume.
  */
 object TranslateChecks {
     private const val CUES = 250
@@ -40,13 +42,15 @@ object TranslateChecks {
         val prefs = targetContext.getSharedPreferences("player", android.content.Context.MODE_PRIVATE)
         val originalSubtitle = prefs.getString("subtitle", null)
         val clientField = Api::class.java.getDeclaredField("http").apply { isAccessible = true }
-        val english = (1..CUES).joinToString("") { "$it\n${time(it * 2_000L)} --> ${time(it * 2_000L + 1_500)}\nLine $it.\n\n" }
+        val fixture = SystemClock.elapsedRealtime()
+        val english = (1..CUES).joinToString("") { "$it\n${time(it * 2_000L)} --> ${time(it * 2_000L + 1_500)}\nLine $it (fixture $fixture).\n\n" }
         val stream = """{"success":true,"result":{"info":{"title":{"english":"Night Shift 2024"}},"hls":[{"info":{"file_id":"translate"},"file":{"subtitle":{"en":"https://fixture.test/en.srt"}}}]}}"""
         val api = OkHttpClient.Builder().addInterceptor { chain ->
             val body = if (chain.request().url.pathSegments.last() == "stream") stream else english
             Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200).message("OK").body(body.toResponseBody()).build()
         }.build()
-        var refuse = false
+        var failRemaining = CountDownLatch(1)
+        val firstBatchCalls = AtomicInteger()
         val models = OkHttpClient.Builder().addInterceptor { chain ->
             val request = chain.request()
             val sent = JSONObject(Buffer().also { request.body!!.writeTo(it) }.readUtf8())
@@ -56,9 +60,15 @@ object TranslateChecks {
                 else -> sent.getString("input")
             }
             val ids = Regex("(?m)^#(\\d+)$").findAll(prompt.substringAfter("Translate:").substringBefore("\nAfter:")).map { it.groupValues[1].toInt() }.toList()
-            SystemClock.sleep(1_000L + ids.first() * 10L) // part by part: 40%, 80%, 100%
+            val refused = if (ids.first() == 1) {
+                firstBatchCalls.incrementAndGet()
+                false
+            } else if (failRemaining.count != 0L) {
+                check(failRemaining.await(20, TimeUnit.SECONDS))
+                true
+            } else false
             val text = JSONObject().put("text", ids.joinToString("\n") { "#$it\nسطر $it?" })
-            val (code, body) = if (refuse) 401 to """{"error":{"message":"invalid key"}}""" else 200 to when (request.url.host) {
+            val (code, body) = if (refused) 401 to """{"error":{"message":"invalid key"}}""" else 200 to when (request.url.host) {
                 "generativelanguage.googleapis.com" -> JSONObject().put("candidates", org.json.JSONArray().put(JSONObject().put("content", JSONObject().put("parts", org.json.JSONArray().put(text)))))
                 "api.anthropic.com" -> JSONObject().put("stop_reason", "end_turn").put("content", org.json.JSONArray().put(text.put("type", "text")))
                 else -> JSONObject().put("output", org.json.JSONArray().put(JSONObject().put("type", "message").put("content", org.json.JSONArray().put(text.put("type", "output_text")))))
@@ -69,8 +79,10 @@ object TranslateChecks {
         lateinit var provider: Translator.Provider
         fun forget() = made.listFiles().orEmpty().filter { it.name.startsWith("${provider.id}-") }.forEach(File::delete)
         try {
+            setInTouchMode(false)
             for (language in listOf("fa", "en")) {
-                refuse = false
+                failRemaining = CountDownLatch(1)
+                firstBatchCalls.set(0)
                 runOnMainSync {
                     clientField.set(Api, api)
                     Translator.client = models
@@ -94,6 +106,18 @@ object TranslateChecks {
                 await("The page did not count up") { text(fragment)?.contains(forty) == true && row(fragment, watch)?.hasFocus() == true }
                 settle()
                 capture("translate-progress-$language")
+                failRemaining.countDown()
+                val rejected = fragment.getString(R.string.subtitle_translate_key, provider.id)
+                await("A refused key did not say so") { text(fragment)?.contains(rejected) == true && row(fragment, fragment.getString(R.string.subtitle_translate_again)) != null }
+                settle()
+                capture("translate-refused-$language")
+                runOnMainSync { activity?.finish() }
+                await("Player did not close") { activity?.isDestroyed != false }
+
+                fragment = open(language)
+                runOnMainSync { invoke(fragment, "openPanel", field(fragment, "subtitlesPage")) }
+                await("Make Persian subtitles was not offered after restart") { row(fragment, label) != null }
+                runOnMainSync { checkNotNull(row(fragment, label)).performClick() }
                 val found = fragment.getString(R.string.subtitle_found, Locale.forLanguageTag("fa").getDisplayLanguage(Locale.getDefault()), provider.id)
                 await("The Persian was not added and checked") { row(fragment, found)?.isSelected == true && row(fragment, label) == null }
                 settle()
@@ -106,24 +130,19 @@ object TranslateChecks {
                 }
                 await("Player did not close") { activity?.isDestroyed != false }
 
-                forget()
-                refuse = true
-                fragment = open(language)
-                runOnMainSync { invoke(fragment, "openPanel", field(fragment, "subtitlesPage")) }
-                await("Make Persian subtitles was not offered again") { row(fragment, label) != null }
-                runOnMainSync { checkNotNull(row(fragment, label)).performClick() }
-                val rejected = fragment.getString(R.string.subtitle_translate_key, provider.id)
-                await("A refused key did not say so") { text(fragment)?.contains(rejected) == true && row(fragment, fragment.getString(R.string.subtitle_translate_again)) != null }
-                settle()
-                capture("translate-refused-$language")
-                runOnMainSync { activity?.finish() }
-                await("Player did not close") { activity?.isDestroyed != false }
+                check(firstBatchCalls.get() == 1) { "The completed batch was sent again after reopening playback" }
             }
-            result.putString("stream", "PASS: offered with a key and English, counted up part by part, added checked as SubRip, refused key said so with a retry\n")
+            result.putString("stream", "PASS: progress and refused-key feedback, completed batch reused after reopening playback, Persian SubRip selected\n")
         } catch (error: Throwable) {
-            result.putString("stream", error.stackTraceToString())
+            var page = ""
+            runOnMainSync {
+                val fragment = activity?.supportFragmentManager?.findFragmentById(android.R.id.content) as? PlayerFragment
+                if (fragment != null) page = "Panel: ${text(fragment)}; focus: ${fragment.view?.findFocus()?.contentDescription}"
+            }
+            result.putString("stream", "$page\n${error.stackTraceToString()}")
             resultCode = Activity.RESULT_CANCELED
         } finally {
+            failRemaining.countDown()
             runOnMainSync { activity?.finish() }
             await("Player did not close") { activity?.isDestroyed != false }
             runCatching { forget() }

@@ -3,15 +3,60 @@ package com.doxigo.tv30
 import androidx.media3.common.text.Cue
 import androidx.media3.extractor.text.CuesWithTiming
 import kotlinx.coroutines.runBlocking
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
+import org.junit.Rule
+import org.junit.rules.TemporaryFolder
 import org.junit.Test
 import java.io.File
 
 class TranslatorTest {
     private val about = Translator.About("Night Shift", "شیفت شب", 2024, "season 1, episode 3", "A mother finds out her son owes money to a gangster.")
+
+    @get:Rule val temp = TemporaryFolder()
+
+    @Test
+    fun reusesExistingTranslationAfterUpgrade() = runBlocking {
+        val model = Translator.MODELS.first()
+        val lines = listOf(Translator.Line(0, 1000, "hello"))
+        val cache = temp.newFolder()
+        val input = model.id + Translator.srt(lines, listOf("hello"))
+        val legacy = File(cache, "${model.provider.id}-${input.hashCode().toUInt()}.srt")
+        legacy.writeText(Translator.srt(lines, listOf("سلام")))
+        assertEquals(legacy, Translator.subtitle(cache, temp.newFolder(), model, lines, about, "fixture") {
+            error("Cached translation sent to the provider")
+        })
+    }
+
+    @Test
+    fun incompleteReplyNeverBecomesASavedTranslation() {
+        val model = Translator.MODELS.first { it.provider === Translator.CLAUDE }
+        val lines = listOf(Translator.Line(0, 1000, "hello"), Translator.Line(1000, 2000, "goodbye"))
+        val cache = temp.newFolder()
+        val work = temp.newFolder()
+        val original = Translator.client
+        var calls = 0
+        Translator.client = OkHttpClient.Builder().addInterceptor { chain ->
+            calls++
+            Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200).message("OK")
+                .body("""{"content":[{"type":"text","text":"#1\nسلام"}]}""".toResponseBody()).build()
+        }.build()
+        try {
+            org.junit.Assert.assertThrows(Translator.Refused::class.java) {
+                runBlocking { Translator.subtitle(cache, work, model, lines, about, "fixture") }
+            }
+            assertEquals(2, calls)
+            assertFalse((cache.walk() + work.walk()).any { it.isFile })
+        } finally {
+            Translator.client = original
+        }
+    }
 
     @Test
     fun reply() {

@@ -10,7 +10,7 @@ class SubtitleTimingTest {
         CuesWithTiming(listOf(Cue.Builder().setText(text).build()), fromMs * 1000, (toMs - fromMs) * 1000)
 
     private fun shown(timed: List<CuesWithTiming>, atMs: Long, offsetMs: Long = 0) =
-        cuesAt(timed, atMs * 1000, offsetMs * 1000).map { it.text.toString() }
+        CueTimeline(timed).at((atMs - offsetMs) * 1000).map { it.text.toString() }
 
     @Test
     fun boundaries() {
@@ -20,6 +20,15 @@ class SubtitleTimingTest {
         assertEquals(listOf("a"), shown(timed, 1_999))
         assertEquals(listOf("b"), shown(timed, 2_000)) // gone at its end, where the next starts
         assertEquals(emptyList<String>(), shown(timed, 3_000))
+    }
+
+    @Test
+    fun nextChangeIncludesOverlappingEndsAndGaps() {
+        val timeline = CueTimeline(listOf(cue("a", 1, 8), cue("b", 2, 3), cue("c", 10, 12)))
+        assertEquals(3_000L, timeline.next(2_000))
+        assertEquals(8_000L, timeline.next(3_000))
+        assertEquals(10_000L, timeline.next(8_000))
+        assertEquals(null, timeline.next(12_000))
     }
 
     @Test

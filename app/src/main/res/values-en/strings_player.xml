@@ -57,7 +57,7 @@
     <string name="subtitle_translate_region">%s isn\'t available in this region. Try again over a VPN.</string>
     <string name="subtitle_translate_blocked">%s declined to translate this subtitle. Try another service\'s key.</string>
     <string name="subtitle_translate_down">%s isn\'t answering right now. Try again in a moment.</string>
-    <string name="subtitle_translate_network">Couldn\'t reach %s. Check the internet connection.</string>
+    <string name="subtitle_translate_network">Couldn\'t reach %s. Reconnect and try again. Completed batches are saved.</string>
 
     <string name="subtitle_timing">Subtitle timing</string>
     <string name="subtitle_timing_none">No shift</string>
@@ -78,4 +78,8 @@
         <item quantity="other">%d minutes</item>
     </plurals>
     <string name="sleep_paused">The sleep timer paused playback.</string>
+    <string name="playback_diagnostics">Playback diagnostics</string>
+    <string name="player_unknown">Unknown</string>
+    <string name="player_bitrate_mbps">%1$.2f Mbps</string>
+    <string name="playback_diagnostic_values">Resolution: %1$s\nVideo bitrate: %2$s\nBuffered: %3$d s\nDecoder: %4$s\nDropped frames: %5$s</string>
 </resources>

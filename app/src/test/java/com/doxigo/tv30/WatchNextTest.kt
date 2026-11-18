@@ -5,7 +5,6 @@ import android.media.tv.TvContract.WatchNextPrograms.WATCH_NEXT_TYPE_NEW
 import android.media.tv.TvContract.WatchNextPrograms.WATCH_NEXT_TYPE_NEXT
 import com.doxigo.tv30.WatchNext.Fate
 import com.doxigo.tv30.WatchNext.Row
-import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -42,10 +41,9 @@ class WatchNextTest {
 
     @Test
     fun newOnlyForTheEpisodeJustOut() {
-        val files = listOf("s1e3", "s1e4", "s2e8", "s2e9").map { JSONObject().put("info", JSONObject().put("file_id", it)) }
-        assertEquals(WATCH_NEXT_TYPE_NEW, WatchNext.nextType(files[3], files, news = true))
+        assertEquals(WATCH_NEXT_TYPE_NEW, WatchNext.nextType(last = true, news = true))
         // Catching up on season 1 while S2E9 aired: S1E4 is next, not new.
-        assertEquals(WATCH_NEXT_TYPE_NEXT, WatchNext.nextType(files[1], files, news = true))
-        assertEquals(WATCH_NEXT_TYPE_NEXT, WatchNext.nextType(files[3], files, news = false))
+        assertEquals(WATCH_NEXT_TYPE_NEXT, WatchNext.nextType(last = false, news = true))
+        assertEquals(WATCH_NEXT_TYPE_NEXT, WatchNext.nextType(last = true, news = false))
     }
 }

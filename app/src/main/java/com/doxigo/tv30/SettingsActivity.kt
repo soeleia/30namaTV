@@ -719,28 +719,8 @@ class SettingsActivity : TvActivity() {
     private fun keyRow(s: Service) =
         Option(s.name, text(s.help), value = { keyValue(s) }, note = { keyNote(s) }, sub = s.unlocks, warn = { outcome(s) == Check.REJECTED }) { askKey(s) }
 
-    /** The key sheet, held while Android asks the viewer about the home network (see [askKey]). */
-    private var afterNetwork: (() -> Unit)? = null
-
-    /**
-     * The key's sheet. Android 17 keeps the home network from an app until the viewer allows it:
-     * unasked, the sheet showed the phone's code and the phone's page never loaded. Android's own
-     * dialog asks first, the one surface here that is not the app's; whatever the answer (at once,
-     * with no dialog, once it has been no twice), the sheet then opens, with the typed key alone if
-     * it was no (KeyForm.open).
-     */
-    private fun askKey(s: Service) {
-        val open = { ask(getString(s.name), Settings.savedKey(s.id), s.link) { key, answer -> save(s, key, answer) } }
-        if (KeyForm.allowed(this)) return open()
-        afterNetwork = open
-        requestPermissions(arrayOf(KeyForm.NETWORK), 0)
-    }
-
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        afterNetwork?.invoke()
-        afterNetwork = null
-    }
+    private fun askKey(s: Service) =
+        ask(getString(s.name), Settings.savedKey(s.id), s.link) { key, answer -> save(s, key, answer) }
 
     private fun outcome(s: Service) = checks[s.id]?.takeIf { it.first == Settings.savedKey(s.id) }?.second
 

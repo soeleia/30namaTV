@@ -3,11 +3,14 @@ package com.doxigo.tv30
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.extractor.text.CuesWithTiming
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -17,7 +20,9 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.io.IOException
+import java.security.MessageDigest
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -119,7 +124,7 @@ object Translator {
     private class Busy(val after: Long?, val why: Why) : IOException("busy")
 
     /** Long: a part takes the model up to a minute or two to write. TranslateChecks answers in the providers' place. */
-    internal var client = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).readTimeout(150, TimeUnit.SECONDS).callTimeout(200, TimeUnit.SECONDS).build()
+    internal var client = OkHttpClient.Builder().followRedirects(false).connectTimeout(10, TimeUnit.SECONDS).readTimeout(150, TimeUnit.SECONDS).callTimeout(200, TimeUnit.SECONDS).build()
     private val JSON_TYPE = "application/json".toMediaType()
 
     /**
@@ -142,13 +147,61 @@ object Translator {
         return out
     }
 
-    /** [lines] in Persian, in order; [progress] hears the share done (0 to 1) as each part lands. */
-    suspend fun translate(model: Model, lines: List<Line>, about: About, key: String = model.provider.key, progress: (Float) -> Unit = {}): List<String> = coroutineScope {
+    private val saving = Mutex()
+
+    suspend fun subtitle(cache: File, work: File, model: Model, lines: List<Line>, about: About,
+                         key: String = model.provider.key, progress: (Float) -> Unit = {}): File = saving.withLock {
+        val (output, batches) = withContext(Dispatchers.IO) {
+            val input = model.id + srt(lines, lines.map { it.text })
+            val legacy = File(cache, "${model.provider.id}-${input.hashCode().toUInt()}.srt")
+            val digest = MessageDigest.getInstance("SHA-256").digest(input.toByteArray()).joinToString("") { "%02x".format(it) }
+            val name = "${model.provider.id}-$digest"
+            (legacy.takeIf { it.isFile && it.length() > 0 } ?: File(cache, "$name.srt")) to File(work, "v1-$name")
+        }
+        if (withContext(Dispatchers.IO) { output.isFile && output.length() > 0 }) {
+            withContext(Dispatchers.IO) { batches.deleteRecursively() }
+            return@withLock output
+        }
+        val translated = translate(model, lines, about, key, batches, progress)
+        withContext(Dispatchers.IO) {
+            writeWhole(output, srt(lines, translated))
+            batches.deleteRecursively()
+        }
+        output
+    }
+
+    private fun writeWhole(file: File, text: String) {
+        val dir = file.parentFile!!
+        if (!dir.isDirectory && !dir.mkdirs() && !dir.isDirectory) throw IOException("Cannot create subtitle directory")
+        val temp = File(dir, "${file.name}.part")
+        temp.writeText(text)
+        if (!temp.renameTo(file)) throw IOException("Cannot save subtitle")
+    }
+
+    private fun saved(file: File, count: Int): List<String>? {
+        if (!file.isFile) return null
+        return try {
+            val values = JSONArray(file.readText())
+            if (values.length() != count) return null
+            List(count) { (values.opt(it) as? String)?.takeIf(String::isNotBlank) ?: return null }
+        } catch (_: org.json.JSONException) {
+            null
+        }
+    }
+
+    suspend fun translate(model: Model, lines: List<Line>, about: About, key: String = model.provider.key,
+                          batches: File? = null, progress: (Float) -> Unit = {}): List<String> = coroutineScope {
         val gate = Semaphore(PARALLEL)
         val done = AtomicInteger()
-        lines.indices.chunked(PART).map { part ->
+        lines.indices.chunked(PART).map { indices ->
             async {
-                gate.withPermit { part(model, key, lines, part, about) }.also { progress(done.addAndGet(part.size).toFloat() / lines.size) }
+                gate.withPermit {
+                    val file = batches?.let { File(it, "${indices.first()}.json") }
+                    val previous = file?.let { withContext(Dispatchers.IO) { saved(it, indices.size) } }
+                    previous ?: part(model, key, lines, indices, about).also { texts ->
+                        if (file != null) withContext(NonCancellable + Dispatchers.IO) { writeWhole(file, JSONArray(texts).toString()) }
+                    }
+                }.also { progress(done.addAndGet(indices.size).toFloat() / lines.size) }
             }
         }.awaitAll().flatten()
     }
@@ -159,10 +212,9 @@ object Translator {
             val wanted = part.filter { it !in got }
             if (wanted.isNotEmpty()) got += parse(ask(model, key, prompt(lines, wanted, about)), wanted.mapTo(HashSet()) { it + 1 }).mapKeys { it.key - 1 }
         }
-        // Not one cue in two answers (cut off at its token limit, only thoughts): the model failed,
-        // and the part must not be kept in English as the film's finished translation.
-        if (got.isEmpty()) throw Refused(model.provider.id, Why.DOWN)
-        return part.map { got[it]?.let(::polish) ?: lines[it].text }
+        // A truncated response must not checkpoint an unfinished batch as paid and complete.
+        if (got.size != part.size) throw Refused(model.provider.id, Why.DOWN)
+        return part.map { polish(got.getValue(it)) }
     }
 
     /** The cues [wanted] (indexes into [lines]) as "#n" blocks, between the lines around them and after what plays. */

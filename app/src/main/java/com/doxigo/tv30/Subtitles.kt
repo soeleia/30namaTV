@@ -604,6 +604,8 @@ object Subtitles {
             }
         }
 
+    internal fun readLimited(input: InputStream) = input.readAtMost(LIMIT)
+
     private fun InputStream.readAtMost(limit: Int): ByteArray {
         val out = ByteArrayOutputStream()
         val buffer = ByteArray(8192)

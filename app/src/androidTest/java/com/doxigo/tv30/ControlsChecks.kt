@@ -9,8 +9,11 @@ import android.util.TypedValue
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.TextView
 import androidx.leanback.media.PlaybackTransportControlGlue
 import androidx.leanback.widget.Action
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.SilenceMediaSource
 import okhttp3.OkHttpClient
@@ -58,7 +61,8 @@ object ControlsChecks {
                 check(host.theme.resolveAttribute(androidx.leanback.R.attr.playbackControlsAutoHideTickleTimeout, timeout, true))
                 check(timeout.data == 5_000) { "Remote interaction disables auto-hide: ${timeout.data}" }
                 player.volume = 0f
-                player.setMediaSource(SilenceMediaSource.Factory().setDurationUs(300_000_000).createMediaSource())
+                player.setMediaItem(MediaItem.fromUri("android.resource://${host.packageName}/${R.raw.nama_motion}"))
+                player.repeatMode = Player.REPEAT_MODE_ONE
                 player.prepare()
                 player.play()
             }
@@ -83,11 +87,25 @@ object ControlsChecks {
                 glue.onActionClicked(field(glue, "hq") as Action)
                 check((field(fragment, "panel") as PlayerPanel).isOpen)
                 check(!fragment.isControlsOverlayVisible)
+                val matches = ArrayList<View>()
+                checkNotNull(fragment.view).findViewsWithText(matches, host.getString(R.string.playback_diagnostics), View.FIND_VIEWS_WITH_CONTENT_DESCRIPTION)
+                matches.single().performClick()
             }
+            await("Playback diagnostics did not display all five values") {
+                val note = fragment.view?.findViewWithTag<TextView>("panelNote")
+                val decoder = (field(fragment, "preview") as SeekPreview).decoderName
+                note != null && note.isShown && note.lineCount >= 5 && note.text.lines().size == 5 &&
+                    "1920 × 1080".localDigits() in note.text && decoder != null && decoder in note.text
+            }
+            press(KeyEvent.KEYCODE_BACK)
+            runOnMainSync { check((field(fragment, "panel") as PlayerPanel).isOpen) }
             press(KeyEvent.KEYCODE_BACK)
             runOnMainSync {
                 check(!(field(fragment, "panel") as PlayerPanel).isOpen)
                 check(fragment.isControlsOverlayVisible) { "Panel did not restore controls" }
+                player.repeatMode = Player.REPEAT_MODE_OFF
+                player.setMediaSource(SilenceMediaSource.Factory().setDurationUs(300_000_000).createMediaSource())
+                player.prepare()
             }
             await("Closing a panel lost the auto-hide timer") { !fragment.isControlsOverlayVisible }
 

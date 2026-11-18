@@ -9,9 +9,16 @@ import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.json.JSONObject
 import org.junit.Test
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import com.sun.net.httpserver.HttpServer
+import java.net.InetSocketAddress
+import java.util.concurrent.atomic.AtomicInteger
 import java.io.IOException
 import java.net.SocketTimeoutException
 import kotlin.coroutines.EmptyCoroutineContext
@@ -122,6 +129,53 @@ class ApiTest {
         assertFalse(once("user_list", "action" to "list", "group" to "favorite"))
         assertFalse(once("home_stream"))
         assertFalse(once("search", "query" to "x"))
+    }
+
+    @Test
+    fun sessionDestinations() {
+        val world = "https://world.hana-api.com/api/v2"
+        val regional = "https://ir.kazem-api.com/api/v2"
+        assertEquals(regional, Api.trustedEndpoint(regional))
+        for (value in listOf(null, "https://example.org/api/v2", regional.replace("https:", "http:"), "$regional/other")) {
+            assertEquals(world, Api.trustedEndpoint(value))
+        }
+        assertTrue(Api.sameOrigin(world.toHttpUrl(), "$world/action/test".toHttpUrl()))
+        assertFalse(Api.sameOrigin(world.toHttpUrl(), regional.toHttpUrl()))
+        assertFalse(Api.sameOrigin(world.toHttpUrl(), world.replace(".com/", ".com:8443/").toHttpUrl()))
+    }
+
+    @Test
+    fun transportSendsOneListToggleEvenWhenAFollowUpIsRequested() {
+        val received = AtomicInteger()
+        val lost = AtomicInteger()
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/lost") { exchange ->
+            exchange.requestBody.use { it.readBytes() }
+            lost.incrementAndGet()
+            exchange.close()
+        }
+        server.createContext("/") { exchange ->
+            exchange.requestBody.use { it.readBytes() }
+            if (received.incrementAndGet() == 1) {
+                exchange.responseHeaders.add("Retry-After", "0")
+                exchange.sendResponseHeaders(503, -1)
+            } else exchange.sendResponseHeaders(200, -1)
+            exchange.close()
+        }
+        server.start()
+        val client = OkHttpClient()
+        try {
+            val body = Api.actionBody("user_list", arrayOf("action" to "add"))
+            val request = Request.Builder().url("http://127.0.0.1:${server.address.port}/").post(body).build()
+            client.newCall(request).execute().use { assertEquals(503, it.code) }
+            assertEquals(1, received.get())
+            val noReply = request.newBuilder().url(request.url.resolve("/lost")!!).build()
+            assertThrows(IOException::class.java) { client.newCall(noReply).execute().close() }
+            assertEquals(1, lost.get())
+        } finally {
+            client.connectionPool.evictAll()
+            server.stop(0)
+        }
     }
 
     @Test

@@ -21,12 +21,15 @@ import kotlinx.coroutines.withTimeout
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.FormBody
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody
 import okhttp3.Response
-import org.json.JSONArray
+import okio.BufferedSink
 import org.json.JSONObject
 import java.io.IOException
+import java.net.ProtocolException
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.CoroutineContext
@@ -35,18 +38,19 @@ import kotlin.coroutines.resumeWithException
 /**
  * The protocol the official 30tv app speaks (its bundled "SDK"): every call is
  * `POST {host}/action/{name}` with a form body and a handful of `c-*` headers, answered with
- * `{success, result}`. Hosts are not fixed: a JSON list on two CDNs names them and the app races
- * a `test` call against each, keeping whichever answers first.
+ * `{success, result}`. The app races anonymous
+ * probes against the two trusted regional API endpoints.
  */
 object Api {
     // The official app ships one key per platform; this is the one it sends as ANDROIDTV.
     private const val API_KEY = "VdapnkLG9EHsSmF8yeKcb4253RAuN6YX"
     private const val SDK_VERSION = "1.0.0"
-    private val HOST_LISTS = listOf(
-        "https://pub-ac69cf865ce145f8b4c1ed87dc2a9fb7.r2.dev/sdk-endpoint.json",
-        "https://30update.s3.ir-thr-at1.arvanstorage.ir/sdk-endpoint.json",
-    )
-    private val FALLBACK_HOSTS = listOf("https://world.hana-api.com/api/v2", "https://ir.kazem-api.com/api/v2")
+    private val HOSTS = listOf("https://world.hana-api.com/api/v2", "https://ir.kazem-api.com/api/v2")
+
+    internal fun trustedEndpoint(saved: String?) = saved?.takeIf { it in HOSTS } ?: HOSTS.first()
+
+    internal fun sameOrigin(from: HttpUrl, to: HttpUrl) =
+        from.scheme == to.scheme && from.host == to.host && from.port == to.port
 
     lateinit var http: OkHttpClient
         private set
@@ -62,13 +66,26 @@ object Api {
         appContext = context.applicationContext
         prefs = appContext.getSharedPreferences("api", Context.MODE_PRIVATE)
         http = OkHttpClient.Builder()
+            .addNetworkInterceptor { chain ->
+                val request = chain.request()
+                val response = chain.proceed(request)
+                if (response.isRedirect && (request.header("c-api-key") != null || request.header("Api-Key") != null ||
+                        request.header("x-api-key") != null || request.header("x-goog-api-key") != null)) {
+                    val to = response.header("Location")?.let(request.url::resolve)
+                    if (to != null && (!sameOrigin(request.url, to) || request.body?.isOneShot() == true)) {
+                        response.close()
+                        throw ProtocolException("API redirect refused")
+                    }
+                }
+                response
+            }
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .build()
     }
 
     var endpoint: String
-        get() = prefs.getString("endpoint", null) ?: FALLBACK_HOSTS[0]
+        get() = trustedEndpoint(prefs.getString("endpoint", null))
         private set(v) = prefs.edit().putString("endpoint", v).apply()
 
     var token: String?
@@ -245,18 +262,29 @@ object Api {
         }
     }
 
-    private suspend fun postOnce(host: String, action: String, params: Array<out Pair<String, Any?>>): JSONObject {
-        val body = FormBody.Builder().apply {
+    internal fun actionBody(action: String, params: Array<out Pair<String, Any?>>): RequestBody {
+        val form = FormBody.Builder().apply {
             for ((k, v) in params) if (v != null) add(k, v.toString())
         }.build()
+        if (!sendsOnce(action, params)) return form
+        return object : RequestBody() {
+            override fun contentType() = form.contentType()
+            override fun contentLength() = form.contentLength()
+            override fun writeTo(sink: BufferedSink) = form.writeTo(sink)
+            override fun isOneShot() = true
+        }
+    }
+
+    private suspend fun postOnce(host: String, action: String, params: Array<out Pair<String, Any?>>): JSONObject {
+        require(host in HOSTS)
         val request = Request.Builder()
             .url("$host/action/$action")
-            .post(body)
+            .post(actionBody(action, params))
             .header("c-api-key", API_KEY)
             .header("c-version-number", SDK_VERSION)
             .header("c-language", language)
             .header("user-agent", userAgent)
-            .apply { token?.takeIf { it.isNotEmpty() }?.let { header("c-token", it) } }
+            .apply { if (action != "test") token?.takeIf { it.isNotEmpty() }?.let { header("c-token", it) } }
             .build()
         return http.newCall(request).await().use { response ->
             if (response.header("cf-mitigated") != null) throw Challenged(host)
@@ -274,7 +302,7 @@ object Api {
 
     /**
      * Endpoint discovery, as the official app does it at startup: keep the saved host if it
-     * answers `test`, otherwise race every host from the published lists and keep the winner.
+     * answers `test`, otherwise race the trusted regional hosts and keep the winner.
      */
     suspend fun initialize(): Boolean {
         if (ping(endpoint)) return true
@@ -285,8 +313,7 @@ object Api {
         if (endpoint != failedHost) return true // someone else already moved us
         if (System.currentTimeMillis() - lastDiscovery < 30_000) return false
         lastDiscovery = System.currentTimeMillis()
-        val hosts = firstOf(HOST_LISTS) { hostList(it) }.orEmpty().ifEmpty { FALLBACK_HOSTS }
-        val best = firstOf(hosts) { host -> host.takeIf { ping(it) } } ?: return false
+        val best = firstOf(HOSTS) { host -> host.takeIf { ping(it) } } ?: return false
         endpoint = best
         true
     }
@@ -296,13 +323,6 @@ object Api {
     private suspend fun ping(host: String) = runCatching {
         withTimeout(10_000) { postOnce(host, "test", emptyArray()).optBoolean("success") }
     }.getOrElse { it is Throttled }
-
-    private suspend fun hostList(url: String): List<String>? = runCatching {
-        val text = http.newCall(Request.Builder().url("$url?t=${System.currentTimeMillis()}").build()).await()
-            .use { withContext(Dispatchers.IO) { it.body!!.string() } }
-        val arr = JSONArray(text)
-        (0 until arr.length()).mapNotNull { arr.optJSONObject(it)?.optString("host")?.takeIf(String::isNotEmpty) }
-    }.getOrNull()?.takeIf { it.isNotEmpty() }
 
     /** Cancelling the coroutine cancels the request, so a lost race does not keep a socket open. */
     suspend fun Call.await(): Response = suspendCancellableCoroutine { cont ->

@@ -2,6 +2,7 @@
 """Run isolated native TV regressions and collect their screenshots."""
 import argparse
 import io
+import json
 import os
 from pathlib import Path, PurePosixPath
 import re
@@ -10,6 +11,7 @@ import sys
 import tarfile
 import tempfile
 import time
+import xml.etree.ElementTree as ET
 
 CHECKS = ("performance", "intro", "controls", "alignment", "subtitles", "translate", "skip", "title", "lists", "search", "genres", "trailer", "updates", "watched", "resume", "filters", "captions", "dismiss", "preview", "playback", "logos", "episodes", "seasons", "playernotice", "gridnote", "homenote", "searchnote")
 
@@ -48,10 +50,73 @@ def crashed(log):
     return re.search(r"AndroidRuntime: Process: com\.doxigo\.tv30, PID:", log) is not None
 
 
+def release_catalogue(adb):
+    """Open a real poster with the remote, using a saved fixture on userdebug emulators."""
+    def shell(*args, **kwargs):
+        return subprocess.run(adb + ["shell", *args], text=True, capture_output=True, check=True,
+                              timeout=25, **kwargs).stdout.strip()
+
+    def wait_for(label, read):
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline:
+            path = "/data/local/tmp/30nama-window.xml"
+            if "dumped to" in shell("uiautomator", "dump", path):
+                result = read(ET.fromstring(shell("cat", path)))
+                if result:
+                    return result
+            time.sleep(0.3)
+        raise ValueError(f"Release did not show {label}")
+
+    def poster(root):
+        focus = root.find(".//node[@focused='true']")
+        if focus is None:
+            return None
+        if focus.find(".//node[@resource-id='com.doxigo.tv30:id/main_image']") is not None:
+            return focus.get("content-desc")
+        if focus.get("resource-id", "").endswith("/promo_more"):
+            shell("input", "keyevent", "KEYCODE_DPAD_DOWN")
+        return None
+
+    disabled = []
+    try:
+        # Stock TV images use the public guest catalogue. Userdebug images can exercise a cold offline launch.
+        if shell("getprop", "ro.debuggable") == "1" and shell("which su || true"):
+            home = {"movies": {"posts": [{"id": 1, "title": {"english": "Release smoke title"}, "options": {"title_type": "movie"}}]}}
+            app_dir = "/data/user/0/com.doxigo.tv30"
+            uid = str(int(shell("su", "0", "stat", "-c", "%u", app_dir)))
+            folder = f"{app_dir}/files/home"
+            shell("su", uid, "mkdir", "-p", folder)
+            shell("-T", "su", uid, "sh", "-c", f"'cat > {folder}/home.json'", input="1 guest fa\n" + json.dumps(home))
+            shell("su", "0", "restorecon", "-RF", folder)
+            for radio, setting in [("wifi", "wifi_on"), ("data", "mobile_data")]:
+                if shell("settings", "get", "global", setting) != "0":
+                    shell("svc", radio, "disable")
+                    disabled.append(radio)
+
+        shell("am", "start", "-S", "-W", "-n", "com.doxigo.tv30/.MainActivity", "--ez", "guest", "true")
+        description = wait_for("a focused guest poster", poster)
+        shell("input", "keyevent", "KEYCODE_DPAD_CENTER")
+
+        def details(root):
+            title = root.find(".//node[@resource-id='com.doxigo.tv30:id/bb_title']")
+            name = title.get("text") if title is not None else None
+            if name and (description == name or description.startswith(name + "، ")):
+                if re.search(r"(?:mResumedActivity|topResumedActivity|ResumedActivity)[^\n]*com\.doxigo\.tv30/\.DetailsActivity",
+                             shell("dumpsys", "activity", "activities")):
+                    return name
+            return None
+
+        return wait_for("the selected title in Details", details)
+    finally:
+        for radio in disabled:
+            shell("svc", radio, "enable")
+
+
 def launch_release(adb, apk, output):
     """Starts the APK that ships. The suites run the debug build, so a class or member that only R8
     strips (a missing keep rule) crashed in the release alone, and passed every check on its way out."""
     report = []
+    problems = []
     try:
         # The release has another signer than the debug pair, and would not install over them.
         for package in ("com.doxigo.tv30.test", "com.doxigo.tv30"):
@@ -61,23 +126,25 @@ def launch_release(adb, apk, output):
         start = subprocess.run(adb + ["shell", "am", "start", "-W", "-n", "com.doxigo.tv30/.MainActivity"],
                                text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
         report.append(start.stdout)
-        # Past home's first requests and the update check it makes five seconds in.
-        time.sleep(10)
+        title = release_catalogue(adb)
+        report.append(f"Guest poster opened in Details: {title}")
         pid = subprocess.run(adb + ["shell", "pidof", "com.doxigo.tv30"], text=True, stdout=subprocess.PIPE, timeout=15).stdout.strip()
-        log = subprocess.run(adb + ["logcat", "-d", "-v", "threadtime"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                             timeout=30).stdout.decode(errors="replace")
-        (output / "release-logcat.txt").write_text(log)
-        problems = []
         if start.returncode != 0 or "Error" in start.stdout:
             problems.append("am start failed")
         if not pid:
             problems.append("the process is not alive")
+        report.append(f"pid: {pid or 'none'}")
+    except (subprocess.SubprocessError, OSError, ValueError, ET.ParseError) as error:
+        problems.append(str(error))
+    try:
+        log = subprocess.run(adb + ["logcat", "-d", "-v", "threadtime"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                             check=True, timeout=30).stdout.decode(errors="replace")
+        (output / "release-logcat.txt").write_text(log)
         if crashed(log):
             problems.append("FATAL EXCEPTION in logcat")
-        report.append(f"pid: {pid or 'none'}")
     except (subprocess.SubprocessError, OSError) as error:
-        problems = [str(error)]
-    report.append("FAIL: " + ", ".join(problems) if problems else "PASS: the release APK installed, started and stayed up for ten seconds with no fatal exception")
+        problems.append(str(error))
+    report.append("FAIL: " + ", ".join(problems) if problems else "PASS: the release APK opened a focused guest poster in Details with no fatal exception")
     (output / "release.txt").write_text("\n".join(report) + "\n")
     print("\n".join(report), flush=True)
     return not problems
@@ -90,7 +157,7 @@ def main():
     parser.add_argument("--output", type=Path, default=Path("app/build/reports/tv-checks"))
     parser.add_argument("--check", action="append", choices=CHECKS)
     parser.add_argument("--release", type=Path, metavar="APK",
-                        help="after the suites, replace the debug build with this release APK and check that it starts")
+                        help="after the suites, open a guest poster in Details using this release APK")
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
     if args.self_test:

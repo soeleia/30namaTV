@@ -931,6 +931,7 @@ fun forgetSession(context: android.content.Context) {
     // The home kept for the next launch (HomeFragment.KEPT), the watched episodes, the followed
     // series' news and each title's speed and subtitle timing are this account's: they go with it.
     context.applicationContext.filesDir.resolve("home").deleteRecursively()
+    Recents.clear(context.applicationContext)
     Watched.clear(context.applicationContext)
     NewEpisodes.clear(context.applicationContext)
     val player = context.getSharedPreferences("player", android.content.Context.MODE_PRIVATE)

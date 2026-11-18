@@ -72,6 +72,8 @@ import coil3.request.ImageRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -186,7 +188,13 @@ class PlayerFragment : VideoSupportFragment() {
         applyTrackPreferences()
         session = PlayerSession(context, player, ::previousEpisode, ::nextEpisode)
         player.addListener(object : Player.Listener {
-            // Not while the subtitle is moved off its times: its cues are drawn from here then (see retime).
+            override fun onEvents(player: Player, events: Player.Events) {
+                if (retimed && events.containsAny(Player.EVENT_POSITION_DISCONTINUITY, Player.EVENT_PLAYBACK_PARAMETERS_CHANGED, Player.EVENT_IS_PLAYING_CHANGED)) {
+                    timingChanged.trySend(Unit)
+                }
+            }
+
+            // Shifted subtitles are drawn by retime.
             override fun onCues(cueGroup: CueGroup) {
                 if (!retimed) showCues(cueGroup.cues)
             }
@@ -591,6 +599,7 @@ class PlayerFragment : VideoSupportFragment() {
 
     private fun tick() {
         if (sleepAt > 0 && SystemClock.elapsedRealtime() >= sleepAt) fallAsleep()
+        if (::panel.isInitialized && panel.shows(diagnosticsPage)) panel.updateNote(diagnostics())
         val f = file ?: return
         val seconds = player.currentPosition / 1000
         updateSkip(f, seconds)
@@ -1254,8 +1263,24 @@ class PlayerFragment : VideoSupportFragment() {
         val speed = listOf(Group(getString(R.string.player_speed).takeIf { video != null }, Settings.SPEEDS.mapIndexed { i, s ->
             Choice(names[i], s == now) { applySpeed(s) }
         }))
-        val columns = listOfNotNull(video, speed)
+        val info = Group(null, listOf(Choice(getString(R.string.playback_diagnostics), null) { panel.push(diagnosticsPage) }))
+        val columns = listOfNotNull(video, speed + info)
         return Page(getString(if (video != null) R.string.player_quality_speed else R.string.player_speed), columns, landing = if (onSpeed) columns.lastIndex else 0)
+    }
+
+    private val diagnosticsPage: () -> Page = {
+        Page(getString(R.string.playback_diagnostics), emptyList(), note = diagnostics())
+    }
+
+    private fun diagnostics(): String {
+        val format = player.videoFormat
+        val unknown = getString(R.string.player_unknown)
+        val size = format?.takeIf { it.width > 0 && it.height > 0 }?.let { "${it.width} × ${it.height}".localDigits() }
+        val rate = format?.bitrate?.takeIf { it > 0 }?.let { getString(R.string.player_bitrate_mbps, it / 1_000_000.0) }
+        val counters = player.videoDecoderCounters
+        counters?.ensureUpdated()
+        return getString(R.string.playback_diagnostic_values, size ?: unknown, rate ?: unknown,
+            player.totalBufferedDuration / 1000, preview.decoderName ?: unknown, counters?.droppedBufferCount?.toString()?.localDigits() ?: unknown)
     }
 
     /**
@@ -1557,16 +1582,10 @@ class PlayerFragment : VideoSupportFragment() {
                 val source = englishSource() ?: englishFromSites()
                 val lines = Translator.lines(cuesOf(source))
                 if (lines.isEmpty()) throw Subtitles.Unreadable()
-                val dir = File(requireContext().cacheDir, "subtitles").apply { mkdirs() }
-                // The same English by the same model is the same Persian: a second viewing, or a retry, is free.
-                val made = File(dir, "${model.provider.id}-${(model.id + Translator.srt(lines, lines.map { it.text })).hashCode().toUInt()}.srt")
-                if (!made.exists()) {
-                    showTranslating(finds, 0f)
-                    // ponytail: a failure loses the parts already done, and a retry pays for them again; keep them per file if failures prove common.
-                    val persian = Translator.translate(model, lines, about()) { showTranslating(finds, it) }
-                    // Whole or not at all: a film cut off mid-write must not pass for made next time.
-                    withContext(Dispatchers.IO) { File(dir, "${made.name}.part").apply { writeText(Translator.srt(lines, persian)) }.renameTo(made) }
-                }
+                val context = requireContext()
+                showTranslating(finds, 0f)
+                val made = Translator.subtitle(File(context.cacheDir, "subtitles"), File(context.filesDir, "subtitle-work"),
+                    model, lines, about()) { showTranslating(finds, it) }
                 source to made
             }.onFailure { if (it is CancellationException) throw it }
             finds.translating = null
@@ -1646,6 +1665,7 @@ class PlayerFragment : VideoSupportFragment() {
     /** The subtitle [timing] is loading or following, by [timingKey]. */
     private var timingFor: String? = null
     private var timing: Job? = null
+    private val timingChanged = Channel<Unit>(Channel.CONFLATED)
     /** ExoPlayer's text track is off and [timing] draws the cues. */
     private var retimed = false
 
@@ -1683,11 +1703,17 @@ class PlayerFragment : VideoSupportFragment() {
         val subtitle = shownSubtitle() ?: return untime()
         val key = timingKey(subtitle)
         if ((offsets[key] ?: 0L) == 0L) return untime()
-        if (key == timingFor) return // loading or following it already
+        if (key == timingFor) {
+            timingChanged.trySend(Unit)
+            return
+        }
         untime()
         timingFor = key
         timing = lifecycleScope.launch {
-            val timed = runCatching { cuesOf(subtitle) }.getOrElse {
+            val timed = runCatching {
+                val groups = cuesOf(subtitle)
+                withContext(Dispatchers.Default) { CueTimeline(groups) }
+            }.getOrElse {
                 if (it is CancellationException) throw it
                 // It stays where ExoPlayer draws it, and the panel shows it unmoved.
                 offsets.remove(key)
@@ -1698,14 +1724,18 @@ class PlayerFragment : VideoSupportFragment() {
             }
             retimed = true
             applyTrackPreferences()
-            // ponytail: a 50 ms tick shows a cue up to 50 ms late; follow frames (postOnAnimation) if anyone ever sees it.
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 var shown: List<Cue>? = null
                 while (true) {
-                    val now = cuesAt(timed, player.currentPosition * 1000, (offsets[key] ?: 0L) * 1000)
+                    val at = (player.currentPosition - (offsets[key] ?: 0L)) * 1000
+                    val now = timed.at(at)
                     if (now != shown) showCues(now)
                     shown = now
-                    delay(50)
+                    val next = timed.next(at)
+                    if (player.isPlaying && next != null) {
+                        val waitMs = kotlin.math.ceil((next - at) / (1000.0 * player.playbackParameters.speed)).toLong()
+                        withTimeoutOrNull(waitMs.coerceAtLeast(1)) { timingChanged.receive() }
+                    } else timingChanged.receive()
                 }
             }
         }
@@ -1729,10 +1759,10 @@ class PlayerFragment : VideoSupportFragment() {
      */
     private suspend fun cuesOf(subtitle: MediaItem.SubtitleConfiguration): List<CuesWithTiming> {
         val uri = subtitle.uri
-        val bytes = if (uri.scheme == "file") withContext(Dispatchers.IO) { File(uri.path!!).readBytes() }
+        val bytes = if (uri.scheme == "file") withContext(Dispatchers.IO) { File(uri.path!!).inputStream().use(Subtitles::readLimited) }
         else Api.run { http.newCall(Request.Builder().url(uri.toString()).header("User-Agent", userAgent).build()).await() }.use { response ->
             if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
-            withContext(Dispatchers.IO) { response.body!!.bytes() }
+            withContext(Dispatchers.IO) { Subtitles.readLimited(response.body!!.byteStream()) }
         }
         return withContext(Dispatchers.Default) {
             val text = Subtitles.decode(bytes, subtitle.language.orEmpty())

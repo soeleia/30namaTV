@@ -16,11 +16,12 @@ An unofficial Android TV app for watching 30nama, written in Kotlin on Android's
 - **Catalogue.** Movies, Series and Anime can be filtered by genre, country, minimum IMDb score and decade, and sorted six ways. Home's genre row lists every genre and leads to the full genre page.
 - **Trailers** play in the app: from Aparat in Iran (no VPN needed, often with Persian subtitles), from YouTube elsewhere, each falling back to the other. Hold OK on **Trailer** to pick the source. YouTube trailers need a WebView from 2019 or later.
 - **Player.** Above the seek bar there is only the title's poster and name; below it, the elapsed time, the length and when it ends. Left and right skip five seconds, faster while held. The next episode's opening loads during the credits, and **Settings > Playback > Preload** keeps more of the film on the TV's storage ahead of time.
+- **Quality & Speed > Playback diagnostics** shows the current video resolution, track bitrate, seconds buffered, decoder and dropped frames.
 - **Resume** picks up where you left off. The TV keeps its own exact position for each title, because 30nama's saved point can lag behind. A title picked up partway offers **Start from the beginning** for its first ten seconds.
 - **Episodes** carry a check once watched, and a progress bar with the minutes left while partway through. This history is kept on the TV and cleared on sign-out.
 - **Subtitles.** The player's Audio & Subtitles menu has three tools:
   - **Find subtitles** searches SubSource for the film or exact episode, plus SubDL and OpenSubtitles if you add their keys. It lists Persian first, and the best match for the playing file first, and loads your pick without stopping playback.
-  - **Make Persian subtitles** translates the English subtitle into natural Persian with Claude, OpenAI or Gemini. It takes a few minutes while the film keeps playing, then switches itself on.
+  - **Make Persian subtitles** translates the English subtitle into natural Persian with Claude, OpenAI or Gemini. It takes a few minutes while the film keeps playing, then switches itself on. After an interruption, select it again with the same English subtitle and model. The TV reuses every completed batch.
   - **Subtitle timing** shifts a subtitle that is out of sync earlier or later in quarter-second steps.
 
   Persian subtitles show Persian ی, ک and digits, and old Windows-1256 files and files typed for left-to-right players display correctly.
@@ -57,7 +58,7 @@ Browsing and 30nama playback need no keys. A few extras use API keys from other 
 
   Until you pick one, the best model of the first service with a key, in that order, translates. Costs go to your own account, and the result stays on the TV, so watching again is free. These services refuse connections from Iran without a VPN.
 
-To add a key, open **Settings > Services**, choose the service and scan the QR code with a phone on the same Wi-Fi. The page that opens links to where the key is made and sends what you paste straight to the TV. You can also type the key on the TV or use **Paste**. The app checks the key and keeps it only on that TV.
+To add a key, open **Settings > Services** and choose the service. The QR code opens the provider's key page on your phone. Enter the key on the TV using its keyboard, the paired Google TV remote keyboard, or **Paste**.
 
 ## Development
 

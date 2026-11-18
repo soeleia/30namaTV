@@ -372,7 +372,7 @@ Dark glass (ink at 85%) with a 2dp white rim over video, solid white under the r
 ### Don't:
 - **Don't** fill a resting control with solid white; white is focus.
 - **Don't** use 30nama red, green or IMDb yellow as a surface or for body text.
-- **Don't** reach for the system's grey toast or a stock dialog to tell the viewer something; the app's own surfaces do it, and a standing notice never takes the remote. The one exception is Android's own permission dialog: on Android 17, before a service key's sheet first opens, it asks for the home network (the phone's key form); refused, the sheet offers the typed key alone.
+- **Don't** reach for the system's grey toast or a stock dialog to tell the viewer something; the app's own surfaces do it, and a standing notice never takes the remote.
 - **Don't** add shadows, blur, animated backgrounds or video beyond the launch motion.
 - **Don't** letter-space Persian.
 - **Don't** dim unfocused rows; artwork keeps its own colour.
