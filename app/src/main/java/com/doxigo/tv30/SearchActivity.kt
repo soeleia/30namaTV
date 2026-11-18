@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.LocaleList
 import android.speech.RecognizerIntent
+import android.text.method.ArrowKeyMovementMethod
 import android.util.TypedValue
 import android.view.FocusFinder
 import android.view.Gravity
@@ -388,6 +389,13 @@ class SearchFragment : Fragment(), SearchBar.SearchBarListener {
         field.setAddStatesFromChildren(true) // the ring follows the editor's focus
         // A long query stops short of the pill's round end, as it starts short of the other.
         editor.setPaddingRelative(0, 0, resources.getDimensionPixelSize(androidx.leanback.R.dimen.lb_search_bar_edit_text_margin_start), 0)
+        // Nothing in the field can be selected by touch. Leanback brings the keyboard up by tapping
+        // the field's far corner each time the remote comes to it, which in Persian is on the
+        // query: two entries within the double-tap time selected its word, and Android, once it
+        // had classified the selection, took the remote back from results that had just landed.
+        editor.movementMethod = object : ArrowKeyMovementMethod() {
+            override fun canSelectArbitrarily() = false
+        }
         // Ask for the UI's language on the keyboard, where the IME has it.
         if (Build.VERSION.SDK_INT >= 24) editor.imeHintLocales = LocaleList(Locale.getDefault())
         ContextCompat.getDrawable(context, R.drawable.search_mic)?.let(orb::setOrbIcon)

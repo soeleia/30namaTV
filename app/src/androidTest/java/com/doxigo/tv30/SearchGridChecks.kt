@@ -9,6 +9,8 @@ import android.os.SystemClock
 import android.speech.RecognizerIntent
 import android.view.InputDevice
 import android.view.KeyEvent
+import android.view.MotionEvent
+import android.view.ViewConfiguration
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
@@ -191,13 +193,15 @@ object SearchGridChecks {
                     // Down before the results land waits for them: left in the box, the remote's next OK brings the keyboard back.
                     text(editor, "late")
                     runOnMainSync { host.getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(editor.windowToken, 0) }
-                    await("Search keyboard did not hide before an early Down") { !keyboardVisible(host) }
                     check(lateStarted.await(5, TimeUnit.SECONDS))
+                    // Down only now, after the wait for the search: a keyboard hidden while still on its way up
+                    // reads as down at once, then comes up after all (Android TV 11) and takes the Down, as is its due.
+                    await("Search keyboard did not hide before an early Down") { !keyboardVisible(host) }
                     press(KeyEvent.KEYCODE_DPAD_DOWN)
                     runOnMainSync { check(editor.hasFocus()) { "Down left the box before the results landed" } }
                     releaseLate.countDown()
                     await("Down before the results landed was lost", detail = {
-                        "grid.hasFocus=${grid.hasFocus()}, focus=${host.currentFocus?.javaClass?.simpleName}"
+                        "ime=${keyboardVisible(host)}, waiting=${field(fragment, "moveToResults")}, first=${first(fragment)?.title}, grid.hasFocus=${grid.hasFocus()}, focus=${host.currentFocus?.javaClass?.simpleName}"
                     }) { first(fragment)?.title == "late 0" && grid.hasFocus() }
                 }
                 text(editor, "none")
@@ -212,11 +216,14 @@ object SearchGridChecks {
                 runOnMainSync {
                     fragment.onActivityResult(1, Activity.RESULT_OK, Intent().putStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS, arrayListOf("voice")))
                 }
-                await("Voice result did not populate and focus the grid") { first(fragment)?.title == "voice 0" && grid.hasFocus() }
+                await("Voice result did not populate and focus the grid", detail = {
+                    "ime=${keyboardVisible(host)}, waiting=${field(fragment, "moveToResults")}, first=${first(fragment)?.title}, selected=${editor.hasSelection()}, grid.hasFocus=${grid.hasFocus()}, focus=${host.currentFocus?.javaClass?.simpleName}"
+                }) { first(fragment)?.title == "voice 0" && grid.hasFocus() }
                 runOnMainSync { check(editor.text.toString() == "voice") }
 
                 recentSearches(host, fragment, grid, editor, language)
                 persianKeyboard(host, fragment, grid, editor, language, requests)
+                tapsSelectNothing(editor)
                 runOnMainSync { host.finish() }
                 await("Search activity did not close") { host.isDestroyed }
                 activity = null
@@ -232,7 +239,7 @@ object SearchGridChecks {
                     true
                 }
             }
-            result.putString("stream", "PASS: cached pagination after layout, six-column RTL/LTR search, D-pad/editor/rail/clicks, Down before results, row spacing, pagination, debounce/cancel, empty/error and voice results, recent searches, in-app Persian keyboard\n")
+            result.putString("stream", "PASS: cached pagination after layout, six-column RTL/LTR search, D-pad/editor/rail/clicks, Down before results, row spacing, pagination, debounce/cancel, empty/error and voice results, recent searches, in-app Persian keyboard, no selection from two entries to the box\n")
         } catch (error: Throwable) {
             capture("search-failure")
             result.putString("stream", error.stackTraceToString())
@@ -510,6 +517,30 @@ object SearchGridChecks {
             runOnMainSync { host.finish() }
             await("Search activity did not close") { host.isDestroyed }
         }
+    }
+
+    /**
+     * Two entries to the box in a row select nothing. Leanback taps the field's far corner each
+     * time the remote comes to it, which in Persian is on the query: two within the double-tap
+     * time selected its word, and Android, once it had classified the selection, took the remote
+     * back from the results that had just landed (the voice step, about every other run).
+     */
+    private fun Instrumentation.tapsSelectNothing(editor: TextView) {
+        text(editor, "taps")
+        SystemClock.sleep(ViewConfiguration.getDoubleTapTimeout() + 100L) // clear of the tap that brought the remote here
+        var selected = false
+        runOnMainSync {
+            repeat(2) {
+                for (action in intArrayOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
+                    val now = SystemClock.uptimeMillis()
+                    val tap = MotionEvent.obtain(now, now, action, editor.width.toFloat(), editor.height.toFloat(), 0)
+                    editor.dispatchTouchEvent(tap)
+                    tap.recycle()
+                }
+            }
+            selected = editor.hasSelection()
+        }
+        check(!selected) { "Two entries to the box in a row selected its text" }
     }
 
     private fun first(fragment: SearchFragment): Card? =
