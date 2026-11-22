@@ -260,12 +260,15 @@ class PromoHero(
     /**
      * Puts the remote on the button, bringing the hero back, on the title it was showing, if the
      * rows had it. False when there is nothing to promote. It takes the billboard at once, so a
-     * re-selection right after (the rail's Home) only reaches [follow].
+     * re-selection right after (the rail's Home) only reaches [follow]. A window in touch mode (a TV
+     * starting in it, the emulator) refuses the button, which is then its default focus: the first
+     * press lands on it, where home used to hand the remote to the rows and open on their first poster.
      */
     fun focus(): Boolean {
         if (cards.isEmpty()) return false
         if (!active) hold(true)
-        return more.requestFocus()
+        more.takeFocus()
+        return true
     }
 
     /** Every card the rows select comes here: onto the billboard, or kept until the hero hands it back. */

@@ -84,6 +84,7 @@ object LogoChecks {
         try {
             for (language in listOf("fa", "en")) {
                 words = CountDownLatch(1)
+                setInTouchMode(false) // a remote's window, as on a TV: the emulator starts in touch mode, and an earlier check may leave it there
                 runOnMainSync {
                     clientField.set(Api, client)
                     Api.token = null
@@ -131,10 +132,10 @@ object LogoChecks {
                 capture("logos-home-$language")
 
                 // The next page's logo was fetched with its art: the name never shows its words first.
-                // Asked until it holds: the rows coming in can take the focus back to a poster,
-                // and the key then pages that row instead of the hero.
-                await("The hero's button did not take focus", detail = { "focus on ${main.currentFocus}" }) {
-                    main.findViewById<View>(R.id.promo_more).let { it.isFocused || (it.requestFocus() && false) }
+                // Home put the remote there itself: the rows landing once handed it to their first
+                // poster, and the key then paged that row instead of the hero.
+                await("The remote was not on the hero's button", detail = { "focus on ${main.currentFocus}" }) {
+                    main.findViewById<View>(R.id.promo_more).isFocused
                 }
                 SystemClock.sleep(300)
                 sendKeyDownUpSync(if (language == "fa") KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT)

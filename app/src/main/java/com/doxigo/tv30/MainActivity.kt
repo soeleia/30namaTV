@@ -338,12 +338,17 @@ class HomeFragment : BrowseSupportFragment() {
         val browse = super.onCreateView(inflater, container, savedInstanceState)!!
         val root = inflater.inflate(R.layout.billboard, container, false) as FrameLayout
         root.addView(browse)
-        browse.findViewById<View>(androidx.leanback.R.id.browse_container_dock)?.let { dock ->
+        browse.findViewById<ViewGroup>(androidx.leanback.R.id.browse_container_dock)?.let { dock ->
             (dock.layoutParams as ViewGroup.MarginLayoutParams).topMargin = resources.getDimensionPixelSize(R.dimen.billboard_height)
-            // The rows arrive together after the parallel load; they rise in once, at launch.
+            // The rows arrive together after the parallel load; they rise in once, at launch, and
+            // only then take the remote (see [rise]). Leanback hands the empty rows the focus on
+            // onStart, the first row to lay out passed it to its first poster, and the hero, up by
+            // then, gave the billboard to the rows until rise won it back; where the window refused the
+            // hero's button (touch mode) nothing did, and home opened on that poster.
             if (!loaded) {
                 dock.alpha = 0f
                 dock.translationY = Motion.travel(16 * resources.displayMetrics.density)
+                dock.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
             }
         }
         val scope = viewLifecycleOwner.lifecycleScope
@@ -559,9 +564,13 @@ class HomeFragment : BrowseSupportFragment() {
         riseOnView = view == null
         if (riseOnView) return
         setSelectedPosition(0, false)
-        view?.post { if (hero?.focus() != true) mainFragment?.view?.requestFocus() }
-        view?.findViewById<View>(androidx.leanback.R.id.browse_container_dock)?.animate()
-            ?.alpha(1f)?.translationY(0f)?.setStartDelay(0)?.setInterpolator(Motion.emph)?.setDuration(Motion.PAGE)?.start()
+        val dock = view?.findViewById<ViewGroup>(androidx.leanback.R.id.browse_container_dock)
+        view?.post {
+            // Open to the remote and given it in one go: no layout between can hand it to a poster.
+            dock?.descendantFocusability = ViewGroup.FOCUS_BEFORE_DESCENDANTS // Leanback's own
+            if (hero?.focus() != true) mainFragment?.view?.requestFocus()
+        }
+        dock?.animate()?.alpha(1f)?.translationY(0f)?.setStartDelay(0)?.setInterpolator(Motion.emph)?.setDuration(Motion.PAGE)?.start()
         hero?.arrive(0)
         loaded = true
         notice?.arrived = true
@@ -842,16 +851,13 @@ class HomeFragment : BrowseSupportFragment() {
     }
 
     /**
-     * The note goes, then the rows' dock comes back, unseen until the rows rise: in that order the
-     * remote rests nowhere while home asks again as at launch, not on a row it can't see.
+     * The note goes, then the rows' dock comes back, unseen and closed to the remote until the rows
+     * rise: the remote rests nowhere while home asks again as at launch, not on a row it can't see.
      */
     private fun retry() {
         val root = view as? ViewGroup ?: return
         root.findViewById<View>(R.id.home_note)?.let(root::removeView)
-        root.findViewById<ViewGroup>(androidx.leanback.R.id.browse_container_dock)?.apply {
-            descendantFocusability = ViewGroup.FOCUS_BEFORE_DESCENDANTS // Leanback's own
-            visibility = View.VISIBLE
-        }
+        root.findViewById<View>(androidx.leanback.R.id.browse_container_dock)?.visibility = View.VISIBLE
         load()
     }
 
