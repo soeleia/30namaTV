@@ -9,6 +9,7 @@ import android.view.KeyEvent
 import android.view.View
 import android.widget.TextView
 import androidx.lifecycle.Lifecycle
+import kotlinx.coroutines.Job
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Response
@@ -40,7 +41,8 @@ object PlayerNoticeChecks {
         val originalLanguage = Api.language
         val originalLocale = Locale.getDefault()
         val clientField = Api::class.java.getDeclaredField("http").apply { isAccessible = true }
-        // Free, so it plays for a guest; a film's page asks nothing of `stream`, only the player does.
+        // Free, so it plays for a guest. The film's page asks `stream` too, for where Play picks up,
+        // as it opens and each time the player leaves it (DetailsActivity.onRestart).
         val film = """{"id":42,"title":{"english":"Player Notice Check","local":"آزمون پیام پخش"},"options":{"title_type":"movie","free_stream":true},
             "info":{"year":"2025"},"plot":{"local":"فیلمی برای آزمودن پیام پخش وقتی ۳۰نما ویدیو را نمی‌دهد."}}"""
         // Only 30nama's actions are answered; anything else (art, TMDB) is refused, so nothing leaves the emulator.
@@ -100,6 +102,11 @@ object PlayerNoticeChecks {
                 }
                 // ---- A film that loads and then cannot play: the player stays, under its note. ----
                 for (broken in listOf("forbidden", "down")) {
+                    // The page's own `stream` from the player it was left by, landed before the count
+                    // starts: on CI's emulator it came after, and the player read as asking twice.
+                    await("The title page's own `stream` did not land ($language, $broken)") {
+                        (field(host, "episodesAsk") as Job?)?.isActive != true
+                    }
                     answer = broken
                     asked = 0
                     await({ "Play does not have the remote ($language, $broken): it is on ${host.currentFocus.let { (it as? TextView)?.text ?: it }}" }) {
@@ -161,6 +168,9 @@ object PlayerNoticeChecks {
         }
         finish(code, result)
     }
+
+    private fun field(instance: Any, name: String): Any? =
+        instance.javaClass.getDeclaredField(name).apply { isAccessible = true }.get(instance)
 
     private fun Instrumentation.await(message: String, timeoutMs: Long = 7_000, condition: () -> Boolean) = await({ message }, timeoutMs, condition)
 
