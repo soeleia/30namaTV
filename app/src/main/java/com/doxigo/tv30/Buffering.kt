@@ -41,8 +41,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import okhttp3.ConnectionPool
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
+import okhttp3.ResponseBody.Companion.toResponseBody
 import java.io.IOException
 import kotlin.math.abs
 
@@ -62,7 +64,23 @@ object Buffering {
      * segment, and the player's 403 policy drops it so the retry dials a fresh one.
      */
     val cdn: OkHttpClient by lazy {
-        Api.http.newBuilder().connectionPool(ConnectionPool()).protocols(listOf(Protocol.HTTP_1_1)).build()
+        Api.http.newBuilder().connectionPool(ConnectionPool()).protocols(listOf(Protocol.HTTP_1_1)).addInterceptor(refused).build()
+    }
+
+    /**
+     * The CDN's refusal is not always a 403: a signature it won't take (another IP's, as when a VPN
+     * sends 30nama's API and its video different ways) got 200 and an empty HTML page,
+     * `<html><body></body></html>`, for any path (seen 2026-11-22). The player read that as a broken
+     * file and offered another quality, and the disk cache kept it as the segment. Here it is the 403
+     * it means, which Retry403 and a fresh `stream` answer (PlayerActivity.refresh) handle. Told by
+     * its first bytes, which no playlist (#EXTM3U) or segment starts with whatever its Content-Type
+     * says; an application interceptor, not a network one, so a gzipped playlist's are unzipped.
+     */
+    internal val refused = Interceptor { chain ->
+        val response = chain.proceed(chain.request())
+        if (!response.isSuccessful || !response.peekBody(64).string().trimStart().startsWith('<')) return@Interceptor response
+        response.close()
+        response.newBuilder().code(403).message("Forbidden").body(ByteArray(0).toResponseBody()).build()
     }
 
     /**
@@ -300,10 +318,26 @@ object Buffering {
             val bytes = minOf(1L shl 30, (context.cacheDir.usableSpace + ours) / 4)
             if (bytes >= 64L shl 20) {
                 capacity = bytes
-                cache = SimpleCache(dir, InWriteOrder(bytes), StandaloneDatabaseProvider(context))
+                cache = SimpleCache(dir, InWriteOrder(bytes), StandaloneDatabaseProvider(context)).also(::dropRefusals)
             }
         }
         return cache
+    }
+
+    /**
+     * Up to 1.5.8, before [refused], the CDN's refusal page went to disk as the segment it stood
+     * for, and as a key leaves the signature out, fresh links read it back: that title failed as a
+     * broken file until the entry aged out. Dropped as the cache opens. Only an entry under a
+     * kilobyte is read (the page is 26 bytes, a segment hundreds of kilobytes), and no media starts with `<`.
+     */
+    // ponytail: walks the index at every process's first open, in memory but for those tiny entries; a once-only flag if that ever shows.
+    internal fun dropRefusals(cache: Cache) {
+        for (key in cache.keys.toList()) {
+            val spans = cache.getCachedSpans(key)
+            if (spans.sumOf { it.length } > 1024) continue
+            val text = spans.firstOrNull { it.position == 0L }?.file?.let { runCatching { it.readText() }.getOrNull() } ?: continue
+            if (text.trimStart().startsWith('<')) cache.removeResource(key)
+        }
     }
 
     /** How much of the disk video may use, or 0 without room. Measures the disk the first time: not on the main thread. */

@@ -1,8 +1,20 @@
 package com.doxigo.tv30
 
+import androidx.media3.datasource.cache.Cache
+import androidx.media3.datasource.cache.CacheSpan
+import okhttp3.Interceptor
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Protocol
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
+import java.lang.reflect.Proxy
+import java.nio.file.Files
+import java.util.TreeSet
 
 class BufferingTest {
     /** A segment as the CDN signs it: the viewer's IPv4, an expiry and a signature in the path. */
@@ -35,5 +47,65 @@ class BufferingTest {
     fun differentFilesStayApart() {
         assertNotEquals(Buffering.cacheKey(signed), Buffering.cacheKey(signed.replace("/x.ts", "/y.ts")))
         assertNotEquals(Buffering.cacheKey(signed), Buffering.cacheKey(signed.replace("/641187/", "/641188/")))
+    }
+
+    /** A 200 carrying [body] from the CDN, as the video client's interceptor passes it on. */
+    private fun cdn(body: ByteArray, type: String): Response {
+        val request = Request.Builder().url(signed).build()
+        val response = Response.Builder().request(request).protocol(Protocol.HTTP_1_1).code(200).message("OK")
+            .body(body.toResponseBody(type.toMediaType())).build()
+        val chain = Proxy.newProxyInstance(javaClass.classLoader, arrayOf(Interceptor.Chain::class.java)) { _, method, _ ->
+            when (method.name) {
+                "request" -> request
+                "proceed" -> response
+                else -> error(method.name)
+            }
+        } as Interceptor.Chain
+        return Buffering.refused.intercept(chain)
+    }
+
+    @Test
+    fun refusalPageIsA403() {
+        val got = cdn("<html><body></body></html>".toByteArray(), "text/html")
+        assertEquals(403, got.code)
+        assertEquals(0, got.body!!.bytes().size)
+    }
+
+    @Test
+    fun mediaPassesUntouched() {
+        val playlist = "#EXTM3U\n#EXT-X-VERSION:3\n#EXTINF:6.0,\nx.ts\n"
+        val list = cdn(playlist.toByteArray(), "application/vnd.apple.mpegurl")
+        assertEquals(200, list.code)
+        assertEquals(playlist, list.body!!.string())
+        // A TS segment: 188-byte packets, each opening on the sync byte 0x47.
+        val ts = ByteArray(188 * 2) { if (it % 188 == 0) 0x47 else 0x1f }
+        val segment = cdn(ts, "video/mp2t")
+        assertEquals(200, segment.code)
+        assertArrayEquals(ts, segment.body!!.bytes())
+    }
+
+    @Test
+    fun cachedRefusalPagesGo() {
+        // SimpleCache needs Android to open: a stand-in with real span files, as SimpleCache keeps them.
+        val dir = Files.createTempDirectory("video").toFile()
+        val spans = mutableMapOf<String, TreeSet<CacheSpan>>()
+        fun put(key: String, bytes: ByteArray) {
+            val file = dir.resolve(key).apply { writeBytes(bytes) }
+            spans[key] = TreeSet(listOf(CacheSpan(key, 0, bytes.size.toLong(), 0, file)))
+        }
+        put("page.ts", "<html><body></body></html>".toByteArray())
+        put("x.ts", ByteArray(188 * 8) { if (it % 188 == 0) 0x47 else 0x1f }) // over a kilobyte: never read
+        put("tiny.vtt", "WEBVTT\n".toByteArray())
+        val cache = Proxy.newProxyInstance(javaClass.classLoader, arrayOf(Cache::class.java)) { _, method, args ->
+            when (method.name) {
+                "getKeys" -> spans.keys
+                "getCachedSpans" -> spans.getValue(args[0] as String)
+                "removeResource" -> { spans.remove(args[0]); null }
+                else -> error(method.name)
+            }
+        } as Cache
+        Buffering.dropRefusals(cache)
+        assertEquals(setOf("x.ts", "tiny.vtt"), spans.keys)
+        dir.deleteRecursively()
     }
 }

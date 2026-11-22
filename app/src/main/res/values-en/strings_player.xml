@@ -22,6 +22,7 @@
     <string name="player_stopped">Playback stopped</string>
     <string name="player_error_network">The internet connection dropped. Try again once it\'s back.</string>
     <string name="player_error_server">This video isn\'t available right now. Try again in a moment.</string>
+    <string name="player_error_split">The video server and 30nama see you on two different networks (probably a VPN). Send 30nama\'s video the same way as 30nama itself, through the VPN or around it.</string>
     <string name="player_error_format">This file won\'t play on this TV. Try another quality.</string>
     <string name="player_error">Something went wrong while playing. Try again.</string>
     <string name="player_change_quality">Change quality</string>

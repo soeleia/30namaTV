@@ -655,14 +655,31 @@ class PlayerFragment : VideoSupportFragment() {
      */
     private fun fail(error: PlaybackException) {
         val forbidden = generateSequence<Throwable>(error) { it.cause }.any { (it as? HttpDataSource.InvalidResponseCodeException)?.responseCode == 403 }
-        if (forbidden && SystemClock.elapsedRealtime() - refreshedAt > REFRESH_GAP_MS) return refresh()
-        when (val why = errorMessage(error.errorCode)) {
+        if (forbidden && SystemClock.elapsedRealtime() - refreshedAt > REFRESH_GAP_MS) {
+            lifecycleScope.launch { Trailer.locate() } // for split, should the fresh answer be refused too
+            return refresh()
+        }
+        when (val why = if (forbidden && split()) R.string.player_error_split else errorMessage(error.errorCode)) {
             // Asking again would fail the same way: the pill opens the qualities instead.
             R.string.player_error_format -> showNote(getString(why), R.string.player_change_quality) { openPanel { qualityAndSpeed(onSpeed = false) } }
             // The CDN's refusal: its URLs are what it refused, so Retry asks for new ones.
-            R.string.player_error_server -> showNote(getString(why), action = ::refresh)
+            R.string.player_error_server, R.string.player_error_split -> showNote(getString(why), action = ::refresh)
             else -> showNote(getString(why)) { player.prepare() }
         }
+    }
+
+    /**
+     * Whether 30nama's API and its video see this device from different countries: the API's
+     * `test` (Api.country) against Cloudflare's trace (Trailer.location), which goes the way a VPN
+     * sends foreign sites, as the video does. A VPN that sends ir.kazem-api.com direct and the CDN
+     * through itself does that (seen 2026-11-22), and the CDN refuses the `stream` answer's
+     * signatures, made for the API's IP, however often it is asked again: only the viewer can mend it.
+     */
+    // ponytail: the API's country is as of its last `test` (startup, or a move of host), no call of its own; a VPN switched on or off since can read as split, and only after a refusal outlived a fresh answer.
+    private fun split(): Boolean {
+        val api = Api.country ?: return false
+        val video = Trailer.location ?: return false
+        return api != video
     }
 
     /**

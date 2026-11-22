@@ -48,7 +48,6 @@ object Trailer {
     @Volatile private var checked = 0L
     @Volatile private var reachable = false
     @Volatile private var located = 0L
-    @Volatile private var iran = true
 
     /** Where [title]'s trailer can play from here, all looked up at once; null when nowhere. */
     suspend fun find(title: JSONObject): Sources? = coroutineScope {
@@ -97,23 +96,31 @@ object Trailer {
         return reachable
     }
 
+    /** Whether the viewer is in Iran ([locate]). Not knowing counts as Iran, where Aparat is the safe choice. */
+    private suspend fun inIran() = locate() in setOf(null, "IR")
+
     /**
-     * Whether the viewer is in Iran: the country Cloudflare sees this connection from, at 30nama's own
-     * site (no third party learns of it), so a VPN counts where it comes out. Not knowing counts as
-     * Iran, where Aparat is the safe choice. Asked every five minutes at most: VPNs come and go.
+     * The country Cloudflare saw this connection from when [locate] last asked ("BE"), or null when
+     * it couldn't tell. The way a VPN sends foreign sites, which is the video's way too.
      */
-    private suspend fun inIran(): Boolean {
-        if (System.currentTimeMillis() - located < AWHILE) return iran
+    @Volatile var location: String? = null
+        private set
+
+    /**
+     * [location] brought up to date: the country Cloudflare sees this connection from, at 30nama's
+     * own site (no third party learns of it), so a VPN counts where it comes out. Asked every five
+     * minutes at most: VPNs come and go.
+     */
+    suspend fun locate(): String? {
+        if (System.currentTimeMillis() - located < AWHILE) return location
         val request = Request.Builder().url("https://30nama.com/cdn-cgi/trace").build()
-        iran = try {
-            Api.run { client.newCall(request).await() }.use { response ->
-                country(withContext(Dispatchers.IO) { response.body!!.string() }) in setOf(null, "IR")
-            }
+        location = try {
+            Api.run { client.newCall(request).await() }.use { response -> country(withContext(Dispatchers.IO) { response.body!!.string() }) }
         } catch (e: IOException) {
-            true
+            null
         }
         located = System.currentTimeMillis()
-        return iran
+        return location
     }
 
     /** The `loc=` line of a Cloudflare trace ("SE"), or null without one. */

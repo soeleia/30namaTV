@@ -30,6 +30,9 @@
     <string name="player_stopped">پخش متوقف شد</string>
     <string name="player_error_network">اتصال اینترنت قطع شد. پس از وصل شدن، دوباره امتحان کنید.</string>
     <string name="player_error_server">این ویدیو فعلاً در دسترس نیست. کمی بعد دوباره امتحان کنید.</string>
+    <!-- The CDN refused the video even after fresh links, and 30nama's API and the video see the
+         TV from different countries (PlayerFragment.split): a VPN sending them different ways. -->
+    <string name="player_error_split">سرور ویدیو و ۳۰نما شما را از دو اینترنت متفاوت می‌بینند (احتمالاً VPN). ویدیوی ۳۰نما را هم مثل خود ۳۰نما، با VPN یا بدون آن، از یک مسیر بفرستید.</string>
     <string name="player_error_format">این فایل روی این تلویزیون پخش نمی‌شود. کیفیت دیگری را امتحان کنید.</string>
     <string name="player_error">هنگام پخش مشکلی پیش آمد. دوباره امتحان کنید.</string>
     <!-- The note's pill under player_error_format, where asking again would fail the same way: it opens the qualities. -->

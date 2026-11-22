@@ -305,7 +305,7 @@ object Api {
      * answers `test`, otherwise race the trusted regional hosts and keep the winner.
      */
     suspend fun initialize(): Boolean {
-        if (ping(endpoint)) return true
+        ping(endpoint)?.let { return seen(it) }
         return rediscover(endpoint)
     }
 
@@ -313,16 +313,30 @@ object Api {
         if (endpoint != failedHost) return true // someone else already moved us
         if (System.currentTimeMillis() - lastDiscovery < 30_000) return false
         lastDiscovery = System.currentTimeMillis()
-        val best = firstOf(HOSTS) { host -> host.takeIf { ping(it) } } ?: return false
+        val (best, answer) = firstOf(HOSTS) { host -> ping(host)?.let { host to it } } ?: return false
         endpoint = best
-        true
+        seen(answer)
+    }
+
+    /**
+     * The country 30nama's API sees this device from ("IR"), by its endpoint's last `test`; null
+     * until one says. Never the IP the answer also carries. A VPN can send the API one way and the
+     * video another (PlayerFragment.split), and the CDN refuses a signature for the other IP.
+     */
+    @Volatile var country: String? = null
+        private set
+
+    /** Keeps where the endpoint's `test` [answer] sees us from; a rate-limited host's says nothing, and the last stands. */
+    private fun seen(answer: JSONObject): Boolean {
+        answer.str("result", "ip", "country")?.let { country = it }
+        return true
     }
 
     // The official SDK gives `test` 15 s; a host that slow is no use to a TV anyway. A host that
-    // rate-limits us is up: moving would only add to the count.
-    private suspend fun ping(host: String) = runCatching {
-        withTimeout(10_000) { postOnce(host, "test", emptyArray()).optBoolean("success") }
-    }.getOrElse { it is Throttled }
+    // rate-limits us is up: moving would only add to the count. Its answer when up, null when not.
+    private suspend fun ping(host: String): JSONObject? = runCatching {
+        withTimeout(10_000) { postOnce(host, "test", emptyArray()) }.takeIf { it.optBoolean("success") }
+    }.getOrElse { if (it is Throttled) JSONObject() else null }
 
     /** Cancelling the coroutine cancels the request, so a lost race does not keep a socket open. */
     suspend fun Call.await(): Response = suspendCancellableCoroutine { cont ->
