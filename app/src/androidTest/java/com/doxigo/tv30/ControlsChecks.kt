@@ -214,7 +214,48 @@ object ControlsChecks {
                 check(beforeSeek - player.currentPosition in 4_900L..5_100L) { "Backward seek did not land" }
                 check(!player.playWhenReady) { "Backward seek changed paused playback" }
             }
-            result.putString("stream", "PASS: five-second remote timeout, inactivity reset, play/pause focus, panel return, pause/resume, remote/button/bar forward resume, 5 s bar steps, held acceleration, self-landing and hidden-controls seeks, seek cancellation and paused rewind\n")
+
+            // A bar drawn behind the paused film: a forward scrub left to land goes on from the film, playing.
+            runOnMainSync {
+                beforeSeek = player.currentPosition
+                glue.controlsRow?.currentPosition = 0
+                fragment.hideControlsOverlay(false)
+            }
+            await("Controls did not hide before the stale-bar seek") { !fragment.isControlsOverlayVisible }
+            press(KeyEvent.KEYCODE_DPAD_RIGHT)
+            await("Forward seek from a stale bar did not land ahead and play") { player.isPlaying && player.currentPosition >= beforeSeek + 5_000 }
+
+            // Idle while a 403's stream answer is asked for again: the bar keeps the film's place, and a
+            // scrub meanwhile plays on once it is prepared again.
+            runOnMainSync {
+                player.stop()
+                beforeSeek = player.currentPosition
+            }
+            await("Idle bar lost the film's place") { glue.controlsRow?.currentPosition == beforeSeek && (glue.controlsRow?.duration ?: 0L) > 0 }
+            runOnMainSync {
+                fragment.tickle()
+                check(checkNotNull(fragment.view).findViewById<View>(androidx.leanback.R.id.playback_progress).requestFocus())
+            }
+            press(KeyEvent.KEYCODE_DPAD_RIGHT)
+            SystemClock.sleep(1_500) // landed
+            runOnMainSync { player.prepare() }
+            await("Seek while idle did not play on") { player.isPlaying && player.currentPosition >= beforeSeek + 5_000 }
+
+            // A note going up mid-scrub takes the key's release, which the seek no longer waits on to land.
+            runOnMainSync {
+                beforeSeek = player.currentPosition
+                fragment.hideControlsOverlay(false)
+            }
+            await("Controls did not hide before the interrupted seek") { !fragment.isControlsOverlayVisible }
+            sendKeySync(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT))
+            runOnMainSync {
+                PlayerFragment::class.java.getDeclaredMethod("showNote", CharSequence::class.java, Int::class.javaPrimitiveType, Function0::class.java)
+                    .apply { isAccessible = true }.invoke(fragment, "Controls check", R.string.retry, {})
+            }
+            sendKeySync(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_RIGHT))
+            await("Seek under a note did not land and play") { player.isPlaying && player.currentPosition >= beforeSeek + 5_000 }
+            runOnMainSync { PlayerFragment::class.java.getDeclaredMethod("hideNote").apply { isAccessible = true }.invoke(fragment) }
+            result.putString("stream", "PASS: five-second remote timeout, inactivity reset, play/pause focus, panel return, pause/resume, remote/button/bar forward resume, 5 s bar steps, held acceleration, self-landing and hidden-controls seeks, seek cancellation, paused rewind, stale-bar, idle and note-interrupted seeks\n")
         } catch (error: Throwable) {
             result.putString("stream", error.stackTraceToString())
             resultCode = Activity.RESULT_CANCELED

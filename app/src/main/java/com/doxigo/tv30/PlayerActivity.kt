@@ -304,7 +304,7 @@ class PlayerFragment : VideoSupportFragment() {
      * play state change, a tickle), so that is refused here rather than undone after. Each time the
      * controls come up, the remote starts on play/pause. The note stands in for them too, and so
      * does a `stream` answer on its way ([refresh]): playback stopping is a play state change, and
-     * the controls it brought up showed a bar at 0:00 for as long as the player stood idle.
+     * it brought the controls up over a film that had only stalled.
      */
     override fun showControlsOverlay(runAnimation: Boolean) {
         if (::panel.isInitialized && panel.isOpen || failed || refreshing?.isActive == true) return
@@ -317,24 +317,37 @@ class PlayerFragment : VideoSupportFragment() {
             object : PlaybackSeekUi.Client() {
                 private var startedAt = 0L
                 private var requestedAt = 0L
+                private var meantToPlay = false
                 override fun isSeekEnabled() = delegate.isSeekEnabled
                 override fun getPlaybackSeekDataProvider() = delegate.playbackSeekDataProvider
                 override fun onSeekStarted() {
                     seeking = true
                     startedAt = player.currentPosition
                     requestedAt = startedAt
+                    meantToPlay = player.playWhenReady
+                    // Leanback steps from where the bar was last drawn: from where the film is, so a
+                    // bar drawn behind it can't send a forward scrub back towards the start.
+                    glue?.controlsRow?.currentPosition = startedAt
                     delegate.onSeekStarted()
                 }
                 override fun onSeekPositionChanged(positionMs: Long) {
                     requestedAt = positionMs
                     delegate.onSeekPositionChanged(positionMs)
                     preview.show(positionMs)
+                    // From the step, not the key's release: a note going up mid-scrub took the release,
+                    // and the seek never landed, the film paused under it until Play.
+                    view?.findViewById<View>(androidx.leanback.R.id.playback_progress)?.run {
+                        removeCallbacks(landSeek)
+                        postDelayed(landSeek, SEEK_LAND_MS)
+                    }
                 }
                 override fun onSeekFinished(cancelled: Boolean) {
                     seeking = false
                     preview.hide()
                     delegate.onSeekFinished(cancelled)
-                    if (!cancelled && requestedAt > startedAt) player.play()
+                    // Leanback plays on only what it saw playing; idle while a 403's stream answer is
+                    // asked for again (refresh), the film was meant to and plays on too.
+                    if (meantToPlay || !cancelled && requestedAt > startedAt) player.play()
                 }
             }
         })
@@ -412,18 +425,13 @@ class PlayerFragment : VideoSupportFragment() {
 
     /**
      * Left and right scrub the seek bar, [seekStep] at a time: from hidden controls they bring it up
-     * already seeking. A second after the last press the seek lands and playback goes on, where
+     * already seeking. A second after the last step the seek lands and playback goes on, where
      * Leanback would wait for OK (OK and Back still land or cancel it at once).
      */
     private fun seekKey(event: KeyEvent): Boolean {
         val code = event.keyCode
-        if (code != KeyEvent.KEYCODE_DPAD_LEFT && code != KeyEvent.KEYCODE_DPAD_RIGHT) return false
+        if (code != KeyEvent.KEYCODE_DPAD_LEFT && code != KeyEvent.KEYCODE_DPAD_RIGHT || event.action != KeyEvent.ACTION_DOWN) return false
         val bar = view?.findViewById<View>(androidx.leanback.R.id.playback_progress) ?: return false
-        bar.removeCallbacks(landSeek)
-        if (event.action == KeyEvent.ACTION_UP) {
-            if (seeking) bar.postDelayed(landSeek, SEEK_LAND_MS)
-            return false
-        }
         seekHeld = event.eventTime - event.downTime
         if (isControlsOverlayVisible || glue == null) return false
         tickle()
@@ -2074,6 +2082,21 @@ class PlayerFragment : VideoSupportFragment() {
             super.onCreatePrimaryActions(adapter) // play / pause
             adapter.add(forward)
             if (series) adapter.add(next)
+        }
+
+        /**
+         * Idle with the film still on it (a 403's stream answer asked for again, [refresh], which can
+         * take half a minute), the player knows where the film stands and how long it is, but Leanback
+         * drew an empty bar: 0:00 under a play button, the film seemingly sent back to its start.
+         */
+        private val idle get() = player.playbackState == Player.STATE_IDLE && player.mediaItemCount > 0
+
+        override fun onUpdateProgress() {
+            if (idle && !seeking) controlsRow?.currentPosition = player.currentPosition else super.onUpdateProgress()
+        }
+
+        override fun onUpdateDuration() {
+            if (idle) controlsRow?.duration = player.duration else super.onUpdateDuration()
         }
 
         /**
