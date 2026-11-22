@@ -114,7 +114,7 @@ object Buffering {
      * thirds of a 48 MB heap, and a paused film plus a subtitle search ran out of memory.
      */
     fun loadControl(): LoadControl = DefaultLoadControl.Builder()
-        .setBufferDurationsMs(50_000, 120_000, 2_500, 5_000)
+        .setBufferDurationsMs(50_000, 120_000, START_MS, 5_000)
         .setTargetBufferBytes((Runtime.getRuntime().maxMemory() / 3).coerceAtMost(96L shl 20).toInt())
         .build()
 
@@ -360,6 +360,9 @@ object Buffering {
         val cache = cache(context.applicationContext) ?: return
         cache.keys.toList().forEach(cache::removeResource)
     }
+
+    /** How much the player must hold ahead to start playing, or go on after running dry ([loadControl]). */
+    const val START_MS = 2_500
 
     private const val UNSET = C.LENGTH_UNSET.toLong()
     private const val IDLE = 5_000L

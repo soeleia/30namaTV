@@ -122,7 +122,7 @@ object OfflineChecks {
                 why = activity.findViewById<TextView>(R.id.player_note_why).text.toString()
             }
             check(failure == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED) { "The note was not the connection's: $seen" }
-            check(at >= furthest - 2_000) { "The note came with ${furthest - at} ms still held: $seen" }
+            check(at >= furthest - Buffering.START_MS) { "The note came with ${furthest - at} ms still held: $seen" }
             check(why == activity.getString(R.string.player_error_network)) { "The note said «$why»" }
             check(waited < 15_000) { "The note took $waited ms after the film ran dry" }
             SystemClock.sleep(400) // the note fades in

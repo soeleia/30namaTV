@@ -203,7 +203,7 @@ class PlayerFragment : VideoSupportFragment() {
                 if (finds.picked != null) applyTrackPreferences()
             }
             override fun onPlaybackStateChanged(state: Int) {
-                Retry403.starved = state != Player.STATE_READY
+                starve()
                 if (state == Player.STATE_READY) hideNote() // playing again, however it came back
                 if (state != Player.STATE_ENDED) return
                 if (sleep == SLEEP_END) sleep = 0 // the sleep timer's end: nothing plays on
@@ -606,7 +606,19 @@ class PlayerFragment : VideoSupportFragment() {
         retime() // another file, or a subtitle just found, starts at its own offset
     }
 
+    /**
+     * Keeps [Retry403.starved]: the player waits and holds less ahead than it needs to start
+     * (Buffering.START_MS). Not waiting alone: a seek inside what it holds waits as long as the
+     * frame takes to decode, seconds on a slow TV, and a connection failure then ended the film with
+     * all of it still ahead (CI's emulator, 13 s). On every state change, and each second for what
+     * the player has loaded since.
+     */
+    private fun starve() {
+        Retry403.starved = player.playbackState != Player.STATE_READY && player.totalBufferedDuration < Buffering.START_MS
+    }
+
     private fun tick() {
+        starve()
         if (sleepAt > 0 && SystemClock.elapsedRealtime() >= sleepAt) fallAsleep()
         if (::panel.isInitialized && panel.shows(diagnosticsPage)) panel.updateNote(diagnostics())
         val f = file ?: return
@@ -1967,8 +1979,8 @@ class PlayerFragment : VideoSupportFragment() {
 
     private object Retry403 : DefaultLoadErrorHandlingPolicy() {
         /**
-         * The player has nothing to play while it loads: any state but READY. Its listener keeps
-         * this on the main thread; the loaders read it on theirs.
+         * The player has nothing to play while it loads ([starve], on the main thread); the
+         * loaders read it on theirs.
          */
         @Volatile var starved = true
 
