@@ -80,7 +80,9 @@ object DismissChecks {
             fun notice() = texts(host.window.decorView).firstOrNull { it.text.toString() == hint }
             if (runCatching { await("", 1_500) { notice()?.alpha == 1f } }.isFailure) {
                 sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP)
-                await("Resting on Continue Watching did not say held OK takes a title off it") { notice()?.alpha == 1f }
+                await("Resting on Continue Watching did not say held OK takes a title off it", detail = {
+                    "notice alpha ${notice()?.alpha}, said=${hints.getBoolean("held_ok_said", false)}, fast=${Motion.fast}, rows ${titles(home)}, focus on ${host.currentFocus}"
+                }) { notice()?.alpha == 1f }
             }
             check(hints.getBoolean("held_ok_said", false)) { "Held OK was said without being remembered" }
             await("The notice about held OK stayed up") { notice()?.alpha == 0f }
@@ -108,6 +110,7 @@ object DismissChecks {
             capture("dismiss")
             result.putString("stream", "PASS: held OK said once on the row and remembered; off the row in $took ms, kept off while 30nama still sends it\n")
         } catch (error: Throwable) {
+            runCatching { capture("dismiss-failure") }
             result.putString("stream", error.stackTraceToString())
             resultCode = Activity.RESULT_CANCELED
         } finally {
@@ -132,7 +135,7 @@ object DismissChecks {
         else -> emptyList()
     }
 
-    private fun Instrumentation.await(message: String, timeoutMs: Long = 7_000, condition: () -> Boolean) {
+    private fun Instrumentation.await(message: String, timeoutMs: Long = 7_000, detail: (() -> String)? = null, condition: () -> Boolean) {
         val deadline = SystemClock.elapsedRealtime() + timeoutMs
         do {
             var passed = false
@@ -140,6 +143,8 @@ object DismissChecks {
             if (passed) return
             SystemClock.sleep(50)
         } while (SystemClock.elapsedRealtime() < deadline)
-        error(message)
+        var more = ""
+        if (detail != null) runOnMainSync { more = ": " + detail() }
+        error(message + more)
     }
 }

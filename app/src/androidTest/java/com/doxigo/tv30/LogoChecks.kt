@@ -102,7 +102,10 @@ object LogoChecks {
                 lateinit var name: TextView
                 lateinit var lines: List<View>
                 var before = emptyList<Int>()
-                await("The hero did not show Cyberpunk: Edgerunners") {
+                await("The hero did not show Cyberpunk: Edgerunners", detail = {
+                    val shown = main.findViewById<TextView>(R.id.bb_title)
+                    "showing «${shown?.text}» (shown=${shown?.isShown}, height=${shown?.height}), button ${main.findViewById<View>(R.id.promo_more)?.let { "shown=${it.isShown} focused=${it.isFocused}" }}, focus on ${main.currentFocus}"
+                }) {
                     name = main.findViewById(R.id.bb_title) ?: return@await false
                     lines = listOf(R.id.bb_title, R.id.bb_local, R.id.bb_meta, R.id.bb_plot).map { main.findViewById(it) }
                     name.text.toString() == "Cyberpunk: Edgerunners" && name.isShown && name.height > 0
@@ -203,6 +206,7 @@ object LogoChecks {
             }
             result.putString("stream", "PASS: TMDB logos replace the English name on home's hero and the title page without moving the words, a prefetched page shows its logo at once, and the credit line takes the series' state and network and the tagline by the interface's language without moving Play, in Persian and English\n")
         } catch (error: Throwable) {
+            runCatching { capture("logos-failure") }
             code = Activity.RESULT_CANCELED
             result.putString("stream", error.stackTraceToString())
         } finally {
