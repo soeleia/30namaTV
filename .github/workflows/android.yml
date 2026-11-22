@@ -25,13 +25,18 @@ jobs:
           fetch-depth: 0
       # A v* tag on any commit, a branch's or one never pushed to main, published a signed release.
       # Checked before the keystore is restored: nothing off main is signed, and release needs this job.
-      - name: Require a release tag to be on main
+      - name: Require a release tag to be on main, with its notes
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           set -euo pipefail
           git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main'
           if ! git merge-base --is-ancestor HEAD origin/main; then
             echo "::error::$GITHUB_REF_NAME is not on main: releases are tagged on main's own commits"
+            exit 1
+          fi
+          # What viewers read on the release page, checked here rather than after the TV tests.
+          if [[ ! -s "docs/releases/$GITHUB_REF_NAME.md" ]]; then
+            echo "::error::docs/releases/$GITHUB_REF_NAME.md is missing: write the release's notes before tagging it"
             exit 1
           fi
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
@@ -163,11 +168,15 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: docs/releases
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: optimized-apk
           path: dist/
+      # The tag's notes, then GitHub's link to the full list of commits.
       - name: Publish tested APK
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/30namaTV.apk dist/SHA256SUMS --repo "$GITHUB_REPOSITORY" --title "30namaTV $GITHUB_REF_NAME" --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" dist/30namaTV.apk dist/SHA256SUMS --repo "$GITHUB_REPOSITORY" --title "30namaTV $GITHUB_REF_NAME" --notes-file "docs/releases/$GITHUB_REF_NAME.md" --generate-notes

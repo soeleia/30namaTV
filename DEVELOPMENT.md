@@ -56,7 +56,7 @@ Emulator timing says nothing about speed on a real TV; see [performance evidence
 
 ## Release
 
-Bump `versionCode` and `versionName` in `app/build.gradle.kts`, push to `main`, and once Actions passes, tag that commit `vVERSION`. A tag on a commit that is not on `main` fails the build before anything is signed. The tag build publishes `30namaTV.apk` to GitHub Releases, which is what the in-app updater installs. Full steps, signing secrets and the private font archive: [docs/setup.md](docs/setup.md).
+Bump `versionCode` and `versionName` in `app/build.gradle.kts`, write what changed for viewers in `docs/releases/vVERSION.md` (Persian, then English), push to `main`, and once Actions passes, tag that commit `vVERSION`. A tag on a commit that is not on `main`, or without its notes, fails the build before anything is signed; the notes are the release page's text. The tag build publishes `30namaTV.apk` to GitHub Releases, which is what the in-app updater installs. Full steps, signing secrets and the private font archive: [docs/setup.md](docs/setup.md).
 
 ## Screenshots
 
