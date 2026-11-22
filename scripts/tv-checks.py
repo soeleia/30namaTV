@@ -13,7 +13,7 @@ import tempfile
 import time
 import xml.etree.ElementTree as ET
 
-CHECKS = ("performance", "intro", "controls", "alignment", "subtitles", "translate", "skip", "title", "lists", "search", "genres", "trailer", "updates", "watched", "resume", "filters", "captions", "dismiss", "preview", "playback", "logos", "episodes", "seasons", "playernotice", "gridnote", "homenote", "searchnote")
+CHECKS = ("performance", "intro", "controls", "alignment", "subtitles", "translate", "skip", "title", "lists", "search", "genres", "trailer", "updates", "watched", "resume", "filters", "captions", "dismiss", "preview", "playback", "logos", "episodes", "seasons", "playernotice", "offline", "gridnote", "homenote", "searchnote")
 
 
 def passed(output):

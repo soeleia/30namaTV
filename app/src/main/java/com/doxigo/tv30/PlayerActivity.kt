@@ -203,6 +203,7 @@ class PlayerFragment : VideoSupportFragment() {
                 if (finds.picked != null) applyTrackPreferences()
             }
             override fun onPlaybackStateChanged(state: Int) {
+                Retry403.starved = state != Player.STATE_READY
                 if (state == Player.STATE_READY) hideNote() // playing again, however it came back
                 if (state != Player.STATE_ENDED) return
                 if (sleep == SLEEP_END) sleep = 0 // the sleep timer's end: nothing plays on
@@ -1940,8 +1941,19 @@ class PlayerFragment : VideoSupportFragment() {
     }
 
     private object Retry403 : DefaultLoadErrorHandlingPolicy() {
+        /**
+         * The player has nothing to play while it loads: any state but READY. Its listener keeps
+         * this on the main thread; the loaders read it on theirs.
+         */
+        @Volatile var starved = true
+
         private fun LoadErrorHandlingPolicy.LoadErrorInfo.is403() =
             (exception as? HttpDataSource.InvalidResponseCodeException)?.responseCode == 403
+
+        /** The connection's failure, not the server's answer: no route, no answer in time, a transfer cut off (OkHttpDataSource's codes). */
+        private fun LoadErrorHandlingPolicy.LoadErrorInfo.isNetwork() = (exception as? HttpDataSource.HttpDataSourceException)?.reason.let {
+            it == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED || it == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
+        }
 
         override fun getFallbackSelectionFor(options: LoadErrorHandlingPolicy.FallbackOptions, info: LoadErrorHandlingPolicy.LoadErrorInfo) =
             if (info.is403()) null else super.getFallbackSelectionFor(options, info)
@@ -1950,10 +1962,16 @@ class PlayerFragment : VideoSupportFragment() {
          * Anything but a 403 gets the tries it always had (3), then fails for good, which the loader
          * takes at once. [getMinimumLoadableRetryCount] is asked without the error, so its 10 held for
          * every failure: with the network gone the spinner turned for over half a minute, each try
-         * waiting out its own timeout besides, before anything was said.
+         * waiting out its own timeout besides, before anything was said. The connection's own
+         * failures are the exception while the player still has something to play ([starved]): they
+         * are tried for as long as that lasts, 5 s apart at most. Given up after three, the loader
+         * never loaded again, from the disk's read-ahead or from a connection back seconds later: a
+         * VPN that dropped for a moment ended the film at the end of the memory buffer, a minute on,
+         * with the bar loaded minutes past it. Run dry, the note comes as quickly as before: at once
+         * after ten tries (the loader's own count), else at the next failure.
          */
         override fun getRetryDelayMsFor(info: LoadErrorHandlingPolicy.LoadErrorInfo): Long {
-            if (!info.is403()) return if (info.errorCount > super.getMinimumLoadableRetryCount(info.mediaLoadData.dataType)) C.TIME_UNSET else super.getRetryDelayMsFor(info)
+            if (!info.is403()) return if (info.errorCount > super.getMinimumLoadableRetryCount(info.mediaLoadData.dataType) && (starved || !info.isNetwork())) C.TIME_UNSET else super.getRetryDelayMsFor(info)
             Buffering.cdn.connectionPool.evictAll() // the failed connection is idle again by now
             return 200L
         }
