@@ -193,11 +193,11 @@ class DetailsActivity : TvActivity() {
         if (episodesAsk?.isActive != true) episodesAsk = lifecycleScope.launch { loadEpisodes() }
     }
 
-    /** The CDN dialled for [file], the one Play opens, so the player finds a connection waiting (Buffering.warm). */
+    /** The CDN dialled for [file], the one Play opens, and the disk cache opened, so the player finds both waiting (Buffering.warm). */
     private fun warm(file: JSONObject?) {
         val url = file?.let(EpisodeFrames::lowest) ?: return
         warming?.cancel()
-        warming = lifecycleScope.launch { Buffering.warm(url) }
+        warming = lifecycleScope.launch { Buffering.warm(applicationContext, url) }
     }
 
     private var warming: Job? = null

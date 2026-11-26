@@ -96,11 +96,15 @@ object Buffering {
      * of its playlists ([url]) and reads it to its end, which leaves the connection idle in [cdn]'s
      * pool, so the player's first request goes out on it instead of waiting on a TCP and TLS
      * handshake after OK, for as long as the server keeps it. A refusal is dropped here, before the
-     * player meets it ([cdn]); whatever else goes wrong is the player's to find and to say.
+     * player meets it ([cdn]); whatever else goes wrong is the player's to find and to say. The disk
+     * cache opens meanwhile ([cache]): left to the player's first load, a process's first film
+     * waited on the disk being measured and the index read before its first segment, now that the
+     * `stream` answer no longer takes longer than that (Api.keepStream).
      */
     // ponytail: any of the file's playlists, on the word that a file's qualities share a host; the player's own pick if they ever don't.
-    suspend fun warm(url: String) {
+    suspend fun warm(context: Context, url: String) {
         withContext(Dispatchers.IO) {
+            launch { cache(context.applicationContext) }
             runCatching {
                 val refused = cdn.newCall(Request.Builder().url(url).header("User-Agent", Api.userAgent).build()).execute().use {
                     it.body?.bytes()
