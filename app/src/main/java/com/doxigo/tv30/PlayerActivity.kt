@@ -204,7 +204,10 @@ class PlayerFragment : VideoSupportFragment() {
             }
             override fun onPlaybackStateChanged(state: Int) {
                 starve()
-                if (state == Player.STATE_READY) hideNote() // playing again, however it came back
+                if (state == Player.STATE_READY) {
+                    played = true
+                    hideNote() // playing again, however it came back
+                }
                 if (state != Player.STATE_ENDED) return
                 if (sleep == SLEEP_END) sleep = 0 // the sleep timer's end: nothing plays on
                 else if (nextFile() == null) leave()
@@ -601,6 +604,7 @@ class PlayerFragment : VideoSupportFragment() {
         // Off screen (Home, while the stream was asked for or a subtitle was being made) nothing
         // loads or sounds: onStart prepares it, as after any stop.
         ended = false
+        played = false
         if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) player.prepare()
         player.playWhenReady = play
         retime() // another file, or a subtitle just found, starts at its own offset
@@ -664,6 +668,12 @@ class PlayerFragment : VideoSupportFragment() {
     /** The `stream` answer on its way again ([refresh]), and when one was last asked for (elapsedRealtime). */
     private var refreshing: Job? = null
     private var refreshedAt = -REFRESH_GAP_MS
+    /** When a file that stopped parsing or decoding was last prepared again without a word ([fail]). */
+    private var recoveredAt = -REFRESH_GAP_MS
+    /** The source has played since it was set ([setSource]): what stops it now is not the file as a whole. */
+    private var played = false
+    /** The last failure's code, kept for the diagnostics page: the note's words cover several. */
+    private var lastError: String? = null
     /** The beat before a title that ended with nothing after it closes ([leave]). */
     private var leaving: Job? = null
 
@@ -672,16 +682,27 @@ class PlayerFragment : VideoSupportFragment() {
      * signatures gone dead, so it is asked for again without a word ([refresh]); another within
      * [REFRESH_GAP_MS] of a fresh answer is not that, and like any other failure it is said in the
      * note. It was a 3.5 s notice over a frozen frame, gone before it was read from the sofa.
+     *
+     * A file that will not parse or decode (3xxx, 4xxx) is prepared again where it stood, without a
+     * word, once: a TV's decoder that throws mid-film, or one segment that arrived damaged, is not
+     * the file. It was said at once as a file this TV cannot play, part-way through playing it
+     * (a Sony, 1.5.9). Another within [REFRESH_GAP_MS] is the file at that spot, and is said.
      */
     private fun fail(error: PlaybackException) {
+        lastError = "${error.errorCodeName.removePrefix("ERROR_CODE_")} (${error.errorCode})"
         val forbidden = generateSequence<Throwable>(error) { it.cause }.any { (it as? HttpDataSource.InvalidResponseCodeException)?.responseCode == 403 }
         if (forbidden && SystemClock.elapsedRealtime() - refreshedAt > REFRESH_GAP_MS) {
             lifecycleScope.launch { Trailer.locate() } // for split, should the fresh answer be refused too
             return refresh()
         }
+        if (error.errorCode in 3000..4999 && SystemClock.elapsedRealtime() - recoveredAt > REFRESH_GAP_MS) {
+            recoveredAt = SystemClock.elapsedRealtime()
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) player.prepare() // off screen, onStart prepares
+            return
+        }
         when (val why = if (forbidden && split()) R.string.player_error_split else errorMessage(error.errorCode)) {
             // Asking again would fail the same way: the pill opens the qualities instead.
-            R.string.player_error_format -> showNote(getString(why), R.string.player_change_quality) { openPanel { qualityAndSpeed(onSpeed = false) } }
+            R.string.player_error_format, R.string.player_error_midway -> showNote(getString(why), R.string.player_change_quality) { openPanel { qualityAndSpeed(onSpeed = false) } }
             // The CDN's refusal: its URLs are what it refused, so Retry asks for new ones.
             R.string.player_error_server, R.string.player_error_split -> showNote(getString(why), action = ::refresh)
             else -> showNote(getString(why)) { player.prepare() }
@@ -1318,7 +1339,8 @@ class PlayerFragment : VideoSupportFragment() {
         val counters = player.videoDecoderCounters
         counters?.ensureUpdated()
         return getString(R.string.playback_diagnostic_values, size ?: unknown, rate ?: unknown,
-            player.totalBufferedDuration / 1000, preview.decoderName ?: unknown, counters?.droppedBufferCount?.toString()?.localDigits() ?: unknown)
+            player.totalBufferedDuration / 1000, preview.decoderName ?: unknown, counters?.droppedBufferCount?.toString()?.localDigits() ?: unknown) +
+            lastError?.let { "\n" + getString(R.string.playback_last_error, it) }.orEmpty()
     }
 
     /**
@@ -1931,7 +1953,8 @@ class PlayerFragment : VideoSupportFragment() {
         PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED, PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> R.string.player_error_network
         // A 403 still there after Retry403's ten tries and a fresh `stream` answer, or a file gone from the CDN.
         PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS, PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND, PlaybackException.ERROR_CODE_IO_NO_PERMISSION -> R.string.player_error_server
-        in 3000..4999 -> if (qualities.size > 1) R.string.player_error_format else R.string.player_error // parsing (3xxx), decoding (4xxx)
+        // Parsing (3xxx), decoding (4xxx): after [fail]'s own try. A file that has played is not one this TV cannot play.
+        in 3000..4999 -> if (qualities.size <= 1) R.string.player_error else if (played) R.string.player_error_midway else R.string.player_error_format
         else -> R.string.player_error
     }
 

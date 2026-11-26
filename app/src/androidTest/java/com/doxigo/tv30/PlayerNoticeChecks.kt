@@ -23,15 +23,19 @@ import java.util.Locale
  * viewer on says why in the app's own notice: the player's own closed with it. A film that loads and
  * then cannot play keeps the player, a note over the video in the toast's place: on the CDN's 403
  * `stream` is asked for again by itself, once, and by Retry after; a server error gets its usual few
- * tries, not the 403's ten, and no new answer. Persian, then English.
+ * tries, not the 403's ten, and no new answer; a playlist that will not parse is asked for once
+ * more by the player itself before anything is said. Persian, then English.
  */
 object PlayerNoticeChecks {
     @Volatile private var answer = "fail"
     /** How often `stream` was asked for. */
     @Volatile private var asked = 0
+    /** How often the film's playlist was. */
+    @Volatile private var listed = 0
 
     fun run(instrumentation: Instrumentation) = with(instrumentation) {
         val result = Bundle()
+        setInTouchMode(false) // a remote's window, as on a TV: the emulator starts in touch mode, and run alone nothing has left it
         var code = Activity.RESULT_OK
         var activity: DetailsActivity? = null
         var player: Activity? = null
@@ -52,7 +56,10 @@ object PlayerNoticeChecks {
                 Response.Builder().request(request).protocol(Protocol.HTTP_1_1).code(status).message("-").body(body.toResponseBody()).build()
             }
             // The film's playlist, as the CDN would refuse it: the player's own client is built from this one.
-            if (request.url.encodedPath.endsWith(".m3u8")) return@addInterceptor reply(if (answer == "forbidden") 403 else 500, "")
+            if (request.url.encodedPath.endsWith(".m3u8")) {
+                listed++
+                return@addInterceptor if (answer == "garbled") reply(200, "garbled") else reply(if (answer == "forbidden") 403 else 500, "")
+            }
             if ("/action/" !in request.url.encodedPath) return@addInterceptor reply(404, "")
             if (request.url.pathSegments.last() == "stream") asked++
             reply(200, when (request.url.pathSegments.last()) {
@@ -101,7 +108,7 @@ object PlayerNoticeChecks {
                     player = null
                 }
                 // ---- A film that loads and then cannot play: the player stays, under its note. ----
-                for (broken in listOf("forbidden", "down")) {
+                for (broken in listOf("forbidden", "down", "garbled")) {
                     // The page's own `stream` from the player it was left by, landed before the count
                     // starts: on CI's emulator it came after, and the player read as asking twice.
                     await("The title page's own `stream` did not land ($language, $broken)") {
@@ -109,6 +116,7 @@ object PlayerNoticeChecks {
                     }
                     answer = broken
                     asked = 0
+                    listed = 0
                     await({ "Play does not have the remote ($language, $broken): it is on ${host.currentFocus.let { (it as? TextView)?.text ?: it }}" }) {
                         (host.currentFocus as? TextView)?.text?.toString() == host.getString(R.string.watch)
                     }
@@ -120,7 +128,7 @@ object PlayerNoticeChecks {
                     fun noted(): Boolean {
                         val note = stuck.findViewById<View>(R.id.player_note) ?: return false
                         return note.visibility == View.VISIBLE && note.alpha == 1f && stuck.findViewById<View>(R.id.player_note_action).isFocused &&
-                            stuck.findViewById<TextView>(R.id.player_note_why).text.toString() == stuck.getString(R.string.player_error_server)
+                            stuck.findViewById<TextView>(R.id.player_note_why).text.toString() == stuck.getString(if (broken == "garbled") R.string.player_error else R.string.player_error_server)
                     }
                     // A 403 has its ten quick tries twice over, either side of the new answer; a 500
                     // its usual three, a second apart and more: ten of those took over half a minute.
@@ -129,6 +137,8 @@ object PlayerNoticeChecks {
                         check(!stuck.isFinishing) { "The player closed on a film that would not play ($language, $broken)" }
                         val wanted = if (broken == "forbidden") 2 else 1
                         check(asked == wanted) { "`stream` was asked for $asked times before the note, not $wanted ($language, $broken)" }
+                        // Not a playlist: no load is tried again for that, so each prepare asks once.
+                        check(broken != "garbled" || listed == 2) { "A playlist that would not parse was asked for $listed times before the note, not twice ($language)" }
                     }
                     if (broken == "forbidden") {
                         capture("player-note-$language")
@@ -146,7 +156,7 @@ object PlayerNoticeChecks {
                 await("Details did not close") { host.isDestroyed }
                 activity = null
             }
-            result.putString("stream", "PASS: a failed or empty stream answer closes the player and the title page beneath says why in its own notice; a film that cannot play keeps the player under its note (a 403 asks for stream again once, then Retry does; a 500 is said within its usual tries), Back leaving it; in Persian and English\n")
+            result.putString("stream", "PASS: a failed or empty stream answer closes the player and the title page beneath says why in its own notice; a film that cannot play keeps the player under its note (a 403 asks for stream again once, then Retry does; a 500 is said within its usual tries; a playlist that will not parse is tried once more first), Back leaving it; in Persian and English\n")
         } catch (error: Throwable) {
             code = Activity.RESULT_CANCELED
             result.putString("stream", error.stackTraceToString())

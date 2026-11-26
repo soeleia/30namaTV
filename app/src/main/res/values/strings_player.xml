@@ -34,6 +34,8 @@
          TV from different countries (PlayerFragment.split): a VPN sending them different ways. -->
     <string name="player_error_split">سرور ویدیو و ۳۰نما شما را از دو اینترنت متفاوت می‌بینند (احتمالاً VPN). ویدیوی ۳۰نما را هم مثل خود ۳۰نما، با VPN یا بدون آن، از یک مسیر بفرستید.</string>
     <string name="player_error_format">این فایل روی این تلویزیون پخش نمی‌شود. کیفیت دیگری را امتحان کنید.</string>
+    <!-- The same failure in a file that had been playing, after one quiet try (PlayerFragment.fail). -->
+    <string name="player_error_midway">این فایل از اینجا به بعد پخش نشد. کیفیت دیگری را امتحان کنید.</string>
     <string name="player_error">هنگام پخش مشکلی پیش آمد. دوباره امتحان کنید.</string>
     <!-- The note's pill under player_error_format, where asking again would fail the same way: it opens the qualities. -->
     <string name="player_change_quality">تغییر کیفیت</string>
@@ -114,4 +116,6 @@
     <string name="player_unknown">نامشخص</string>
     <string name="player_bitrate_mbps">%1$.2f مگابیت‌برثانیه</string>
     <string name="playback_diagnostic_values">وضوح تصویر: %1$s\nنرخ بیت ویدیو: %2$s\nزمان بافرشده: %3$d ثانیه\nرمزگشای ویدیو: %4$s\nفریم‌های ازدست‌رفته: %5$s</string>
+    <!-- Under them once playback has failed, said or not: ExoPlayer's own name for it, Latin, after the label so the line stays right to left. -->
+    <string name="playback_last_error">آخرین خطای پخش: %1$s</string>
 </resources>

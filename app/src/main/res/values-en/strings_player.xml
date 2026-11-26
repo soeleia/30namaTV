@@ -24,6 +24,7 @@
     <string name="player_error_server">This video isn\'t available right now. Try again in a moment.</string>
     <string name="player_error_split">The video server and 30nama see you on two different networks (probably a VPN). Send 30nama\'s video the same way as 30nama itself, through the VPN or around it.</string>
     <string name="player_error_format">This file won\'t play on this TV. Try another quality.</string>
+    <string name="player_error_midway">This file wouldn\'t play past this point. Try another quality.</string>
     <string name="player_error">Something went wrong while playing. Try again.</string>
     <string name="player_change_quality">Change quality</string>
     <string name="player_no_files">30nama sent no video for this title. Try again in a moment.</string>
@@ -83,4 +84,5 @@
     <string name="player_unknown">Unknown</string>
     <string name="player_bitrate_mbps">%1$.2f Mbps</string>
     <string name="playback_diagnostic_values">Resolution: %1$s\nVideo bitrate: %2$s\nBuffered: %3$d s\nDecoder: %4$s\nDropped frames: %5$s</string>
+    <string name="playback_last_error">Last playback error: %1$s</string>
 </resources>
