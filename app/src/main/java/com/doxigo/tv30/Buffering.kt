@@ -44,6 +44,7 @@ import okhttp3.ConnectionPool
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
+import okhttp3.Request
 import okhttp3.ResponseBody.Companion.toResponseBody
 import java.io.IOException
 import kotlin.math.abs
@@ -89,6 +90,26 @@ object Buffering {
      * the player loading, pulls the read-ahead off its old position.
      */
     val priority = PriorityTaskManager()
+
+    /**
+     * Dials the CDN ahead of Play: the title page, once it knows the file Play opens, asks for one
+     * of its playlists ([url]) and reads it to its end, which leaves the connection idle in [cdn]'s
+     * pool, so the player's first request goes out on it instead of waiting on a TCP and TLS
+     * handshake after OK, for as long as the server keeps it. A refusal is dropped here, before the
+     * player meets it ([cdn]); whatever else goes wrong is the player's to find and to say.
+     */
+    // ponytail: any of the file's playlists, on the word that a file's qualities share a host; the player's own pick if they ever don't.
+    suspend fun warm(url: String) {
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val refused = cdn.newCall(Request.Builder().url(url).header("User-Agent", Api.userAgent).build()).execute().use {
+                    it.body?.bytes()
+                    it.code == 403
+                }
+                if (refused) cdn.connectionPool.evictAll() // idle only now, the answer closed
+            }
+        }
+    }
 
     /** Straight to the CDN on [cdn], no disk: playlists, and the seek previews' cut segments (SeekPreview). */
     val upstream by lazy { OkHttpDataSource.Factory(cdn).setUserAgent(Api.userAgent) }

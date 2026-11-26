@@ -91,12 +91,15 @@ object ControlsChecks {
                 checkNotNull(fragment.view).findViewsWithText(matches, host.getString(R.string.playback_diagnostics), View.FIND_VIEWS_WITH_CONTENT_DESCRIPTION)
                 matches.single().performClick()
             }
-            await("Playback diagnostics did not display all five values") {
+            // Five of the picture and its buffer, then the start's two waits and the last seek's.
+            await("Playback diagnostics did not display all eight values") {
                 val note = fragment.view?.findViewWithTag<TextView>("panelNote")
                 val decoder = (field(fragment, "preview") as SeekPreview).decoderName
-                note != null && note.isShown && note.lineCount >= 5 && note.text.lines().size == 5 &&
+                note != null && note.isShown && note.lineCount >= 8 && note.text.lines().size == 8 &&
                     "1920 × 1080".localDigits() in note.text && decoder != null && decoder in note.text
             }
+            SystemClock.sleep(400) // the page slides in
+            capture("controls-diagnostics")
             press(KeyEvent.KEYCODE_BACK)
             runOnMainSync { check((field(fragment, "panel") as PlayerPanel).isOpen) }
             press(KeyEvent.KEYCODE_BACK)

@@ -24,7 +24,9 @@ import java.util.Locale
  * then cannot play keeps the player, a note over the video in the toast's place: on the CDN's 403
  * `stream` is asked for again by itself, once, and by Retry after; a server error gets its usual few
  * tries, not the 403's ten, and no new answer; a playlist that will not parse is asked for once
- * more by the player itself before anything is said. Persian, then English.
+ * more by the player itself before anything is said. The player asks for `stream` itself only where
+ * the title page has no answer with files to hand it (Api.keepStream): after the page's empty one
+ * it does, after a good one it plays the page's. Persian, then English.
  */
 object PlayerNoticeChecks {
     @Volatile private var answer = "fail"
@@ -74,11 +76,13 @@ object PlayerNoticeChecks {
         }.build()
         try {
             for (language in listOf("fa", "en")) {
+                answer = "fail" // before the page asks: the language before left it on a good answer
                 runOnMainSync {
                     clientField.set(Api, client)
                     Api.language = language
                     Api.token = null
                     Api.user = null
+                    Api.takeStream(42, true) // and the one its page kept for a player
                 }
                 activity = startActivitySync(DetailsActivity.intent(targetContext, JSONObject(film))
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as DetailsActivity
@@ -108,11 +112,14 @@ object PlayerNoticeChecks {
                     player = null
                 }
                 // ---- A film that loads and then cannot play: the player stays, under its note. ----
-                for (broken in listOf("forbidden", "down", "garbled")) {
+                // "down" comes after the page's empty answer, so the player asks itself; the two after
+                // it each come after a good one, which the page hands the player.
+                for (broken in listOf("down", "forbidden", "garbled")) {
                     // The page's own `stream` from the player it was left by, landed before the count
                     // starts: on CI's emulator it came after, and the player read as asking twice.
+                    // The playlist it then asks for to dial the CDN (Buffering.warm), too.
                     await("The title page's own `stream` did not land ($language, $broken)") {
-                        (field(host, "episodesAsk") as Job?)?.isActive != true
+                        (field(host, "episodesAsk") as Job?)?.isActive != true && (field(host, "warming") as Job?)?.isActive != true
                     }
                     answer = broken
                     asked = 0
@@ -135,7 +142,8 @@ object PlayerNoticeChecks {
                     await("No note with Retry on the remote ($language, $broken)", 15_000) { noted() }
                     runOnMainSync {
                         check(!stuck.isFinishing) { "The player closed on a film that would not play ($language, $broken)" }
-                        val wanted = if (broken == "forbidden") 2 else 1
+                        // Its own ask, with nothing handed over; the 403's new answer; none at all.
+                        val wanted = if (broken == "garbled") 0 else 1
                         check(asked == wanted) { "`stream` was asked for $asked times before the note, not $wanted ($language, $broken)" }
                         // Not a playlist: no load is tried again for that, so each prepare asks once.
                         check(broken != "garbled" || listed == 2) { "A playlist that would not parse was asked for $listed times before the note, not twice ($language)" }
@@ -143,9 +151,9 @@ object PlayerNoticeChecks {
                     if (broken == "forbidden") {
                         capture("player-note-$language")
                         sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
-                        await("Retry did not ask for `stream` again ($language)") { asked == 3 }
+                        await("Retry did not ask for `stream` again ($language)") { asked == 2 }
                         await("The note did not come back when Retry failed too ($language)", 15_000) { noted() }
-                        runOnMainSync { check(asked == 3) { "Retry's failure asked for `stream` again by itself: $asked times ($language)" } }
+                        runOnMainSync { check(asked == 2) { "Retry's failure asked for `stream` again by itself: $asked times ($language)" } }
                     }
                     sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
                     await("Back on the note did not leave the player ($language, $broken)") { stuck.isFinishing || stuck.isDestroyed }
@@ -156,7 +164,7 @@ object PlayerNoticeChecks {
                 await("Details did not close") { host.isDestroyed }
                 activity = null
             }
-            result.putString("stream", "PASS: a failed or empty stream answer closes the player and the title page beneath says why in its own notice; a film that cannot play keeps the player under its note (a 403 asks for stream again once, then Retry does; a 500 is said within its usual tries; a playlist that will not parse is tried once more first), Back leaving it; in Persian and English\n")
+            result.putString("stream", "PASS: a failed or empty stream answer closes the player and the title page beneath says why in its own notice; a film that cannot play keeps the player under its note (a 403 asks for stream again once, then Retry does; a 500 is said within its usual tries; a playlist that will not parse is tried once more first), Back leaving it; the player plays the title page's own stream answer where that has files and asks itself where it has none; in Persian and English\n")
         } catch (error: Throwable) {
             code = Activity.RESULT_CANCELED
             result.putString("stream", error.stackTraceToString())

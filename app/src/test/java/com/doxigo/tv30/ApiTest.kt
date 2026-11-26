@@ -9,6 +9,8 @@ import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.json.JSONObject
@@ -34,6 +36,26 @@ class ApiTest {
                 else -> error("unexpected string $id")
             }
         }
+
+    @Test
+    fun theTitlePagesStreamAnswerIsHandedOverOnce() {
+        val answer = JSONObject("""{"hls":[{"info":{"file_id":"a"}}]}""")
+        Api.keepStream(42, true, answer, now = 0)
+        assertSame(answer, Api.takeStream(42, true, now = 1_000))
+        assertNull(Api.takeStream(42, true, now = 1_000)) // once
+        Api.keepStream(42, true, answer, now = 0)
+        assertNull(Api.takeStream(43, true, now = 1_000)) // another title's player
+        assertNull(Api.takeStream(42, true, now = 1_000)) // and it is gone all the same
+        Api.keepStream(42, true, answer, now = 0)
+        assertNull(Api.takeStream(42, false, now = 1_000)) // asked for as a subscriber's
+        Api.keepStream(42, true, answer, now = 0)
+        assertNull(Api.takeStream(42, true, now = 5 * 60_000)) // its signatures may have died
+        Api.keepStream(42, true, JSONObject("""{"hls":[]}"""), now = 0)
+        assertNull(Api.takeStream(42, true, now = 1_000)) // no files: the player asks, and says why itself
+        Api.keepStream(42, true, answer, now = 0)
+        Api.keepStream(42, true, null, now = 0) // the page asking again
+        assertNull(Api.takeStream(42, true, now = 1_000))
+    }
 
     @Test
     fun onlyARefusedSessionEndsIt() {

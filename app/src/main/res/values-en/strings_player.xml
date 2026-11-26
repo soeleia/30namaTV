@@ -84,5 +84,8 @@
     <string name="player_unknown">Unknown</string>
     <string name="player_bitrate_mbps">%1$.2f Mbps</string>
     <string name="playback_diagnostic_values">Resolution: %1$s\nVideo bitrate: %2$s\nBuffered: %3$d s\nDecoder: %4$s\nDropped frames: %5$s</string>
+    <string name="playback_timing_values">Start-up delay: %1$s\n30nama\'s answer: %2$s\nLast seek delay: %3$s</string>
+    <string name="player_seconds">%1$.1f s</string>
+    <string name="playback_answer_handed_over">from the title page</string>
     <string name="playback_last_error">Last playback error: %1$s</string>
 </resources>

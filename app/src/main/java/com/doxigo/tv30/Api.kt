@@ -3,6 +3,7 @@ package com.doxigo.tv30
 import android.content.Context
 import android.content.SharedPreferences
 import android.content.res.Configuration
+import android.os.SystemClock
 import android.webkit.WebSettings
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -398,6 +399,29 @@ object Api {
     }
     suspend fun stream(id: Int, free: Boolean) =
         result("stream", "post_id" to id, "free_stream" to free) as JSONObject
+
+    /**
+     * The title page's `stream` answer, for the player its Play opens: the player asked again for
+     * what the page beneath it had just been sent, a round trip to 30nama before anything loaded.
+     * Only the page's latest ask, and only an answer with files: a page asking again forgets the one
+     * before first ([answer] null), so nothing older, emptier or another title's is ever handed
+     * over, and the player takes it once. Main thread.
+     */
+    // ponytail: five minutes, on the word of signatures that outlast a film; one dead all the same meets its 403 and the player asks again itself (PlayerFragment.refresh).
+    fun keepStream(id: Int, free: Boolean, answer: JSONObject?, now: Long = SystemClock.elapsedRealtime()) {
+        kept = answer?.takeIf { (it.optJSONArray("hls")?.length() ?: 0) > 0 }?.let { Kept(id, free, it, now) }
+    }
+
+    /** The answer [keepStream] holds, if it is [id]'s and fresh; gone from here either way. */
+    fun takeStream(id: Int, free: Boolean, now: Long = SystemClock.elapsedRealtime()): JSONObject? {
+        val held = kept
+        kept = null
+        return held?.takeIf { it.id == id && it.free == free && now - it.at < 5 * 60_000 }?.answer
+    }
+
+    private class Kept(val id: Int, val free: Boolean, val answer: JSONObject, val at: Long)
+    private var kept: Kept? = null
+
     /**
      * Where [seconds] of playback is reported: its 15 s mark. The official player reports only on
      * the marks (floor(time) % 15 == 0), and 30nama keeps nothing sent between them: reports at

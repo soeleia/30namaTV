@@ -193,6 +193,15 @@ class DetailsActivity : TvActivity() {
         if (episodesAsk?.isActive != true) episodesAsk = lifecycleScope.launch { loadEpisodes() }
     }
 
+    /** The CDN dialled for [file], the one Play opens, so the player finds a connection waiting (Buffering.warm). */
+    private fun warm(file: JSONObject?) {
+        val url = file?.let(EpisodeFrames::lowest) ?: return
+        warming?.cancel()
+        warming = lifecycleScope.launch { Buffering.warm(url) }
+    }
+
+    private var warming: Job? = null
+
     private fun bind() {
         // The critics' scores make way when the line would otherwise lose its end, the length and
         // the Persian subtitles chip, to the ellipsis.
@@ -393,6 +402,8 @@ class DetailsActivity : TvActivity() {
         // Not a failure to say: Play asks again and says why (buildActions).
         runCatching { knowUser() }.onFailure { if (it is CancellationException) throw it }
         if (!title.streamable) return
+        // The answer goes on to the player Play opens (Api.keepStream); the one before is no longer the page's.
+        Api.keepStream(title.titleId, title.isFree, null)
         val stream = runCatching { Api.stream(title.titleId, title.isFree) }.getOrElse {
             if (it is CancellationException) throw it
             // Tiles already up keep what they show; none yet, their place says why. A film's Play
@@ -400,6 +411,7 @@ class DetailsActivity : TvActivity() {
             if (!title.isMovie && episodeRows.isEmpty()) noteEpisodes(errorText(it))
             return
         }
+        Api.keepStream(title.titleId, title.isFree, stream)
         val all = stream.optJSONArray("hls").objects()
         if (title.isMovie) return resumeFilm(all, stream.optJSONObject("continue_watching"))
         // Play's episode by the player's own rule (UpNext.kt): saved in the credits, it is the next one
@@ -413,6 +425,7 @@ class DetailsActivity : TvActivity() {
         val savedIndex = point?.first ?: -1
         val (playIndex, playAt) = Watched.upNext(this, all, savedIndex, point?.second ?: 0L)
         val resumeFile = all.getOrNull(playIndex)?.str("info", "file_id")
+        warm(all.getOrNull(playIndex))
         // The marked tile: how far in where Play resumes it, none where Play starts it, which it says as the next one.
         val length = all.getOrNull(playIndex)?.let { Watched.of(this, it)?.duration }?.takeIf { it > 0 }
         // Nor is a tile marked that Play starts over, seen to its end (a finished series' finale): it keeps its check.
@@ -483,6 +496,7 @@ class DetailsActivity : TvActivity() {
         Watched.seed(this, files, saved)
         // Left in its credits, a film starts over (UpNext.kt), and Play says «تماشا» again.
         val (index, at) = Watched.upNext(this, files, point?.first ?: -1, point?.second ?: 0L)
+        warm(files.getOrNull(index))
         // Its length as this TV played it or the server's point implies it, else 30nama's own minutes.
         val length = files.getOrNull(index)?.let { Watched.of(this, it)?.duration }?.takeIf { it > 0 }
             ?: title.obj("info", "time")?.optInt("default")?.let { it * 60L } ?: 0L

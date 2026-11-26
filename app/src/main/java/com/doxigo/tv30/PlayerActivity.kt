@@ -164,6 +164,17 @@ class PlayerFragment : VideoSupportFragment() {
     private var seekHeld = 0L
     /** The frame the bar is scrubbed to, over it (SeekPreview.kt). */
     private lateinit var preview: SeekPreview
+    /**
+     * What a viewer waits on, for the diagnostics page ([timings]): from this screen opening
+     * (elapsedRealtime) to the `stream` answer, [handedOver] by the title page or asked for here, and
+     * to the first frame; then from the last seek to its frame. -1 until it has happened.
+     */
+    private val openedAt = SystemClock.elapsedRealtime()
+    private var answeredMs = -1L
+    private var handedOver = false
+    private var firstFrameMs = -1L
+    private var seekAt = 0L
+    private var seekMs = -1L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -220,6 +231,16 @@ class PlayerFragment : VideoSupportFragment() {
                 syncCountdown()
             }
             override fun onPlayerError(error: PlaybackException) = fail(error)
+            // The waits the diagnostics page shows ([timings]). A source set at a position is no seek.
+            override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+                if (reason == Player.DISCONTINUITY_REASON_SEEK) seekAt = SystemClock.elapsedRealtime()
+            }
+            override fun onRenderedFirstFrame() {
+                val now = SystemClock.elapsedRealtime()
+                if (firstFrameMs < 0) firstFrameMs = now - openedAt
+                if (seekAt > 0) seekMs = now - seekAt
+                seekAt = 0
+            }
         })
         progressBarManager.show()
         lifecycleScope.launch { load() }
@@ -455,8 +476,13 @@ class PlayerFragment : VideoSupportFragment() {
         val args = requireActivity().intent
         postId = args.getIntExtra("id", 0)
         facts = args.getStringExtra("title")?.let { runCatching { JSONObject(it) }.getOrNull() } ?: JSONObject()
+        val free = args.getBooleanExtra("free", false)
+        // The title page's own answer, when it has just had one (Api.keepStream); else asked for here.
         // Back while it loads cancels this: not a failure to tell the next page of (parting).
-        val loaded = runCatching { Api.stream(postId, args.getBooleanExtra("free", false)) }.onFailure { if (it is CancellationException) throw it }
+        val kept = Api.takeStream(postId, free)
+        handedOver = kept != null
+        val loaded = kept?.let { Result.success(it) } ?: runCatching { Api.stream(postId, free) }.onFailure { if (it is CancellationException) throw it }
+        answeredMs = SystemClock.elapsedRealtime() - openedAt
         val context = context ?: return // left while loading
         // A notice here would close with the player: the page beneath says why (parting).
         val stream = loaded.getOrElse {
@@ -1340,7 +1366,15 @@ class PlayerFragment : VideoSupportFragment() {
         counters?.ensureUpdated()
         return getString(R.string.playback_diagnostic_values, size ?: unknown, rate ?: unknown,
             player.totalBufferedDuration / 1000, preview.decoderName ?: unknown, counters?.droppedBufferCount?.toString()?.localDigits() ?: unknown) +
+            "\n" + timings(unknown) +
             lastError?.let { "\n" + getString(R.string.playback_last_error, it) }.orEmpty()
+    }
+
+    /** The start's two waits and the last seek's, in seconds; [unknown] for what has not happened yet. */
+    private fun timings(unknown: String): String {
+        fun seconds(ms: Long) = if (ms < 0) unknown else getString(R.string.player_seconds, ms / 1000.0)
+        return getString(R.string.playback_timing_values, seconds(firstFrameMs),
+            if (handedOver) getString(R.string.playback_answer_handed_over) else seconds(answeredMs), seconds(seekMs))
     }
 
     /**

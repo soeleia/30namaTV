@@ -116,6 +116,9 @@
     <string name="player_unknown">نامشخص</string>
     <string name="player_bitrate_mbps">%1$.2f مگابیت‌برثانیه</string>
     <string name="playback_diagnostic_values">وضوح تصویر: %1$s\nنرخ بیت ویدیو: %2$s\nزمان بافرشده: %3$d ثانیه\nرمزگشای ویدیو: %4$s\nفریم‌های ازدست‌رفته: %5$s</string>
+    <string name="playback_timing_values">تأخیر شروع پخش: %1$s\nپاسخ ۳۰نما: %2$s\nتأخیر آخرین پرش: %3$s</string>
+    <string name="player_seconds">%1$.1f ثانیه</string>
+    <string name="playback_answer_handed_over">از صفحهٔ عنوان</string>
     <!-- Under them once playback has failed, said or not: ExoPlayer's own name for it, Latin, after the label so the line stays right to left. -->
     <string name="playback_last_error">آخرین خطای پخش: %1$s</string>
 </resources>
