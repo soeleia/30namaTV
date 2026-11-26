@@ -138,11 +138,12 @@ class Pager(
 /**
  * [count] stand-ins for posters [width] × [height] dp (the cards' own size, so nothing moves when
  * they arrive): the artwork's block and its two caption lines in the placeholder grey, breathing
- * slowly. Never focusable, so the remote waits for real cards.
+ * slowly. Never focusable, so the remote waits for real cards. Without [captions] it is the block
+ * alone: an episode's tile, whose words sit inside it.
  */
-class Skeleton(val count: Int, width: Int, height: Int) {
+class Skeleton(val count: Int, width: Int, height: Int, captions: Boolean = true) {
     val presenter: Presenter = object : Presenter() {
-        override fun onCreateViewHolder(parent: ViewGroup) = ViewHolder(Bones(parent.context, width, height))
+        override fun onCreateViewHolder(parent: ViewGroup) = ViewHolder(Bones(parent.context, width, height, captions))
         override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) = Unit
         override fun onUnbindViewHolder(viewHolder: ViewHolder) = Unit
     }
@@ -153,7 +154,7 @@ class Skeleton(val count: Int, width: Int, height: Int) {
  * the outer one when the cards replace it; every pulse keeps the clock's phase, so a row of them
  * breathes as one rather than rippling. Still under reduced motion.
  */
-private class Bones(context: Context, width: Int, height: Int) : FrameLayout(context) {
+private class Bones(context: Context, width: Int, height: Int, captions: Boolean) : FrameLayout(context) {
     private val body = LinearLayout(context)
     private val pulse = ObjectAnimator.ofFloat(body, View.ALPHA, 1f, 0.5f).apply {
         duration = PULSE
@@ -170,10 +171,12 @@ private class Bones(context: Context, width: Int, height: Int) : FrameLayout(con
         body.orientation = LinearLayout.VERTICAL
         body.gravity = Gravity.START
         // A card's caption takes 48dp under its art (title, then the facts): two lines' worth here.
-        body.setPadding(0, 0, 0, (10 * dp).toInt())
         body.addView(block(resources.getDimension(R.dimen.corner)), LinearLayout.LayoutParams(w, (height * dp).toInt()))
-        body.addView(block(2 * dp), LinearLayout.LayoutParams(w * 7 / 10, (10 * dp).toInt()).apply { topMargin = (12 * dp).toInt() })
-        body.addView(block(2 * dp), LinearLayout.LayoutParams(w * 9 / 20, (8 * dp).toInt()).apply { topMargin = (8 * dp).toInt() })
+        if (captions) {
+            body.setPadding(0, 0, 0, (10 * dp).toInt())
+            body.addView(block(2 * dp), LinearLayout.LayoutParams(w * 7 / 10, (10 * dp).toInt()).apply { topMargin = (12 * dp).toInt() })
+            body.addView(block(2 * dp), LinearLayout.LayoutParams(w * 9 / 20, (8 * dp).toInt()).apply { topMargin = (8 * dp).toInt() })
+        }
         addView(body)
     }
 

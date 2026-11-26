@@ -15,9 +15,14 @@ import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.json.JSONObject
 import java.util.Locale
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
- * Run the existing instrumentation runner with -e check seasons. A series whose `stream` answer
+ * Run the existing instrumentation runner with -e check seasons. While a series' `stream` answer
+ * is on its way its tiles' bones stand in the seasons' place, out of the remote's reach, and the
+ * seasons take it as soon as that answer lands, `single` still unanswered: the two are asked
+ * together. Then a series whose `stream` answer
  * fails, or comes back with no episodes, keeps «قسمت‌ها بارگیری نشد» and why in its seasons' place;
  * Down from Play lands on its Retry, and OK there, once 30nama answers, puts the seasons in its
  * place with the remote on the first episode. Persian fails, English comes back empty. A season
@@ -26,6 +31,8 @@ import java.util.Locale
  */
 object SeasonsChecks {
     @Volatile private var answer = "fail"
+    /** An action's answers wait for its latch, as on a slow line. */
+    private val held = java.util.concurrent.ConcurrentHashMap<String, CountDownLatch>()
 
     fun run(instrumentation: Instrumentation) = with(instrumentation) {
         val result = Bundle()
@@ -55,6 +62,7 @@ object SeasonsChecks {
                 Response.Builder().request(request).protocol(Protocol.HTTP_1_1).code(status).message("-").body(body.toResponseBody()).build()
             }
             if ("/action/" !in request.url.encodedPath) return@addInterceptor reply(404, "")
+            held[request.url.pathSegments.last()]?.await(20, TimeUnit.SECONDS)
             reply(200, when (request.url.pathSegments.last()) {
                 "single" -> """{"success":true,"result":${if (answer.startsWith("film")) film else series}}"""
                 "stream" -> when (answer) {
@@ -69,6 +77,44 @@ object SeasonsChecks {
             })
         }.build()
         try {
+            // ---- The bones while the episodes are asked for, and the seasons before `single`. ----
+            answer = "ok"
+            val single = CountDownLatch(1).also { held["single"] = it }
+            val stream = CountDownLatch(1).also { held["stream"] = it }
+            runOnMainSync {
+                clientField.set(Api, client)
+                Api.language = "fa"
+                Api.token = null
+                Api.user = null
+            }
+            activity = startActivitySync(DetailsActivity.intent(targetContext, JSONObject(series))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as DetailsActivity
+            val waiting = checkNotNull(activity)
+            fun first() = (waiting.supportFragmentManager.findFragmentById(R.id.rows) as RowsSupportFragment).adapter.takeIf { it.size() > 0 }?.get(0) as? ListRow
+            await("No bones in the seasons' place while the episodes are asked for") {
+                first()?.let { it.headerItem == null && it.adapter.size() > 0 && it.adapter.get(0) is Skeleton } == true
+            }
+            SystemClock.sleep(800) // the page settles: actions, scrims
+            capture("seasons-bones")
+            // The first press may only leave touch mode; neither reaches the bones or raises the rows.
+            repeat(2) { sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN) }
+            SystemClock.sleep(500)
+            var reached = ""
+            runOnMainSync {
+                val page = waiting.findViewById<android.view.View>(R.id.rows)
+                if (page.hasFocus() || waiting.findViewById<android.view.View>(R.id.actions).alpha != 1f) reached = "${waiting.currentFocus}"
+            }
+            check(reached.isEmpty()) { "Down from Play went into the bones: $reached" }
+            stream.countDown()
+            await("The seasons waited for `single`, not only for their own answer") {
+                first()?.headerItem?.name == waiting.getString(R.string.season_n, 1) && first()?.adapter?.size() == 6
+            }
+            single.countDown()
+            held.clear()
+            runOnMainSync { waiting.finish() }
+            await("Details did not close") { waiting.isDestroyed }
+            activity = null
+
             for ((language, broken) in listOf("fa" to "fail", "en" to "empty")) {
                 answer = broken
                 runOnMainSync {
@@ -158,11 +204,13 @@ object SeasonsChecks {
                 await("Details did not close") { page.isDestroyed }
                 activity = null
             }
-            result.putString("stream", "PASS: a failed (Persian) or empty (English) episode answer notes the seasons' place, Down reaches Retry, OK brings the seasons in place, risen, with the remote on episode 1; a season out since gets its own row on coming back; a film left part-way resumes on Play with its time left, which follows the point\n")
+            result.putString("stream", "PASS: bones stand in the seasons' place while they are asked for, out of the remote's reach, and the seasons land before `single` answers; a failed (Persian) or empty (English) episode answer notes the seasons' place, Down reaches Retry, OK brings the seasons in place, risen, with the remote on episode 1; a season out since gets its own row on coming back; a film left part-way resumes on Play with its time left, which follows the point\n")
         } catch (error: Throwable) {
             code = Activity.RESULT_CANCELED
             result.putString("stream", error.stackTraceToString())
         } finally {
+            held.values.forEach { it.countDown() }
+            held.clear()
             runOnMainSync { activity?.finish() }
             await("Details did not close") { activity?.isDestroyed != false }
             runOnMainSync {

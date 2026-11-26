@@ -59,6 +59,8 @@ class DetailsActivity : TvActivity() {
     private val episodeRows = mutableListOf<ArrayObjectAdapter>()
     /** In the seasons' place while 30nama's answer failed or came back empty (see [noteEpisodes]). */
     private var episodesNote: ListRow? = null
+    /** In the seasons' place while a series' first answer is on its way (see [awaitEpisodes]). */
+    private var episodesBones: ListRow? = null
     /** Another ask for the episodes, from the note or on coming back; one at a time. */
     private var episodesAsk: Job? = null
     /** Each row's id, which keeps its last focused card: rows come and go, so not their place. */
@@ -126,6 +128,8 @@ class DetailsActivity : TvActivity() {
         buildActions()
         bind()
         watch.requestFocus()
+        // A plan not known yet (knowUser) may turn out to stream it: the bones wait for that too.
+        if (!title.isMovie && (title.streamable || title.streams && Api.loggedIn && Api.user == null)) awaitEpisodes()
 
         // None of them waits on another, or holds up the page; all stop when the page closes.
         // TMDB's entry (the call the trailer and More Like This share) adds to the credit line.
@@ -138,12 +142,20 @@ class DetailsActivity : TvActivity() {
             // TMDB plus up to twelve 30nama searches take seconds, so the row is fetched from the
             // start but added last, under the cast.
             val similar = async { Similar.titles(this@DetailsActivity, title) }
+            // The episodes are asked for beside `single`, not after it, and drawn as their own
+            // answer lands: a list's title already says all `stream` is asked by (its id, whether
+            // it streams and is free), and the tiles waited a round trip to 30nama for each, one
+            // after the other. A title that came without those flags waits for `single` to say, as before.
+            val episodes = if (title.obj("options")?.has("free_stream") == true) launch { loadEpisodes() } else null
             runCatching { Api.single(title.titleId) }.onSuccess {
                 title = it
                 bind()
                 updateActions() // a list that left options.stream out may have led to a title 30nama doesn't stream
             }
-            loadEpisodes()
+            episodes?.join() ?: loadEpisodes()
+            // Nothing came in their place: a plan that can't stream it, or a film after all.
+            episodesBones?.let { rows.remove(it) }
+            episodesBones = null
             showCast()
             similar.await()?.let(::showSimilar)
         }
@@ -168,6 +180,9 @@ class DetailsActivity : TvActivity() {
 
     /** Risen rows cover the actions, so Up from the first row has nothing above it: send it to Play. */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // The bones are the only row while they stand, and a row with nothing to focus takes the
+        // remote itself: the rows rose over the actions with no tile lit. Down waits for the tiles.
+        if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN && episodesBones != null) return true
         if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP && rowsFragment.view?.hasFocus() == true && rowsFragment.selectedPosition == 0) {
             if (event.action == KeyEvent.ACTION_DOWN) watch.requestFocus()
             return true
@@ -399,19 +414,12 @@ class DetailsActivity : TvActivity() {
      * rows themselves have changed. A film has no rows; the same answer says where its Play picks up.
      */
     private suspend fun loadEpisodes() {
-        // Not a failure to say: Play asks again and says why (buildActions).
-        runCatching { knowUser() }.onFailure { if (it is CancellationException) throw it }
-        if (!title.streamable) return
-        // The answer goes on to the player Play opens (Api.keepStream); the one before is no longer the page's.
-        Api.keepStream(title.titleId, title.isFree, null)
-        val stream = runCatching { Api.stream(title.titleId, title.isFree) }.getOrElse {
-            if (it is CancellationException) throw it
+        val stream = (askStream() ?: return).getOrElse {
             // Tiles already up keep what they show; none yet, their place says why. A film's Play
             // keeps its word, and the player says why if it can't play either.
             if (!title.isMovie && episodeRows.isEmpty()) noteEpisodes(errorText(it))
             return
         }
-        Api.keepStream(title.titleId, title.isFree, stream)
         val all = stream.optJSONArray("hls").objects()
         if (title.isMovie) return resumeFilm(all, stream.optJSONObject("continue_watching"))
         // Play's episode by the player's own rule (UpNext.kt): saved in the credits, it is the next one
@@ -465,7 +473,7 @@ class DetailsActivity : TvActivity() {
         // Else they are made again: the first time, in the note's place, or because a season came out
         // or a long one ran into its next fifty while the page was open. Filled in by their old
         // places, every row after such a change showed the stretch before its own under its old header.
-        val old = if (episodesNote != null) 1 else episodeRows.size
+        val old = if (episodesNote != null || episodesBones != null) 1 else episodeRows.size
         val among = rowsFragment.view?.hasFocus() == true && (rowsFragment.verticalGridView?.selectedPosition ?: old) < old
         val episodes = EpisodePresenter(this)
         val made = built.map { (header, cards) -> ListRow(HeaderItem(rowIds++, header), ArrayObjectAdapter(episodes).apply { setItems(cards, null) }) }
@@ -478,12 +486,44 @@ class DetailsActivity : TvActivity() {
         episodeRows.clear()
         made.mapTo(episodeRows) { it.adapter as ArrayObjectAdapter }
         episodesNote = null
+        episodesBones = null
         // The remote was among them (asked again from the note, say): on to Play's episode.
         if (among) {
             val (row, tile) = landing ?: (0 to 0)
             landing = null
             rowsFragment.setSelectedPosition(row, false, ListRowPresenter.SelectItemViewHolderTask(tile).apply { isSmoothScroll = false })
         }
+    }
+
+    /**
+     * 30nama's `stream` answer for the title as the page knows it, or why it didn't come; null for a
+     * title that isn't the viewer's to stream. The answer goes on to the player Play opens
+     * (Api.keepStream), by the id and the flag it was asked with; the one before is no longer the page's.
+     */
+    private suspend fun askStream(): Result<JSONObject>? {
+        // Not a failure to say: Play asks again and says why (buildActions).
+        runCatching { knowUser() }.onFailure { if (it is CancellationException) throw it }
+        if (!title.streamable) return null
+        val id = title.titleId
+        val free = title.isFree
+        Api.keepStream(id, free, null)
+        return runCatching { Api.stream(id, free) }
+            .onSuccess { Api.keepStream(id, free, it) }
+            .onFailure { if (it is CancellationException) throw it }
+    }
+
+    /**
+     * The seasons' place while a series' first `stream` answer is on its way: a row of the tiles'
+     * own bones (Pager.kt's Skeleton, at the tiles' size), so the page says episodes are coming
+     * instead of ending under Play until they land, seconds on a slow line. Under no header: how
+     * many seasons, and which, is the answer's to say. Nothing the remote can reach; the seasons,
+     * or the note that they failed, take its place where it stands.
+     */
+    private fun awaitEpisodes() {
+        val bone = Skeleton(4, 224, 126, captions = false) // as many tiles as the screen's width shows
+        val row = ListRow(ArrayObjectAdapter(bone.presenter).apply { addAll(0, List(bone.count) { bone }) })
+        rows.add(0, row)
+        episodesBones = row
     }
 
     /**
@@ -530,7 +570,8 @@ class DetailsActivity : TvActivity() {
         }
         episodesNote?.let { return (it.adapter as ArrayObjectAdapter).replace(0, card) }
         val note = ListRow(HeaderItem(rowIds++, getString(R.string.episodes_failed)), ArrayObjectAdapter(EpisodesNotePresenter()).apply { add(card) })
-        rows.add(0, note)
+        if (episodesBones != null) rows.replace(0, note) else rows.add(0, note)
+        episodesBones = null
         episodesNote = note
     }
 
